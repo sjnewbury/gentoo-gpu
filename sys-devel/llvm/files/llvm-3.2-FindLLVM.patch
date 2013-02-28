@@ -1,0 +1,63 @@
+--- /dev/null	2013-02-28 05:21:29.044915051 +0000
++++ cmake/modules/FindLLVM.cmake	2013-02-28 14:24:36.305067440 +0000
+@@ -0,0 +1,60 @@
++# - Find LLVM
++# Find the native LLVM includes and library
++#
++#  LLVM_DIR		- This directory!
++#  LLVM_CFLAGS		- CFLAGS needed to build against LLVM
++#  LLVM_LFLAGS		- LDFLAGS needed when linking LLVM.
++#  LLVM_JIT_LIBS	- List of libraries when using LLVM JIT.
++#  LLVM_ALL_LIBS	- List of libraries when using LLVM.
++#  LLVM_LIBRARY_DIRS	- Path to LLVM libraries.
++#  LLVM_INCLUDE_DIRS	- Path to LLVM includes.
++#  LLVM_FOUND		- True LLVM found.
++set(LLVM_DIR "${CMAKE_ROOT}/Modules")
++
++# Clear return values in case the module is loaded more than once.
++set(LLVM_CFLAGS "")
++set(LLVM_LFLAGS "")
++set(LLVM_JIT_LIBS "")
++set(LLVM_ALL_LIBS "")
++set(LLVM_FOUND FALSE)
++
++find_program(LLVM_CONFIG_EXECUTABLE NAMES "${LLVM_PATH}/bin/llvm-config" DOC "llvm-config executable")
++
++if(LLVM_CONFIG_EXECUTABLE)
++	message(STATUS "Found llvm-config: ${LLVM_CONFIG_EXECUTABLE}")
++	set(LLVM_FOUND TRUE)
++endif(LLVM_CONFIG_EXECUTABLE)
++
++execute_process(
++	COMMAND ${LLVM_CONFIG_EXECUTABLE} --cppflags
++	OUTPUT_VARIABLE LLVM_CFLAGS
++	OUTPUT_STRIP_TRAILING_WHITESPACE
++)
++
++execute_process(
++	COMMAND ${LLVM_CONFIG_EXECUTABLE} --ldflags
++	OUTPUT_VARIABLE LLVM_LFLAGS
++	OUTPUT_STRIP_TRAILING_WHITESPACE
++)
++execute_process(
++	COMMAND ${LLVM_CONFIG_EXECUTABLE} --libs core jit native linker bitreader bitwriter ipo
++	OUTPUT_VARIABLE LLVM_JIT_LIBS
++	OUTPUT_STRIP_TRAILING_WHITESPACE
++)
++execute_process(
++	COMMAND ${LLVM_CONFIG_EXECUTABLE} --libs all
++	OUTPUT_VARIABLE LLVM_ALL_LIBS
++	OUTPUT_STRIP_TRAILING_WHITESPACE
++)
++execute_process(
++	COMMAND ${LLVM_CONFIG_EXECUTABLE} --libdir
++	OUTPUT_VARIABLE LLVM_LIBRARY_DIRS
++	OUTPUT_STRIP_TRAILING_WHITESPACE
++)
++execute_process(
++	COMMAND ${LLVM_CONFIG_EXECUTABLE} --includedir
++	OUTPUT_VARIABLE LLVM_INCLUDE_DIRS
++	OUTPUT_STRIP_TRAILING_WHITESPACE
++)
++message("llvm jit libs: " ${LLVM_JIT_LIBS})
++message("llvm all libs: " ${LLVM_ALL_LIBS})

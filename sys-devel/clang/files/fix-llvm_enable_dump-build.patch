@@ -1,0 +1,34 @@
+--- llvm/lib/Transforms/Scalar/SROA.cpp~	2012-11-07 08:13:13.000000000 +0000
++++ llvm/lib/Transforms/Scalar/SROA.cpp	2012-11-07 08:26:50.551330794 +0000
+@@ -334,7 +334,7 @@
+   class UseBuilder;
+   friend class AllocaPartitioning::UseBuilder;
+ 
+-#ifndef NDEBUG
++#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+   /// \brief Handle to alloca instruction to simplify method interfaces.
+   AllocaInst &AI;
+ #endif
+@@ -1115,7 +1115,7 @@
+ 
+ AllocaPartitioning::AllocaPartitioning(const DataLayout &TD, AllocaInst &AI)
+     :
+-#ifndef NDEBUG
++#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+       AI(AI),
+ #endif
+       PointerEscapingInstr(0) {
+--- llvm/lib/Target/AMDGPU/AMDGPUAsmPrinter.cpp~	2012-11-07 08:49:38.000000000 +0000
++++ llvm/lib/Target/AMDGPU/AMDGPUAsmPrinter.cpp	2012-11-07 10:01:34.677920009 +0000
+@@ -39,9 +39,11 @@
+ /// the call to EmitFunctionHeader(), which the MCPureStreamer can't handle.
+ bool AMDGPUAsmPrinter::runOnMachineFunction(MachineFunction &MF) {
+   const AMDGPUSubtarget &STM = TM.getSubtarget<AMDGPUSubtarget>();
++#ifdef LLVM_ENABLE_DUMP
+   if (STM.dumpCode()) {
+     MF.dump();
+   }
++#endif
+   SetupMachineFunction(MF);
+   OutStreamer.SwitchSection(getObjFileLowering().getTextSection());
+   if (STM.device()->getGeneration() > AMDGPUDeviceInfo::HD6XXX) {

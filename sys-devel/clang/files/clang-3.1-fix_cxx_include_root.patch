@@ -1,0 +1,21 @@
+Bug #387309
+
+--- llvm/tools/clang/lib/Driver/ToolChains.cpp.orig	2011-11-09 23:10:04.000000000 +0100
++++ llvm/tools/clang/lib/Driver/ToolChains.cpp	2011-11-09 23:11:04.000000000 +0100
+@@ -1586,12 +1586,13 @@
+     // This is of the form /foo/bar/include/c++/4.5.2/
+     if (CxxIncludeRoot.back() == '/')
+       llvm::sys::path::remove_filename(CxxIncludeRoot); // remove the /
++    llvm::sys::path::remove_filename(CxxIncludeRoot); // remove the g++-v4
++    llvm::sys::path::remove_filename(CxxIncludeRoot); // remove the include
+     StringRef Version = llvm::sys::path::filename(CxxIncludeRoot);
+     llvm::sys::path::remove_filename(CxxIncludeRoot); // remove the version
+-    llvm::sys::path::remove_filename(CxxIncludeRoot); // remove the c++
+-    llvm::sys::path::remove_filename(CxxIncludeRoot); // remove the include
++    llvm::sys::path::remove_filename(CxxIncludeRoot); // remove the ARCH
+     GCCInstallPath = CxxIncludeRoot.str();
+-    GCCInstallPath.append("/lib/gcc/");
++    GCCInstallPath.append("/");
+     GCCInstallPath.append(CXX_INCLUDE_ARCH);
+     GCCInstallPath.append("/");
+     GCCInstallPath.append(Version);

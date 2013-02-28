@@ -1,0 +1,67 @@
+From b2ec8e889fa9005cd9a6a81116171083f709e769 Mon Sep 17 00:00:00 2001
+From: Tom Stellard <thomas.stellard@amd.com>
+Date: Mon, 26 Nov 2012 21:18:19 +0000
+Subject: [PATCH] XXX: Hacks for R600 rename
+
+---
+ configure.ac                                    | 12 ++++++------
+ src/gallium/drivers/radeon/radeon_llvm_emit.cpp |  7 +++++++
+ 2 files changed, 13 insertions(+), 6 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index 228f464..b848503 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -1784,20 +1784,20 @@ radeon_llvm_check() {
+     LLVM_AVAILABLE_VERSION_MAJOR=`echo $LLVM_VERSION | cut -d. -f1`
+     LLVM_AVAILABLE_VERSION_MINOR=`echo $LLVM_VERSION | cut -d. -f2`
+     if test "$LLVM_AVAILABLE_VERSION_MAJOR" -lt "$LLVM_REQUIRED_VERSION_MAJOR" -o [ "$LLVM_AVAILABLE_VERSION_MAJOR" -eq "$LLVM_REQUIRED_VERSION_MAJOR" -a "$LLVM_AVAILABLE_VERSION_MINOR" -lt "$LLVM_REQUIRED_VERSION_MINOR" ] ; then
+-        AC_MSG_ERROR([LLVM $LLVM_REQUIRED_VERSION_MAJOR.$LLVM_REQUIRED_VERSION_MINOR or newer with AMDGPU target enabled is required.
++        AC_MSG_ERROR([LLVM $LLVM_REQUIRED_VERSION_MAJOR.$LLVM_REQUIRED_VERSION_MINOR or newer with R600 target enabled is required.
+                      To use the r600/radeonsi LLVM backend, you need to fetch the LLVM source from:
+                      git://people.freedesktop.org/~tstellar/llvm master
+-                     and build with --enable-experimental-targets=AMDGPU])
++                     and build with --enable-experimental-targets=R600])
+     fi
+-    if test true && $LLVM_CONFIG --targets-built | grep -qv '\<AMDGPU\>' ; then
+-        AC_MSG_ERROR([LLVM AMDGPU Target not enabled.
++    if test true && $LLVM_CONFIG --targets-built | grep -qv '\<R600\>' ; then
++        AC_MSG_ERROR([LLVM R600 Target not enabled.
+                       To use the r600/radeonsi LLVM backend, you need to fetch the LLVM source from:
+                       git://people.freedesktop.org/~tstellar/llvm master
+-                      and build with --enable-experimental-targets=AMDGPU])
++                      and build with --enable-experimental-targets=R600])
+     fi
+     AC_MSG_WARN([Please ensure you use the latest llvm tree from git://people.freedesktop.org/~tstellar/llvm master before submitting a bug])
+     if test "x$LLVM_VERSION" = "x3.2"; then
+-        LLVM_LIBS="$LLVM_LIBS `$LLVM_CONFIG --libs amdgpu`"
++        LLVM_LIBS="$LLVM_LIBS `$LLVM_CONFIG --libs R600`"
+     fi
+ }
+ 
+diff --git a/src/gallium/drivers/radeon/radeon_llvm_emit.cpp b/src/gallium/drivers/radeon/radeon_llvm_emit.cpp
+index 21661a0..9914228 100644
+--- a/src/gallium/drivers/radeon/radeon_llvm_emit.cpp
++++ b/src/gallium/drivers/radeon/radeon_llvm_emit.cpp
+@@ -89,11 +89,18 @@ radeon_llvm_compile(LLVMModuleRef M, unsigned char ** bytes,
+ 
+    Triple AMDGPUTriple(sys::getDefaultTargetTriple());
+ 
++#if 0
+    LLVMInitializeAMDGPUTargetInfo();
+    LLVMInitializeAMDGPUTarget();
+    LLVMInitializeAMDGPUTargetMC();
+    LLVMInitializeAMDGPUAsmPrinter();
++#else
++   LLVMInitializeR600TargetInfo();
++   LLVMInitializeR600Target();
++   LLVMInitializeR600TargetMC();
++   LLVMInitializeR600AsmPrinter();
+ 
++#endif
+    std::string err;
+    const Target * AMDGPUTarget = TargetRegistry::lookupTarget("r600", err);
+    if(!AMDGPUTarget) {
+-- 
+1.7.11.4
+

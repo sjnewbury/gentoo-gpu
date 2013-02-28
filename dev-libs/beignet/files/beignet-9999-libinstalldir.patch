@@ -1,0 +1,19 @@
+--- backend/src/CMakeLists.txt~	2013-02-28 12:24:15.000000000 +0000
++++ backend/src/CMakeLists.txt	2013-02-28 12:35:40.892924356 +0000
+@@ -112,6 +112,6 @@
+   ${LLVM_LFLAGS}
+ )
+ 
+-install (TARGETS gbe LIBRARY DESTINATION lib)
++install (TARGETS gbe LIBRARY DESTINATION ${LIB_INSTALL_DIR})
+ install (FILES backend/program.h DESTINATION include/gen)
+ 
+--- src/CMakeLists.txt~	2013-02-28 12:24:14.000000000 +0000
++++ src/CMakeLists.txt	2013-02-28 12:35:41.666915080 +0000
+@@ -36,5 +36,5 @@
+                       ${XFIXES_LIBRARY}
+                       ${DRM_INTEL_LIBRARY}
+                       ${DRM_LIBRARY})
+-install (TARGETS cl LIBRARY DESTINATION lib)
++install (TARGETS cl LIBRARY DESTINATION ${LIB_INSTALL_DIR})
+ 

@@ -1,0 +1,36 @@
+--- src/glsl/builtin_compiler/Makefile.am~	2013-01-23 11:21:17.000000000 +0000
++++ src/glsl/builtin_compiler/Makefile.am	2013-01-23 11:26:12.493238132 +0000
+@@ -20,6 +20,7 @@
+ # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ # IN THE SOFTWARE.
+ 
++if CROSS_COMPILING
+ CC = @CC_FOR_BUILD@
+ CFLAGS = @CFLAGS_FOR_BUILD@
+ CPP = @CPP_FOR_BUILD@
+@@ -37,6 +38,25 @@
+ 	-I $(GLSL_SRCDIR)/glcpp \
+ 	-I $(GLSL_BUILDDIR) \
+ 	$(DEFINES_FOR_BUILD)
++else
++CC = @CC@
++CFLAGS = @CFLAGS@
++CPP = @CPP@
++CPPFLAGS = @CPPFLAGS@
++CXX = @CXX@
++CXXFLAGS = @CXXFLAGS@
++LD = @LD@
++LDFLAGS = @LDFLAGS@
++
++AM_CFLAGS = \
++	-I $(top_srcdir)/include \
++	-I $(top_srcdir)/src/mapi \
++	-I $(top_srcdir)/src/mesa \
++	-I $(GLSL_SRCDIR) \
++	-I $(GLSL_SRCDIR)/glcpp \
++	-I $(GLSL_BUILDDIR) \
++	$(DEFINES)
++endif
+ 
+ AM_CXXFLAGS = $(AM_CFLAGS)
+ 
