@@ -1,0 +1,20 @@
+--- configure.py~	2013-04-19 15:47:21.000000000 +0100
++++ configure.py	2013-04-19 15:48:00.010702074 +0100
+@@ -69,7 +69,7 @@
+ llvm_opt = os.path.join(llvm_bindir, 'opt')
+ 
+ available_targets = {
+-  'r600--' : { 'devices' :
++  'r600-amd-none' : { 'devices' :
+                [{'gpu' : 'cedar',   'aliases' : ['palm', 'sumo', 'sumo2', 'redwood', 'juniper']},
+                 {'gpu' : 'cypress', 'aliases' : ['hemlock']},
+                 {'gpu' : 'barts',   'aliases' : ['turks', 'caicos']},
+@@ -77,7 +77,7 @@
+                 {'gpu' : 'tahiti',  'aliases' : ['pitcairn', 'verde', 'oland']}]}
+ }
+ 
+-default_targets = ['r600--']
++default_targets = ['r600-amd-none']
+ 
+ targets = args
+ if not targets:

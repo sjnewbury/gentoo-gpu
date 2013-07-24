@@ -1,0 +1,28 @@
+--- configure.py.orig	2013-01-09 15:09:05.732172164 +0000
++++ configure.py	2013-01-09 15:33:52.135271212 +0000
+@@ -11,7 +11,11 @@
+ from optparse import OptionParser
+ import os
+ from subprocess import *
+-import sys
++import sys, platform
++
++system_libdir = 'lib'
++if platform.machine() in ('x86_64',):
++    system_libdir = 'lib64'
+ 
+ srcdir = os.path.dirname(sys.argv[0])
+ 
+@@ -164,11 +168,10 @@
+   b.build(builtins_link_bc, "LLVM_LINK", objects)
+   b.build(builtins_opt_bc, "OPT", builtins_link_bc)
+   b.build(builtins_bc, "PREPARE_BUILTINS", builtins_opt_bc, prepare_builtins)
+-  install_files_bc.append((builtins_bc, builtins_bc))
++  install_files_bc.append((builtins_bc, '%s/clc/%s' % (system_libdir, target)))
+   install_deps.append(builtins_bc)
+   b.default(builtins_bc)
+ 
+-
+ install_cmd = ' && '.join(['mkdir -p $(DESTDIR)/%(dst)s && cp -r %(src)s $(DESTDIR)/%(dst)s' % 
+                            {'src': file,
+                             'dst': libexecdir}
