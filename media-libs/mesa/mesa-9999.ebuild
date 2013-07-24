@@ -61,8 +61,7 @@ REQUIRED_USE="
 	vdpau? ( g3dvl )
 	r600-llvm-compiler? ( gallium llvm || ( video_cards_r600 video_cards_radeon ) )
 	xa?  ( gallium )
-	xorg?  ( gallium )
-	xvmc?  ( g3dvl )
+	xvmc?  ( || ( g3dvl classic ) )
 	video_cards_intel?  ( || ( classic gallium ) )
 	video_cards_i915?   ( || ( classic gallium ) )
 	video_cards_i965?   ( classic )
@@ -75,6 +74,7 @@ REQUIRED_USE="
 	video_cards_radeonsi?   ( gallium llvm )
 	video_cards_vmware? ( gallium )
 "
+#	xorg?  ( gallium ) huh?
 
 LIBDRM_DEPSTRING=">=x11-libs/libdrm-2.4.40"
 # keep correct libdrm and dri2proto dep
@@ -86,7 +86,7 @@ RDEPEND="
 	gallium? ( app-admin/eselect-mesa )
 	>=app-admin/eselect-opengl-1.2.6
 	dev-libs/expat
-	gbm? ( sys-fs/udev )
+	gbm? ( virtual/udev )
 	>=x11-libs/libX11-1.3.99.901
 	x11-libs/libXdamage
 	x11-libs/libXext
@@ -142,9 +142,9 @@ DEPEND="${RDEPEND}
 
 S="${WORKDIR}/${MY_P}"
 
-PATCHES=(
-		"${FILESDIR}/0002-radeong-opencl-rename-target-from-r600-to-r600-amd-n.patch"
-		)
+#PATCHES=(
+#		"${FILESDIR}/0002-radeong-opencl-rename-target-from-r600-to-r600-amd-n.patch"
+#		)
 #		"${FILESDIR}/0001-XXX-Hacks-for-R600-rename.patch"
 
 # It is slow without texrels, if someone wants slow
@@ -175,7 +175,7 @@ src_prepare() {
 	fi
 
 	# relax the requirement that r300 must have llvm, bug 380303
-	epatch "${FILESDIR}"/${P}-dont-require-llvm-for-r300.patch
+	#epatch "${FILESDIR}"/${P}-dont-require-llvm-for-r300.patch
 
 	# fix for hardened pax_kernel, bug 240956
 	[[ ${PV} != 9999* ]] && epatch "${FILESDIR}"/glx_ro_text_segm.patch
@@ -337,7 +337,7 @@ src_install() {
 			ebegin "Symlinking Gallium/Clover OpenCL library for dynamic switching"
 			dodir /usr/$(get_libdir)/OpenCL/vendors
 			ln -s "${ED}"/usr/$(get_libdir)/opengl/${OPENGL_DIR}/lib \
-				"${ED}"/usr/$(get_libdir)/OpenCL/vendors/gallium
+				"${ED}"/usr/$(get_libdir)/OpenCL/vendors/mesa
 			eend $?
 	fi
 
