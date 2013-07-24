@@ -1,0 +1,259 @@
+--- ./tools/clang/include/clang/Driver/Options.td.orig	2013-05-16 21:51:51.286129820 +0000
++++ ./tools/clang/include/clang/Driver/Options.td	2013-05-16 21:53:24.875004239 +0000
+@@ -841,6 +841,7 @@
+   HelpText<"Enable hexagon-qdsp6 backward compatibility">;
+ def m3dnowa : Flag<["-"], "m3dnowa">, Group<m_x86_Features_Group>;
+ def m3dnow : Flag<["-"], "m3dnow">, Group<m_x86_Features_Group>;
++def mx32 : Flag<["-"], "mx32">, Group<m_Group>, Flags<[DriverOption]>;
+ def m64 : Flag<["-"], "m64">, Group<m_Group>, Flags<[DriverOption]>;
+ def mabi_EQ : Joined<["-"], "mabi=">, Group<m_Group>;
+ def march_EQ : Joined<["-"], "march=">, Group<m_Group>;
+--- ./tools/clang/lib/Basic/Targets.cpp.orig	2013-05-16 21:24:45.877787999 +0000
++++ ./tools/clang/lib/Basic/Targets.cpp	2013-05-17 06:02:10.853886837 +0000
+@@ -2510,6 +2510,14 @@
+     Builder.defineMacro("__amd64");
+     Builder.defineMacro("__x86_64");
+     Builder.defineMacro("__x86_64__");
++    if (PointerWidth == 64 && getLongWidth() == 64) {
++       Builder.defineMacro("_LP64");
++       Builder.defineMacro("__LP64__");
++    } else if (PointerWidth == 32 && getLongWidth() == 32 &&
++               getIntWidth() == 32) {
++       Builder.defineMacro("_ILP32");
++       Builder.defineMacro("__ILP32__");
++    }
+   } else {
+     DefineStd(Builder, "i386", Opts);
+   }
+@@ -3144,20 +3152,31 @@
+ class X86_64TargetInfo : public X86TargetInfo {
+ public:
+   X86_64TargetInfo(const std::string &triple) : X86TargetInfo(triple) {
+-    LongWidth = LongAlign = PointerWidth = PointerAlign = 64;
++    const bool IsX32 = (getTriple().getEnvironment() == llvm::Triple::GNUX32);
++    LongWidth = LongAlign = PointerWidth = PointerAlign = IsX32 ? 32 : 64;
+     LongDoubleWidth = 128;
+     LongDoubleAlign = 128;
+     LargeArrayMinWidth = 128;
+     LargeArrayAlign = 128;
+     SuitableAlign = 128;
+-    IntMaxType = SignedLong;
+-    UIntMaxType = UnsignedLong;
+-    Int64Type = SignedLong;
++    if (IsX32) {
++      SizeType = UnsignedInt;
++      PtrDiffType = SignedInt;
++      IntPtrType = SignedInt;
++    } else {
++      IntMaxType = SignedLong;
++      UIntMaxType = UnsignedLong;
++      Int64Type = SignedLong;
++    }
+     RegParmMax = 6;
+ 
+-    DescriptionString = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-"
+-                        "i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:128:128-"
+-                        "a0:0:64-s0:64:64-f80:128:128-n8:16:32:64-S128";
++    DescriptionString = IsX32 ?
++      "e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-"
++      "i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:128:128-"
++      "a0:0:64-s0:64:64-f80:128:128-n8:16:32:64-S128" :
++      "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-"
++      "i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:128:128-"
++      "a0:0:64-s0:64:64-f80:128:128-n8:16:32:64-S128";
+ 
+     // Use fpret only for long double.
+     RealTypeUsesObjCFPRet = (1 << TargetInfo::LongDouble);
+--- ./tools/clang/lib/Driver/ToolChains.cpp.orig	2013-05-20 06:47:31.333527441 +0000
++++ ./tools/clang/lib/Driver/ToolChains.cpp	2013-05-20 06:45:59.164672007 +0000
+@@ -1008,7 +1008,6 @@
+   llvm::Triple MultiarchTriple
+     = TargetTriple.isArch32Bit() ? TargetTriple.get64BitArchVariant()
+                                  : TargetTriple.get32BitArchVariant();
+-  llvm::Triple::ArchType TargetArch = TargetTriple.getArch();
+   // The library directories which may contain GCC installations.
+   SmallVector<StringRef, 4> CandidateLibDirs, CandidateMultiarchLibDirs;
+   // The compatible GCC triples for this particular architecture.
+@@ -1046,7 +1045,7 @@
+       if (!llvm::sys::fs::exists(LibDir))
+         continue;
+       for (unsigned k = 0, ke = CandidateTripleAliases.size(); k < ke; ++k)
+-        ScanLibDirForGCCTriple(TargetArch, Args, LibDir,
++        ScanLibDirForGCCTriple(TargetTriple, Args, LibDir,
+                                CandidateTripleAliases[k]);
+     }
+     for (unsigned j = 0, je = CandidateMultiarchLibDirs.size(); j < je; ++j) {
+@@ -1056,7 +1055,7 @@
+         continue;
+       for (unsigned k = 0, ke = CandidateMultiarchTripleAliases.size(); k < ke;
+            ++k)
+-        ScanLibDirForGCCTriple(TargetArch, Args, LibDir,
++        ScanLibDirForGCCTriple(TargetTriple, Args, LibDir,
+                                CandidateMultiarchTripleAliases[k],
+                                /*NeedsMultiarchSuffix=*/true);
+     }
+@@ -1101,6 +1100,14 @@
+     "x86_64-linux-gnu",
+     "x86_64-slackware-linux"
+   };
++  static const char *const GNUX32LibDirs[] = { "/libx32" };
++  static const char *const GNUX32Triples[] = {
++    "x86_64-linux-gnux32",
++    "x86_64-unknown-linux-gnux32",
++    "x86_64-pc-linux-gnux32",
++    "x86_64-manbo-linux-gnux32",
++    "x86_64-linux-gnux32",
++  };
+   static const char *const X86LibDirs[] = { "/lib32", "/lib" };
+   static const char *const X86Triples[] = {
+     "i686-linux-gnu",
+@@ -1178,20 +1185,43 @@
+     }
+     break;
+   case llvm::Triple::x86_64:
+-    LibDirs.append(
+-      X86_64LibDirs, X86_64LibDirs + llvm::array_lengthof(X86_64LibDirs));
+-    TripleAliases.append(
+-      X86_64Triples, X86_64Triples + llvm::array_lengthof(X86_64Triples));
+-    MultiarchLibDirs.append(
+-      X86LibDirs, X86LibDirs + llvm::array_lengthof(X86LibDirs));
+-    MultiarchTripleAliases.append(
+-      X86Triples, X86Triples + llvm::array_lengthof(X86Triples));
++    if (TargetTriple.getEnvironment() == llvm::Triple::GNUX32) {
++      LibDirs.append(
++        GNUX32LibDirs, X86_64LibDirs + llvm::array_lengthof(GNUX32LibDirs));
++      TripleAliases.append(
++        GNUX32Triples, GNUX32Triples + llvm::array_lengthof(GNUX32Triples));
++      MultiarchLibDirs.append(
++        X86_64LibDirs, X86_64LibDirs + llvm::array_lengthof(X86_64LibDirs));
++      MultiarchTripleAliases.append(
++        X86_64Triples, X86Triples + llvm::array_lengthof(X86_64Triples));
++      MultiarchLibDirs.append(
++        X86LibDirs, X86LibDirs + llvm::array_lengthof(X86LibDirs));
++      MultiarchTripleAliases.append(
++        X86Triples, X86Triples + llvm::array_lengthof(X86Triples));
++    } else {
++      LibDirs.append(
++        X86_64LibDirs, X86_64LibDirs + llvm::array_lengthof(X86_64LibDirs));
++      TripleAliases.append(
++        X86_64Triples, X86_64Triples + llvm::array_lengthof(X86_64Triples));
++      MultiarchLibDirs.append(
++        GNUX32LibDirs, X86LibDirs + llvm::array_lengthof(GNUX32LibDirs));
++      MultiarchTripleAliases.append(
++        GNUX32Triples, X86Triples + llvm::array_lengthof(GNUX32Triples));
++      MultiarchLibDirs.append(
++        X86LibDirs, X86LibDirs + llvm::array_lengthof(X86LibDirs));
++      MultiarchTripleAliases.append(
++        X86Triples, X86Triples + llvm::array_lengthof(X86Triples));
++    }
+     break;
+   case llvm::Triple::x86:
+     LibDirs.append(X86LibDirs, X86LibDirs + llvm::array_lengthof(X86LibDirs));
+     TripleAliases.append(
+       X86Triples, X86Triples + llvm::array_lengthof(X86Triples));
+     MultiarchLibDirs.append(
++      GNUX32LibDirs, X86LibDirs + llvm::array_lengthof(GNUX32LibDirs));
++    MultiarchTripleAliases.append(
++      GNUX32Triples, X86Triples + llvm::array_lengthof(GNUX32Triples));
++    MultiarchLibDirs.append(
+       X86_64LibDirs, X86_64LibDirs + llvm::array_lengthof(X86_64LibDirs));
+     MultiarchTripleAliases.append(
+       X86_64Triples, X86_64Triples + llvm::array_lengthof(X86_64Triples));
+@@ -1340,6 +1370,7 @@
+ 
+ static bool findTargetMultiarchSuffix(std::string &Suffix,
+                                       StringRef Path,
++                                      llvm::Triple TargetTriple,
+                                       llvm::Triple::ArchType TargetArch,
+                                       const ArgList &Args) {
+   if (isMipsArch(TargetArch)) {
+@@ -1367,6 +1398,8 @@
+       TargetArch == llvm::Triple::ppc64 ||
+       TargetArch == llvm::Triple::systemz)
+     Suffix = "/64";
++  else if (TargetTriple.getEnvironment() == llvm::Triple::GNUX32)
++      Suffix = "/x32";
+   else
+     Suffix = "/32";
+ 
+@@ -1374,9 +1407,10 @@
+ }
+ 
+ void Generic_GCC::GCCInstallationDetector::ScanLibDirForGCCTriple(
+-    llvm::Triple::ArchType TargetArch, const ArgList &Args,
++    llvm::Triple TargetTriple, const ArgList &Args,
+     const std::string &LibDir,
+     StringRef CandidateTriple, bool NeedsMultiarchSuffix) {
++  llvm::Triple::ArchType TargetArch = TargetTriple.getArch();
+   // There are various different suffixes involving the triple we
+   // check for. We also record what is necessary to walk from each back
+   // up to the lib directory.
+@@ -1425,7 +1459,7 @@
+ 
+       std::string MultiarchSuffix;
+       if (findTargetMultiarchSuffix(MultiarchSuffix,
+-                                    LI->path(), TargetArch, Args)) {
++                                    LI->path(), TargetTriple, TargetArch, Args)) {
+         GCCMultiarchSuffix = MultiarchSuffix;
+       } else {
+         if (NeedsMultiarchSuffix ||
+@@ -2197,8 +2231,9 @@
+ 
+ static StringRef getMultilibDir(const llvm::Triple &Triple,
+                                 const ArgList &Args) {
++  const bool IsX32 = Triple.getEnvironment() == llvm::Triple::GNUX32;
+   if (!isMipsArch(Triple.getArch()))
+-    return Triple.isArch32Bit() ? "lib32" : "lib64";
++    return Triple.isArch32Bit() ? "lib32" : IsX32 ? "libx32" : "lib64";
+ 
+   // lib32 directory has a special meaning on MIPS targets.
+   // It contains N32 ABI binaries. Use this folder if produce
+--- ./tools/clang/lib/Driver/ToolChains.h.orig	2013-05-16 21:51:51.439466769 +0000
++++ ./tools/clang/lib/Driver/ToolChains.h	2013-05-17 07:18:41.778609316 +0000
+@@ -108,7 +108,7 @@
+       SmallVectorImpl<StringRef> &MultiarchLibDirs,
+       SmallVectorImpl<StringRef> &MultiarchTripleAliases);
+ 
+-    void ScanLibDirForGCCTriple(llvm::Triple::ArchType TargetArch,
++    void ScanLibDirForGCCTriple(llvm::Triple TargetTriple,
+                                 const ArgList &Args,
+                                 const std::string &LibDir,
+                                 StringRef CandidateTriple,
+--- ./tools/clang/lib/Driver/Tools.cpp.orig	2013-05-16 21:24:47.061149245 +0000
++++ ./tools/clang/lib/Driver/Tools.cpp	2013-05-17 07:20:25.484430520 +0000
+@@ -5948,7 +5948,7 @@
+   else if (ToolChain.getArch() == llvm::Triple::aarch64)
+     CmdArgs.push_back("aarch64linux");
+   else if (ToolChain.getArch() == llvm::Triple::arm
+-           ||  ToolChain.getArch() == llvm::Triple::thumb)
++           || ToolChain.getArch() == llvm::Triple::thumb)
+     CmdArgs.push_back("armelf_linux_eabi");
+   else if (ToolChain.getArch() == llvm::Triple::ppc)
+     CmdArgs.push_back("elf32ppclinux");
+@@ -5972,8 +5972,12 @@
+   }
+   else if (ToolChain.getArch() == llvm::Triple::systemz)
+     CmdArgs.push_back("elf64_s390");
+-  else
+-    CmdArgs.push_back("elf_x86_64");
++  else if (ToolChain.getArch() == llvm::Triple::x86_64)
++    CmdArgs.push_back(ToolChain.getTriple().getEnvironment() ==
++                      llvm::Triple::GNUX32
++                      ? "elf32_x86_64" : "elf_x86_64");
++   else
++    llvm_unreachable("unknown arch");
+ 
+   if (Args.hasArg(options::OPT_static)) {
+     if (ToolChain.getArch() == llvm::Triple::arm
+@@ -6022,7 +6026,10 @@
+ 	     ToolChain.getArch() == llvm::Triple::systemz)
+       CmdArgs.push_back("/lib64/ld64.so.1");
+     else
+-      CmdArgs.push_back("/lib64/ld-linux-x86-64.so.2");
++      CmdArgs.push_back(ToolChain.getTriple().getEnvironment() ==
++                        llvm::Triple::GNUX32
++                        ? "/libx32/ld-linux-x32.so.2"
++                        : "/lib64/ld-linux-x86-64.so.2");
+   }
+ 
+   CmdArgs.push_back("-o");

@@ -1,0 +1,322 @@
+diff --git llvm.orig/tools/clang/include/clang/Driver/Options.td llvm/tools/clang/include/clang/Driver/Options.td
+index 48f2b1a..dc8f409 100644
+--- llvm.orig/tools/clang/include/clang/Driver/Options.td
++++ llvm/tools/clang/include/clang/Driver/Options.td
+@@ -726,6 +726,7 @@ def mqdsp6_compat : Flag<"-mqdsp6-compat">, Group<m_Group>, Flags<[DriverOption,
+   HelpText<"Enable hexagon-qdsp6 backward compatibility">;
+ def m3dnowa : Flag<"-m3dnowa">, Group<m_x86_Features_Group>;
+ def m3dnow : Flag<"-m3dnow">, Group<m_x86_Features_Group>;
++def mx32 : Flag<"-mx32">, Group<m_Group>, Flags<[DriverOption]>;
+ def m64 : Flag<"-m64">, Group<m_Group>, Flags<[DriverOption]>;
+ def mabi_EQ : Joined<"-mabi=">, Group<m_Group>;
+ def march_EQ : Joined<"-march=">, Group<m_Group>;
+diff --git llvm.orig/tools/clang/lib/Basic/Targets.cpp llvm/tools/clang/lib/Basic/Targets.cpp
+index c4a80dd..22f0c4d 100644
+--- llvm.orig/tools/clang/lib/Basic/Targets.cpp
++++ llvm/tools/clang/lib/Basic/Targets.cpp
+@@ -1435,9 +1435,9 @@ public:
+   virtual bool hasFeature(StringRef Feature) const;
+   virtual void HandleTargetFeatures(std::vector<std::string> &Features);
+   virtual const char* getABI() const {
+-    if (PointerWidth == 64 && SSELevel >= AVX)
++    if (getTriple().getArch() == llvm::Triple::x86_64 && SSELevel >= AVX)
+       return "avx";
+-    else if (PointerWidth == 32 && MMX3DNowLevel == NoMMX3DNow)
++    else if (getTriple().getArch() == llvm::Triple::x86 && MMX3DNowLevel == NoMMX3DNow)
+       return "no-mmx";
+     return "";
+   }
+@@ -1531,7 +1531,7 @@ public:
+     case CK_AthlonMP:
+     case CK_Geode:
+       // Only accept certain architectures when compiling in 32-bit mode.
+-      if (PointerWidth != 32)
++      if (getTriple().getArch() != llvm::Triple::x86)
+         return false;
+ 
+       // Fallthrough
+@@ -1587,7 +1587,7 @@ void X86TargetInfo::getDefaultFeatures(llvm::StringMap<bool> &Features) const {
+   // FIXME: This *really* should not be here.
+ 
+   // X86_64 always has SSE2.
+-  if (PointerWidth == 64)
++  if (getTriple().getArch() == llvm::Triple::x86_64)
+     Features["sse2"] = Features["sse"] = Features["mmx"] = true;
+ 
+   switch (CPU) {
+@@ -1929,10 +1929,14 @@ void X86TargetInfo::HandleTargetFeatures(std::vector<std::string> &Features) {
+ void X86TargetInfo::getTargetDefines(const LangOptions &Opts,
+                                      MacroBuilder &Builder) const {
+   // Target identification.
+-  if (PointerWidth == 64) {
+-    if (getLongWidth() == 64) {
++  if (getTriple().getArch() == llvm::Triple::x86_64) {
++    if (PointerWidth == 64 && getLongWidth() == 64) {
+       Builder.defineMacro("_LP64");
+       Builder.defineMacro("__LP64__");
++    } else if (PointerWidth == 32 && getLongWidth() == 32 &&
++               getIntWidth() == 32) {
++      Builder.defineMacro("_ILP32");
++      Builder.defineMacro("__ILP32__");
+     }
+     Builder.defineMacro("__amd64__");
+     Builder.defineMacro("__amd64");
+@@ -2178,8 +2182,8 @@ bool X86TargetInfo::hasFeature(StringRef Feature) const {
+       .Case("sse42", SSELevel >= SSE42)
+       .Case("sse4a", HasSSE4a)
+       .Case("x86", true)
+-      .Case("x86_32", PointerWidth == 32)
+-      .Case("x86_64", PointerWidth == 64)
++      .Case("x86_32", getTriple().getArch() == llvm::Triple::x86)
++      .Case("x86_64", getTriple().getArch() == llvm::Triple::x86_64)
+       .Default(false);
+ }
+ 
+@@ -2508,20 +2512,31 @@ namespace {
+ class X86_64TargetInfo : public X86TargetInfo {
+ public:
+   X86_64TargetInfo(const std::string &triple) : X86TargetInfo(triple) {
+-    LongWidth = LongAlign = PointerWidth = PointerAlign = 64;
++    const bool IsX32 = (getTriple().getEnvironment() == llvm::Triple::X32);
++    LongWidth = LongAlign = PointerWidth = PointerAlign = IsX32 ? 32 : 64;
+     LongDoubleWidth = 128;
+     LongDoubleAlign = 128;
+     LargeArrayMinWidth = 128;
+     LargeArrayAlign = 128;
+     SuitableAlign = 128;
+-    IntMaxType = SignedLong;
+-    UIntMaxType = UnsignedLong;
+-    Int64Type = SignedLong;
++    if (IsX32) {
++      SizeType = UnsignedInt;
++      PtrDiffType = SignedInt;
++      IntPtrType = SignedInt;
++    } else {
++      IntMaxType = SignedLong;
++      UIntMaxType = UnsignedLong;
++      Int64Type = SignedLong;
++    }
+     RegParmMax = 6;
+ 
+-    DescriptionString = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-"
+-                        "i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:128:128-"
+-                        "a0:0:64-s0:64:64-f80:128:128-n8:16:32:64-S128";
++    DescriptionString = IsX32 ?
++      "e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-"
++      "i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:128:128-"
++      "a0:0:64-s0:64:64-f80:128:128-n8:16:32:64-S128" :
++      "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-"
++      "i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:128:128-"
++      "a0:0:64-s0:64:64-f80:128:128-n8:16:32:64-S128";
+ 
+     // Use fpret only for long double.
+     RealTypeUsesObjCFPRet = (1 << TargetInfo::LongDouble);
+diff --git llvm.orig/tools/clang/lib/CodeGen/TargetInfo.cpp llvm/tools/clang/lib/CodeGen/TargetInfo.cpp
+index 357b3fe..b7cb89a 100644
+--- llvm.orig/tools/clang/lib/CodeGen/TargetInfo.cpp
++++ llvm/tools/clang/lib/CodeGen/TargetInfo.cpp
+@@ -949,9 +949,11 @@ class X86_64ABIInfo : public ABIInfo {
+ 
+   bool HasAVX;
+ 
++  bool isX32; // X32 psABI
++
+ public:
+-  X86_64ABIInfo(CodeGen::CodeGenTypes &CGT, bool hasavx) :
+-      ABIInfo(CGT), HasAVX(hasavx) {}
++  X86_64ABIInfo(CodeGen::CodeGenTypes &CGT, bool hasavx, bool IsX32) :
++      ABIInfo(CGT), HasAVX(hasavx), isX32(IsX32) {}
+ 
+   bool isPassedUsingAVXType(QualType type) const {
+     unsigned neededInt, neededSSE;
+@@ -987,8 +989,8 @@ public:
+ 
+ class X86_64TargetCodeGenInfo : public TargetCodeGenInfo {
+ public:
+-  X86_64TargetCodeGenInfo(CodeGen::CodeGenTypes &CGT, bool HasAVX)
+-    : TargetCodeGenInfo(new X86_64ABIInfo(CGT, HasAVX)) {}
++  X86_64TargetCodeGenInfo(CodeGen::CodeGenTypes &CGT, bool HasAVX, bool IsX32)
++    : TargetCodeGenInfo(new X86_64ABIInfo(CGT, HasAVX, IsX32)) {}
+ 
+   const X86_64ABIInfo &getABIInfo() const {
+     return static_cast<const X86_64ABIInfo&>(TargetCodeGenInfo::getABIInfo());
+@@ -1184,7 +1186,7 @@ void X86_64ABIInfo::classify(QualType Ty, uint64_t OffsetBase,
+   }
+ 
+   if (Ty->isMemberPointerType()) {
+-    if (Ty->isMemberFunctionPointerType())
++    if (Ty->isMemberFunctionPointerType() && !isX32)
+       Lo = Hi = Integer;
+     else
+       Current = Integer;
+@@ -1694,7 +1696,7 @@ GetINTEGERTypeAtOffset(llvm::Type *IRType, unsigned IROffset,
+   // returning an 8-byte unit starting with it.  See if we can safely use it.
+   if (IROffset == 0) {
+     // Pointers and int64's always fill the 8-byte unit.
+-    if (isa<llvm::PointerType>(IRType) || IRType->isIntegerTy(64))
++    if ((!isX32 && isa<llvm::PointerType>(IRType)) || IRType->isIntegerTy(64))
+       return IRType;
+ 
+     // If we have a 1/2/4-byte integer, we can use it only if the rest of the
+@@ -1703,9 +1705,12 @@ GetINTEGERTypeAtOffset(llvm::Type *IRType, unsigned IROffset,
+     // struct{double,int,int} because we wouldn't return the second int.  We
+     // have to do this analysis on the source type because we can't depend on
+     // unions being lowered a specific way etc.
+-    if (IRType->isIntegerTy(8) || IRType->isIntegerTy(16) ||
++    if ((isX32 && isa<llvm::PointerType>(IRType)) ||
++        IRType->isIntegerTy(8) || IRType->isIntegerTy(16) ||
+         IRType->isIntegerTy(32)) {
+-      unsigned BitWidth = cast<llvm::IntegerType>(IRType)->getBitWidth();
++      unsigned BitWidth = 32;
++      if (!isa<llvm::PointerType>(IRType))
++        BitWidth = cast<llvm::IntegerType>(IRType)->getBitWidth();
+ 
+       if (BitsContainNoUserData(SourceTy, SourceOffset*8+BitWidth,
+                                 SourceOffset*8+64, getContext()))
+@@ -3752,6 +3757,7 @@ const TargetCodeGenInfo &CodeGenModule::getTargetCodeGenInfo() {
+ 
+   case llvm::Triple::x86_64: {
+     bool HasAVX = strcmp(getContext().getTargetInfo().getABI(), "avx") == 0;
++    bool IsX32 = Triple.getEnvironment() == llvm::Triple::GNUX32;
+ 
+     switch (Triple.getOS()) {
+     case llvm::Triple::Win32:
+@@ -3760,7 +3766,8 @@ const TargetCodeGenInfo &CodeGenModule::getTargetCodeGenInfo() {
+       return *(TheTargetCodeGenInfo = new WinX86_64TargetCodeGenInfo(Types));
+     default:
+       return *(TheTargetCodeGenInfo = new X86_64TargetCodeGenInfo(Types,
+-                                                                  HasAVX));
++                                                                  HasAVX,
++                                                                  IsX32));
+     }
+   }
+   case llvm::Triple::hexagon:
+diff --git llvm.orig/tools/clang/lib/Driver/Driver.cpp llvm/tools/clang/lib/Driver/Driver.cpp
+index 9a73da6..315eee8 100644
+--- llvm.orig/tools/clang/lib/Driver/Driver.cpp
++++ llvm/tools/clang/lib/Driver/Driver.cpp
+@@ -1700,6 +1700,9 @@ static llvm::Triple computeTargetTriple(StringRef DefaultTargetTriple,
+       if (Target.getArch() == llvm::Triple::ppc)
+         Target.setArch(llvm::Triple::ppc64);
+     }
++  } else if (Args.getLastArg(options::OPT_mx32)) {
++    if (Target.getArch() == llvm::Triple::x86_64)
++      Target.setEnvironment(llvm::Triple::X32);
+   }
+ 
+   return Target;
+diff --git llvm.orig/tools/clang/lib/Driver/ToolChains.cpp llvm/tools/clang/lib/Driver/ToolChains.cpp
+index 53b78d2..717ba70 100644
+--- llvm.orig/tools/clang/lib/Driver/ToolChains.cpp
++++ llvm/tools/clang/lib/Driver/ToolChains.cpp
+@@ -1058,7 +1058,6 @@ Generic_GCC::GCCInstallationDetector::GCCInstallationDetector(
+   llvm::Triple MultiarchTriple
+     = TargetTriple.isArch32Bit() ? TargetTriple.get64BitArchVariant()
+                                  : TargetTriple.get32BitArchVariant();
+-  llvm::Triple::ArchType TargetArch = TargetTriple.getArch();
+   // The library directories which may contain GCC installations.
+   SmallVector<StringRef, 4> CandidateLibDirs, CandidateMultiarchLibDirs;
+   // The compatible GCC triples for this particular architecture.
+@@ -1096,7 +1095,7 @@ Generic_GCC::GCCInstallationDetector::GCCInstallationDetector(
+       if (!llvm::sys::fs::exists(LibDir))
+         continue;
+       for (unsigned k = 0, ke = CandidateTripleAliases.size(); k < ke; ++k)
+-        ScanLibDirForGCCTriple(TargetArch, LibDir, CandidateTripleAliases[k]);
++        ScanLibDirForGCCTriple(TargetTriple, LibDir, CandidateTripleAliases[k]);
+     }
+     for (unsigned j = 0, je = CandidateMultiarchLibDirs.size(); j < je; ++j) {
+       const std::string LibDir
+@@ -1105,7 +1104,7 @@ Generic_GCC::GCCInstallationDetector::GCCInstallationDetector(
+         continue;
+       for (unsigned k = 0, ke = CandidateMultiarchTripleAliases.size(); k < ke;
+            ++k)
+-        ScanLibDirForGCCTriple(TargetArch, LibDir,
++        ScanLibDirForGCCTriple(TargetTriple, LibDir,
+                                CandidateMultiarchTripleAliases[k],
+                                /*NeedsMultiarchSuffix=*/true);
+     }
+@@ -1281,8 +1280,9 @@ Generic_GCC::GCCInstallationDetector::GCCInstallationDetector(
+ }
+ 
+ void Generic_GCC::GCCInstallationDetector::ScanLibDirForGCCTriple(
+-    llvm::Triple::ArchType TargetArch, const std::string &LibDir,
++    llvm::Triple TargetTriple, const std::string &LibDir,
+     StringRef CandidateTriple, bool NeedsMultiarchSuffix) {
++  llvm::Triple::ArchType TargetArch = TargetTriple.getArch();
+   // There are various different suffixes involving the triple we
+   // check for. We also record what is necessary to walk from each back
+   // up to the lib directory.
+@@ -1328,6 +1328,8 @@ void Generic_GCC::GCCInstallationDetector::ScanLibDirForGCCTriple(
+            TargetArch == llvm::Triple::ppc64 ||
+            TargetArch == llvm::Triple::mips64 ||
+            TargetArch == llvm::Triple::mips64el) ? "/64" : "/32";
++      if (TargetTriple.getEnvironment() == llvm::Triple::X32)
++        MultiarchSuffix = "/x32";
+       if (llvm::sys::fs::exists(LI->path() + MultiarchSuffix + "/crtbegin.o")) {
+         GCCMultiarchSuffix = MultiarchSuffix.str();
+       } else {
+@@ -2029,7 +2031,8 @@ Linux::Linux(const Driver &D, const llvm::Triple &Triple, const ArgList &Args)
+   // to the link paths.
+   path_list &Paths = getFilePaths();
+ 
+-  const std::string Multilib = Triple.isArch32Bit() ? "lib32" : "lib64";
++  const bool IsX32 = getTriple().getEnvironment() == llvm::Triple::X32;
++  const std::string Multilib = Triple.isArch32Bit() ? "lib32" : IsX32 ? "libx32" : "lib64";
+   const std::string MultiarchTriple = getMultiarchTriple(Triple, SysRoot);
+ 
+   // Add the multilib suffixed paths where they are available.
+diff --git llvm.orig/tools/clang/lib/Driver/ToolChains.h llvm/tools/clang/lib/Driver/ToolChains.h
+index aabf258..28c0822 100644
+--- llvm.orig/tools/clang/lib/Driver/ToolChains.h
++++ llvm/tools/clang/lib/Driver/ToolChains.h
+@@ -110,7 +110,7 @@ protected:
+       SmallVectorImpl<StringRef> &MultiarchLibDirs,
+       SmallVectorImpl<StringRef> &MultiarchTripleAliases);
+ 
+-    void ScanLibDirForGCCTriple(llvm::Triple::ArchType TargetArch,
++    void ScanLibDirForGCCTriple(llvm::Triple TargetTriple,
+                                 const std::string &LibDir,
+                                 StringRef CandidateTriple,
+                                 bool NeedsMultiarchSuffix = false);
+diff --git llvm.orig/tools/clang/lib/Driver/Tools.cpp llvm/tools/clang/lib/Driver/Tools.cpp
+index 9a157ef..f816836 100644
+--- llvm.orig/tools/clang/lib/Driver/Tools.cpp
++++ llvm/tools/clang/lib/Driver/Tools.cpp
+@@ -5248,7 +5248,7 @@ void linuxtools::Link::ConstructJob(Compilation &C, const JobAction &JA,
+   if (ToolChain.getArch() == llvm::Triple::x86)
+     CmdArgs.push_back("elf_i386");
+   else if (ToolChain.getArch() == llvm::Triple::arm
+-           ||  ToolChain.getArch() == llvm::Triple::thumb)
++           || ToolChain.getArch() == llvm::Triple::thumb)
+     CmdArgs.push_back("armelf_linux_eabi");
+   else if (ToolChain.getArch() == llvm::Triple::ppc)
+     CmdArgs.push_back("elf32ppclinux");
+@@ -5262,8 +5262,12 @@ void linuxtools::Link::ConstructJob(Compilation &C, const JobAction &JA,
+     CmdArgs.push_back("elf64btsmip");
+   else if (ToolChain.getArch() == llvm::Triple::mips64el)
+     CmdArgs.push_back("elf64ltsmip");
++  else if (ToolChain.getArch() == llvm::Triple::x86_64)
++    CmdArgs.push_back(ToolChain.getTriple().getEnvironment() ==
++                      llvm::Triple::X32
++                      ? "elf32_x86_64" : "elf_x86_64");
+   else
+-    CmdArgs.push_back("elf_x86_64");
++    llvm_unreachable("unknown arch");
+ 
+   if (Args.hasArg(options::OPT_static)) {
+     if (ToolChain.getArch() == llvm::Triple::arm
+@@ -5302,7 +5306,10 @@ void linuxtools::Link::ConstructJob(Compilation &C, const JobAction &JA,
+     else if (ToolChain.getArch() == llvm::Triple::ppc64)
+       CmdArgs.push_back("/lib64/ld64.so.1");
+     else
+-      CmdArgs.push_back("/lib64/ld-linux-x86-64.so.2");
++      CmdArgs.push_back(ToolChain.getTriple().getEnvironment() ==
++                        llvm::Triple::X32
++                        ? "/libx32/ld-linux-x32.so.2"
++                        : "/lib64/ld-linux-x86-64.so.2");
+   }
+ 
+   CmdArgs.push_back("-o");
+-- 
+1.7.9.5
+

@@ -6,8 +6,9 @@ EAPI=5
 
 PYTHON_COMPAT=( python{2_6,2_7} pypy{1_9,2_0} )
 
-#CLANG_BRANCH=branches/release_32
-CLANG_BRANCH=trunk
+MY_PV=${PV/_pre*}
+CLANG_BRANCH=branches/release_${MY_PV/.}
+#CLANG_BRANCH=trunk
 
 inherit subversion eutils multilib python-r1
 
@@ -30,10 +31,10 @@ S="${WORKDIR}/llvm"
 
 src_unpack() {
 	# Fetching LLVM and subprojects
-	ESVN_PROJECT=llvm subversion_fetch "http://llvm.org/svn/llvm-project/llvm/trunk"
+	ESVN_PROJECT=llvm subversion_fetch "http://llvm.org/svn/llvm-project/llvm/${CLANG_BRANCH}"
 	ESVN_PROJECT=compiler-rt S="${S}"/projects/compiler-rt subversion_fetch "http://llvm.org/svn/llvm-project/compiler-rt/${CLANG_BRANCH}"
 	ESVN_PROJECT=clang S="${S}"/tools/clang subversion_fetch
-
+	
 	#EGIT_PROJECT=llvm EGIT_REPO_URI="git://github.com/llvm-mirror/llvm.git" git-2_src_unpack
 	#ESVN_PROJECT=compiler-rt S="${S}"/projects/compiler-rt subversion_fetch "http://llvm.org/svn/llvm-project/compiler-rt/${CLANG_BRANCH}"
 	#ESVN_PROJECT=clang S="${S}"/tools/clang subversion_fetch
@@ -43,7 +44,7 @@ src_unpack() {
 src_prepare() {
 	# Same as llvm doc patches
 	epatch "${FILESDIR}"/${PN}-2.7-fixdoc.patch
-#	epatch "${FILESDIR}"/${PN}-add-x32-abi.patch
+	epatch "${FILESDIR}"/${PN}-add-x32-abi.patch
 
 	# multilib-strict
 	if [[ ${SYMLINK_LIB} == "yes" ]]; then

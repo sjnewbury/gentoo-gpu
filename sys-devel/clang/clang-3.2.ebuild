@@ -1,59 +1,43 @@
 # Copyright 1999-2013 Gentoo Foundation
 # Distributed under the terms of the GNU General Public License v2
-# $Header: /var/cvsroot/gentoo-x86/sys-devel/clang/clang-9999.ebuild,v 1.35 2013/02/04 08:50:49 mgorny Exp $
+# $Header: /var/cvsroot/gentoo-x86/sys-devel/clang/clang-3.2.ebuild,v 1.5 2013/02/04 08:50:49 mgorny Exp $
 
 EAPI=5
 
 PYTHON_COMPAT=( python{2_6,2_7} pypy{1_9,2_0} )
 
-#CLANG_BRANCH=branches/release_32
-CLANG_BRANCH=trunk
-
-inherit subversion eutils multilib python-r1
+inherit eutils multilib python-r1
 
 DESCRIPTION="C language family frontend for LLVM"
 HOMEPAGE="http://clang.llvm.org/"
-SRC_URI=""
-ESVN_REPO_URI="http://llvm.org/svn/llvm-project/cfe/${CLANG_BRANCH}"
+# Fetching LLVM as well: see http://llvm.org/bugs/show_bug.cgi?id=4840
+SRC_URI="http://llvm.org/releases/${PV}/llvm-${PV}.src.tar.gz
+	http://llvm.org/releases/${PV}/compiler-rt-${PV}.src.tar.gz
+	http://llvm.org/releases/${PV}/${P}.src.tar.gz"
 
 LICENSE="UoI-NCSA"
 SLOT="0"
-KEYWORDS=""
-IUSE="debug multitarget python +static-analyzer test"
+KEYWORDS="~amd64 ~arm ~x86 ~amd64-linux ~x86-linux ~ppc-macos ~x64-macos"
+IUSE="debug kernel_FreeBSD multitarget python +static-analyzer test"
 
 DEPEND="static-analyzer? ( dev-lang/perl )
 	${PYTHON_DEPS}"
 RDEPEND="~sys-devel/llvm-${PV}[debug=,multitarget=]
 	${PYTHON_DEPS}"
 
-S="${WORKDIR}/llvm"
-
-src_unpack() {
-	# Fetching LLVM and subprojects
-	ESVN_PROJECT=llvm subversion_fetch "http://llvm.org/svn/llvm-project/llvm/trunk"
-	ESVN_PROJECT=compiler-rt S="${S}"/projects/compiler-rt subversion_fetch "http://llvm.org/svn/llvm-project/compiler-rt/${CLANG_BRANCH}"
-	ESVN_PROJECT=clang S="${S}"/tools/clang subversion_fetch
-
-	#EGIT_PROJECT=llvm EGIT_REPO_URI="git://github.com/llvm-mirror/llvm.git" git-2_src_unpack
-	#ESVN_PROJECT=compiler-rt S="${S}"/projects/compiler-rt subversion_fetch "http://llvm.org/svn/llvm-project/compiler-rt/${CLANG_BRANCH}"
-	#ESVN_PROJECT=clang S="${S}"/tools/clang subversion_fetch
-
-}
+S=${WORKDIR}/llvm-${PV}.src
 
 src_prepare() {
+	rm -f "${S}"/tools/clang "${S}"/projects/compiler-rt \
+		|| die "symlinks removal failed"
+	mv "${WORKDIR}"/${P}.src "${S}"/tools/clang \
+		|| die "clang source directory move failed"
+	mv "${WORKDIR}"/compiler-rt-${PV}.src "${S}"/projects/compiler-rt \
+		|| die "compiler-rt source directory move failed"
+
 	# Same as llvm doc patches
 	epatch "${FILESDIR}"/${PN}-2.7-fixdoc.patch
-#	epatch "${FILESDIR}"/${PN}-add-x32-abi.patch
 
-	# multilib-strict
-	if [[ ${SYMLINK_LIB} == "yes" ]]; then
-		sed -e "/PROJ_headers/s#lib/clang#$(get_libdir)/clang#" \
-			-i tools/clang/lib/Headers/Makefile \
-			|| die "clang Makefile failed"
-		sed -e "/PROJ_resources/s#lib/clang#$(get_libdir)/clang#" \
-			-i tools/clang/runtime/compiler-rt/Makefile \
-			|| die "compiler-rt Makefile failed"
-	fi
 	# fix the static analyzer for in-tree install
 	sed -e 's/import ScanView/from clang \0/'  \
 		-i tools/clang/tools/scan-view/scan-view \
@@ -72,13 +56,25 @@ src_prepare() {
 		-e 's,^PROJ_etcdir.*,PROJ_etcdir := '"${EPREFIX}"'/etc/llvm,' \
 		-e 's,^PROJ_libdir.*,PROJ_libdir := $(PROJ_prefix)/'$(get_libdir)/llvm, \
 		-i Makefile.config.in || die "Makefile.config sed failed"
+
 	einfo "Fixing rpath and CFLAGS"
 	sed -e 's,\$(RPATH) -Wl\,\$(\(ToolDir\|LibDir\)),$(RPATH) -Wl\,'"${EPREFIX}"/usr/$(get_libdir)/llvm, \
 		-e '/OmitFramePointer/s/-fomit-frame-pointer//' \
 		-i Makefile.rules || die "rpath sed failed"
+
 	# Use system llc (from llvm ebuild) for tests
 	sed -e "/^llc_props =/s/os.path.join(llvm_tools_dir, 'llc')/'llc'/" \
 		-i tools/clang/test/lit.cfg  || die "test path sed failed"
+
+	# Automatically select active system GCC's libraries, bugs #406163 and #417913
+	epatch "${FILESDIR}"/${PN}-3.1-gentoo-runtime-gcc-detection-v3.patch
+
+	# Fix search paths on FreeBSD, bug #409269
+	epatch "${FILESDIR}"/${PN}-3.1-gentoo-freebsd-fix-lib-path.patch
+
+	# Fix regression caused by removal of USE=system-cxx-headers, bug #417541
+	# Needs to be updated for 3.2
+	#epatch "${FILESDIR}"/${PN}-3.1-gentoo-freebsd-fix-cxx-paths-v2.patch
 
 	# User patches
 	epatch_user
@@ -87,7 +83,6 @@ src_prepare() {
 src_configure() {
 	local CONF_FLAGS="--enable-shared
 		--with-optimize-option=
-		--with-default-sysroot=/
 		$(use_enable !debug optimized)
 		$(use_enable debug assertions)
 		$(use_enable debug expensive-checks)"
@@ -194,4 +189,7 @@ src_install() {
 			eend $?
 		done
 	fi
+
+	# Remove unnecessary headers on FreeBSD, bug #417171
+	use kernel_FreeBSD && rm "${ED}"usr/$(get_libdir)/clang/${PV}/include/{arm_neon,std,float,iso,limits,tgmath,varargs}*.h
 }
