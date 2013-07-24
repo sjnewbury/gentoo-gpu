@@ -1,33 +1,38 @@
-# Copyright 1999-2012 Gentoo Foundation
+# Copyright 1999-2013 Gentoo Foundation
 # Distributed under the terms of the GNU General Public License v2
-# $Header: /var/cvsroot/gentoo-x86/sys-devel/llvm/llvm-3.2.ebuild,v 1.1 2012/12/21 09:18:12 voyageur Exp $
+# $Header: /var/cvsroot/gentoo-x86/sys-devel/llvm/llvm-3.2.ebuild,v 1.6 2013/02/27 06:02:15 zmedico Exp $
 
 EAPI=5
-PYTHON_DEPEND="2"
-inherit eutils flag-o-matic multilib toolchain-funcs python pax-utils
+
+# pypy gives me around 1700 unresolved tests due to open file limit
+# being exceeded. probably GC does not close them fast enough.
+PYTHON_COMPAT=( python{2_5,2_6,2_7} )
+
+inherit eutils flag-o-matic multilib python-any-r1 toolchain-funcs pax-utils
 
 DESCRIPTION="Low Level Virtual Machine"
 HOMEPAGE="http://llvm.org/"
-SRC_URI="http://llvm.org/releases/${PV}/${P}.src.tar.gz"
+SRC_URI="http://llvm.org/releases/${PV}/${P}.src.tar.gz
+	!doc? ( http://dev.gentoo.org/~voyageur/distfiles/${P}-manpages.tar.bz2 )"
 
 LICENSE="UoI-NCSA"
 SLOT="0"
-KEYWORDS="~amd64 ~arm ~ppc ~x86 ~amd64-fbsd ~x86-fbsd ~x64-freebsd ~amd64-linux ~x86-linux ~ppc-macos ~x64-macos"
+KEYWORDS="~amd64 ~arm ~ppc ~x86 ~amd64-fbsd ~x86-fbsd ~x64-freebsd ~amd64-linux ~arm-linux ~x86-linux ~ppc-macos ~x64-macos"
 IUSE="debug doc gold +libffi multitarget ocaml test udis86 vim-syntax"
 
 DEPEND="dev-lang/perl
-	dev-python/sphinx
 	>=sys-devel/make-3.79
 	>=sys-devel/flex-2.5.4
 	>=sys-devel/bison-1.875d
 	|| ( >=sys-devel/gcc-3.0 >=sys-devel/gcc-apple-4.2.1 )
 	|| ( >=sys-devel/binutils-2.18 >=sys-devel/binutils-apple-3.2.3 )
+	doc? ( dev-python/sphinx )
 	gold? ( >=sys-devel/binutils-2.22[cxx] )
 	libffi? ( virtual/pkgconfig
 		virtual/libffi )
 	ocaml? ( dev-lang/ocaml )
-	udis86? ( amd64? ( dev-libs/udis86[pic] )
-		!amd64? ( dev-libs/udis86 ) )"
+	udis86? ( dev-libs/udis86[pic(+)] )
+	${PYTHON_DEPS}"
 RDEPEND="dev-lang/perl
 	libffi? ( virtual/libffi )
 	vim-syntax? ( || ( app-editors/vim app-editors/gvim ) )"
@@ -36,8 +41,7 @@ S=${WORKDIR}/${P}.src
 
 pkg_setup() {
 	# Required for test and build
-	python_set_active_version 2
-	python_pkg_setup
+	python-any-r1_pkg_setup
 
 	# need to check if the active compiler is ok
 
@@ -64,12 +68,12 @@ pkg_setup() {
 
 	if [[ ${CHOST} == x86_64-* && ${broken_gcc_amd64} == *" ${version} "* ]];
 	then
-		 elog "Your version of gcc is known to miscompile llvm in amd64"
-		 elog "architectures.  Check"
-		 elog "http://www.llvm.org/docs/GettingStarted.html for possible"
-		 elog "solutions."
+		elog "Your version of gcc is known to miscompile llvm in amd64"
+		elog "architectures.  Check"
+		elog "http://www.llvm.org/docs/GettingStarted.html for possible"
+		elog "solutions."
 		die "Your currently active version of gcc is known to miscompile llvm"
-	 fi
+	fi
 }
 
 src_prepare() {
@@ -96,12 +100,9 @@ src_prepare() {
 	sed -e "/NO_INSTALL = 1/s/^/#/" -i utils/FileCheck/Makefile \
 		|| die "FileCheck Makefile sed failed"
 
-	# Specify python version
-	python_convert_shebangs -r 2 test/Scripts
-
 	epatch "${FILESDIR}"/${PN}-3.2-nodoctargz.patch
 	epatch "${FILESDIR}"/${PN}-3.0-PPC_macro.patch
-	epatch "${FILESDIR}"/${PN}-3.2-R600.patch
+	epatch "${FILESDIR}"/${PN}-R600.patch
 
 	# User patches
 	epatch_user
@@ -116,7 +117,6 @@ src_configure() {
 
 	if use multitarget; then
 		CONF_FLAGS="${CONF_FLAGS} --enable-targets=all"
-		CONF_FLAGS="${CONF_FLAGS} --enable-experimental-targets=R600"
 	else
 		CONF_FLAGS="${CONF_FLAGS} --enable-targets=host,cpp"
 	fi
@@ -138,6 +138,10 @@ src_configure() {
 		CONF_FLAGS="${CONF_FLAGS} --with-udis86"
 	fi
 
+	if use video_cards_radeon; then
+		CONF_FLAGS="${CONF_FLAGS} --enable-experimental-targets=R600"
+	fi
+
 	if use libffi; then
 		append-cppflags "$(pkg-config --cflags libffi)"
 	fi
@@ -151,25 +155,39 @@ src_configure() {
 src_compile() {
 	emake VERBOSE=1 KEEP_SYMBOLS=1 REQUIRES_RTTI=1
 
-	emake -C docs -f Makefile.sphinx man
-	use doc && emake -C docs -f Makefile.sphinx html
+	if use doc; then
+		emake -C docs -f Makefile.sphinx man html
+	fi
+	#	emake -C docs -f Makefile.sphinx html
 
 	pax-mark m Release/bin/lli
 	if use test; then
 		pax-mark m unittests/ExecutionEngine/JIT/Release/JITTests
+		pax-mark m unittests/ExecutionEngine/MCJIT/Release/MCJITTests
+		pax-mark m unittests/Support/Release/SupportTests
 	fi
 }
 
 src_install() {
 	emake KEEP_SYMBOLS=1 DESTDIR="${D}" install
 
-	doman docs/_build/man/*.1
-	use doc && dohtml -r docs/_build/html/
+	if use doc; then
+		doman docs/_build/man/*.1
+		dohtml -r docs/_build/html/
+	else
+		doman "${WORKDIR}"/${P}-manpages/*.1
+	fi
 
 	if use vim-syntax; then
 		insinto /usr/share/vim/vimfiles/syntax
 		doins utils/vim/*.vim
 	fi
+
+	# Install LLVM CMake Modules to enable CMake based packages to build
+	# against LLVM
+	dodir "${EPREFIX}"/usr/share/cmake/Modules
+	insinto "${EPREFIX}"/usr/share/cmake/Modules
+	doins cmake/modules/*.cmake
 
 	# Fix install_names on Darwin.  The build system is too complicated
 	# to just fix this, so we correct it post-install

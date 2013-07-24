@@ -8,12 +8,14 @@ EAPI=5
 # being exceeded. probably GC does not close them fast enough.
 PYTHON_COMPAT=( python{2_5,2_6,2_7} )
 
+MY_PV=${PV/_pre*}
+
 inherit subversion eutils flag-o-matic multilib python-any-r1 toolchain-funcs pax-utils
 
 DESCRIPTION="Low Level Virtual Machine"
 HOMEPAGE="http://llvm.org/"
 SRC_URI=""
-ESVN_REPO_URI="http://llvm.org/svn/llvm-project/llvm/trunk"
+ESVN_REPO_URI="http://llvm.org/svn/llvm-project/llvm/branches/release_${MY_PV/.}"
 
 LICENSE="UoI-NCSA"
 SLOT="0"
