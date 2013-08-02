@@ -265,57 +265,6 @@ src_test() {
 }
 
 src_install() {
-	if use doc; then
-		doman docs/_build/man/*.1
-		dohtml -r docs/_build/html/
-	else
-		doman "${WORKDIR}"/${P}-manpages/*.1
-	fi
-
-	insinto /usr/share/vim/vimfiles/syntax
-	doins utils/vim/*.vim
-
-	if use clang; then
-		cd tools/clang || die
-
-		if use static-analyzer ; then
-			dobin tools/scan-build/ccc-analyzer
-			dosym ccc-analyzer /usr/bin/c++-analyzer
-			dobin tools/scan-build/scan-build
-
-			insinto /usr/share/${PN}
-			doins tools/scan-build/scanview.css
-			doins tools/scan-build/sorttable.js
-		fi
-
-		python_inst() {
-			if use static-analyzer ; then
-				pushd tools/scan-view >/dev/null || die
-
-				python_doscript scan-view
-
-				touch __init__.py || die
-				python_moduleinto clang
-				python_domodule __init__.py Reporter.py Resources ScanView.py startfile.py
-
-				popd >/dev/null || die
-			fi
-
-			if use python ; then
-				pushd bindings/python/clang >/dev/null || die
-
-				python_moduleinto clang
-				python_domodule __init__.py cindex.py enumerations.py
-
-				popd >/dev/null || die
-			fi
-
-			# AddressSanitizer symbolizer (currently separate)
-			python_doscript "${S}"/projects/compiler-rt/lib/asan/scripts/asan_symbolize.py
-		}
-		python_foreach_impl python_inst
-	fi
-
 	local mymakeopts=(
 		DESTDIR="${D}"
 		GENTOO_LIBDIR="$(get_libdir)"
@@ -381,6 +330,57 @@ src_install() {
 			eend $?
 		done
 	fi
+	if use doc; then
+		doman docs/_build/man/*.1
+		dohtml -r docs/_build/html/
+	else
+		doman "${WORKDIR}"/${P}-manpages/*.1
+	fi
+
+	insinto /usr/share/vim/vimfiles/syntax
+	doins utils/vim/*.vim
+
+	if use clang; then
+		cd tools/clang || die
+
+		if use static-analyzer ; then
+			dobin tools/scan-build/ccc-analyzer
+			dosym ccc-analyzer /usr/bin/c++-analyzer
+			dobin tools/scan-build/scan-build
+
+			insinto /usr/share/${PN}
+			doins tools/scan-build/scanview.css
+			doins tools/scan-build/sorttable.js
+		fi
+
+		python_inst() {
+			if use static-analyzer ; then
+				pushd tools/scan-view >/dev/null || die
+
+				python_doscript scan-view
+
+				touch __init__.py || die
+				python_moduleinto clang
+				python_domodule __init__.py Reporter.py Resources ScanView.py startfile.py
+
+				popd >/dev/null || die
+			fi
+
+			if use python ; then
+				pushd bindings/python/clang >/dev/null || die
+
+				python_moduleinto clang
+				python_domodule __init__.py cindex.py enumerations.py
+
+				popd >/dev/null || die
+			fi
+
+			# AddressSanitizer symbolizer (currently separate)
+			python_doscript "${S}"/projects/compiler-rt/lib/asan/scripts/asan_symbolize.py
+		}
+		python_foreach_impl python_inst
+	fi
+
 	# Remove unnecessary headers on FreeBSD, bug #417171
 	use kernel_FreeBSD && use clang && rm "${ED}"usr/lib/clang/${PV}/include/{arm_neon,std,float,iso,limits,tgmath,varargs}*.h
 }
