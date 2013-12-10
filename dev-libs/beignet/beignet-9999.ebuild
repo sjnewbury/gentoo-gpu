@@ -19,8 +19,7 @@ KEYWORDS=""
 IUSE=""
 
 RDEPEND="x11-libs/libdrm[video_cards_intel]
-	 >=sys-devel/llvm-3.1
-	 >=sys-devel/clang-3.1
+	 >=sys-devel/llvm-3.3[clang]
 	 app-admin/eselect-opencl"
 DEPEND="${PYTHON_DEPS}
      ${RDEPEND}"

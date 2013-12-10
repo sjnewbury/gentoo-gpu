@@ -1,7 +1,22 @@
---- ./src/CMakeLists.txt.orig	2013-07-24 20:06:33.003665377 +0100
-+++ ./src/CMakeLists.txt	2013-07-24 20:11:38.871666176 +0100
-@@ -48,9 +48,10 @@
- SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-Bsymbolic")
+diff -urN beignet/backend/src/CMakeLists.txt beignet-patched/backend/src/CMakeLists.txt
+--- beignet/backend/src/CMakeLists.txt  2013-12-10 23:19:27.276640399 +0200
++++ beignet-patched/backend/src/CMakeLists.txt  2013-12-10 23:32:23.909661197 +0200
+@@ -159,8 +159,8 @@
+ ADD_EXECUTABLE(gbe_bin_generater gbe_bin_generater.cpp)
+ TARGET_LINK_LIBRARIES(gbe_bin_generater gbe)
+ 
+-install (TARGETS gbe LIBRARY DESTINATION lib)
+-install (FILES ${pch_object} DESTINATION lib)
++install (TARGETS gbe LIBRARY DESTINATION ${LIB_INSTALL_DIR})
++install (FILES ${pch_object} DESTINATION ${LIB_INSTALL_DIR})
+ install (FILES backend/program.h DESTINATION include/gen)
+ 
+ set (PCH_OBJECT_DIR "${pch_object};${CMAKE_INSTALL_PREFIX}/lib/ocl_stdlib.h.pch")
+diff -urN beignet/src/CMakeLists.txt beignet-patched/src/CMakeLists.txt
+--- beignet/src/CMakeLists.txt  2013-12-10 23:19:27.313640399 +0200
++++ beignet-patched/src/CMakeLists.txt  2013-12-10 23:31:26.904659671 +0200
+@@ -68,9 +68,10 @@
+ SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-Bsymbolic,--allow-shlib-undefined")
  
  link_directories (${LLVM_LIBRARY_DIR})
 -add_library(cl SHARED ${OPENCL_SRC})
@@ -13,28 +28,16 @@
                        gbe
                        ${XLIB_LIBRARY}
                        ${XEXT_LIBRARY}
-@@ -60,4 +61,4 @@
+@@ -79,4 +80,4 @@
+                       ${DRM_LIBRARY}
                        ${OPENGL_LIBRARIES}
-                       ${OPTIONAL_EGL_LIBRARY}
-                       ${OPTIONAL_GBM_LIBRARY})
+                       ${OPTIONAL_EGL_LIBRARY})
 -install (TARGETS cl LIBRARY DESTINATION lib)
 +install (TARGETS OpenCL LIBRARY DESTINATION ${LIB_INSTALL_DIR})
---- ./backend/src/CMakeLists.txt~	2013-07-24 20:05:42.000000000 +0100
-+++ ./backend/src/CMakeLists.txt	2013-07-24 20:08:48.419665731 +0100
-@@ -154,8 +154,8 @@
-                       ${CMAKE_THREAD_LIBS_INIT}
-                       ${CMAKE_DL_LIBS})
- 
--install (TARGETS gbe LIBRARY DESTINATION lib)
--install (FILES ${pch_object} DESTINATION lib)
-+install (TARGETS gbe LIBRARY DESTINATION ${LIB_INSTALL_DIR})
-+install (FILES ${pch_object} DESTINATION ${LIB_INSTALL_DIR})
- install (FILES backend/program.h DESTINATION include/gen)
- 
- set (PCH_OBJECT_DIR "${pch_object};${CMAKE_INSTALL_PREFIX}/lib/ocl_stdlib.h.pch")
---- ./utests/CMakeLists.txt~	2013-07-24 20:05:45.000000000 +0100
-+++ ./utests/CMakeLists.txt	2013-07-24 20:13:23.441666449 +0100
-@@ -130,7 +130,7 @@
+diff -urN beignet/utests/CMakeLists.txt beignet-patched/utests/CMakeLists.txt
+--- beignet/utests/CMakeLists.txt       2013-12-10 23:19:27.319640399 +0200
++++ beignet-patched/utests/CMakeLists.txt       2013-12-10 23:32:49.342661878 +0200
+@@ -174,7 +174,7 @@
  
  ADD_LIBRARY(utests SHARED ${utests_sources})
  
@@ -43,3 +46,4 @@
  
  ADD_EXECUTABLE(utest_run utest_run.cpp)
  TARGET_LINK_LIBRARIES(utest_run utests)
+
