@@ -1,24 +1,3 @@
---- ./src/CMakeLists.txt.orig	2013-07-24 20:06:33.003665377 +0100
-+++ ./src/CMakeLists.txt	2013-07-24 20:11:38.871666176 +0100
-@@ -48,9 +48,10 @@
- SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-Bsymbolic")
- 
- link_directories (${LLVM_LIBRARY_DIR})
--add_library(cl SHARED ${OPENCL_SRC})
-+add_library(OpenCL SHARED ${OPENCL_SRC})
-+set_target_properties(OpenCL PROPERTIES VERSION 1.0.0 SOVERSION 1)
- target_link_libraries(
--                      cl
-+                      OpenCL
-                       gbe
-                       ${XLIB_LIBRARY}
-                       ${XEXT_LIBRARY}
-@@ -60,4 +61,4 @@
-                       ${OPENGL_LIBRARIES}
-                       ${OPTIONAL_EGL_LIBRARY}
-                       ${OPTIONAL_GBM_LIBRARY})
--install (TARGETS cl LIBRARY DESTINATION lib)
-+install (TARGETS OpenCL LIBRARY DESTINATION ${LIB_INSTALL_DIR})
 --- ./backend/src/CMakeLists.txt~	2013-07-24 20:05:42.000000000 +0100
 +++ ./backend/src/CMakeLists.txt	2013-07-24 20:08:48.419665731 +0100
 @@ -154,8 +154,8 @@
@@ -43,3 +22,24 @@
  
  ADD_EXECUTABLE(utest_run utest_run.cpp)
  TARGET_LINK_LIBRARIES(utest_run utests)
+--- ./src/CMakeLists.txt.orig	2013-09-22 22:34:43.056183413 +0100
++++ ./src/CMakeLists.txt	2013-09-22 22:36:38.494183714 +0100
+@@ -48,9 +48,10 @@
+ SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-Bsymbolic,--allow-shlib-undefined")
+ 
+ link_directories (${LLVM_LIBRARY_DIR})
+-add_library(cl SHARED ${OPENCL_SRC})
++add_library(OpenCL SHARED ${OPENCL_SRC})
++set_target_properties(OpenCL PROPERTIES VERSION 1.0.0 SOVERSION 1)
+ target_link_libraries(
+-                      cl
++                      OpenCL
+                       gbe
+                       ${XLIB_LIBRARY}
+                       ${XEXT_LIBRARY}
+@@ -59,4 +60,4 @@
+                       ${DRM_LIBRARY}
+                       ${OPENGL_LIBRARIES}
+                       ${OPTIONAL_EGL_LIBRARY})
+-install (TARGETS cl LIBRARY DESTINATION lib)
++install (TARGETS OpenCL LIBRARY DESTINATION ${LIB_INSTALL_DIR})

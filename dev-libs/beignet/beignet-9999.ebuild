@@ -4,23 +4,23 @@
 
 EAPI=5
 PYTHON_COMPAT=( python{2_6,2_7} )
-inherit python-single-r1 cmake-utils eutils git-2
+inherit python-single-r1 cmake-utils eutils git-2 multilib-minimal
 
 DESCRIPTION="Beignet is an open source implementaion of OpenCL on Intel GPUs"
 HOMEPAGE="https://github.com/karolherbst/beignet"
 SRC_URI=""
 #EGIT_REPO_URI="https://github.com/karolherbst/beignet.git"
 EGIT_REPO_URI="git://anongit.freedesktop.org/beignet"
-#EGIT_BRANCH="changes"
+EGIT_BRANCH="opencl-1.2"
 
 LICENSE="LGPL-2.1"
 SLOT="0"
 KEYWORDS=""
 IUSE=""
 
-RDEPEND="x11-libs/libdrm[video_cards_intel]
-	 >=sys-devel/llvm-3.1
-	 >=sys-devel/clang-3.1
+RDEPEND="x11-libs/libdrm[video_cards_intel,${MULTILIB_USEDEP}]
+	 >=sys-devel/llvm-3.1[${MULTILIB_USEDEP}]
+	 >=sys-devel/clang-3.1[${MULTILIB_USEDEP}]
 	 app-admin/eselect-opencl"
 DEPEND="${PYTHON_DEPS}
      ${RDEPEND}"
@@ -31,18 +31,23 @@ src_prepare() {
 	# Fix linking
 	epatch "${FILESDIR}"/"${P}"-respect-flags.patch
 	epatch "${FILESDIR}"/"${P}"-libOpenCL.patch
-#	epatch "${FILESDIR}"/"${P}"-llvm33.patch
+	epatch "${FILESDIR}"/"${P}"-llvm-libs-tr.patch
+	epatch "${FILESDIR}"/"${P}"-llvm35.patch
 }
 
-src_configure() {
+multilib_src_configure() {
 	local mycmakeargs=(
 		-DLIB_INSTALL_DIR="/usr/$(get_libdir)/OpenCL/vendors/${PN}"
 	)
 
+	multilib_is_native_abi || mycmakeargs+=(
+        -DLLVM_CONFIG_EXECUTABLE="${EPREFIX}/usr/bin/llvm-config.${ABI}"
+    )
+
 	cmake-utils_src_configure
 }
 
-src_install() {
+multilib_src_install() {
 	cmake-utils_src_install
 	insinto /usr/$(get_libdir)/OpenCL/vendors/${PN}/include/CL
 	doins ${S}/include/CL/*
