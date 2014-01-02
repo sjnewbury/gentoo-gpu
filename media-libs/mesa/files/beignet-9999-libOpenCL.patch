@@ -1,16 +1,3 @@
---- ./backend/src/CMakeLists.txt~	2013-07-24 20:05:42.000000000 +0100
-+++ ./backend/src/CMakeLists.txt	2013-07-24 20:08:48.419665731 +0100
-@@ -154,8 +154,8 @@
-                       ${CMAKE_THREAD_LIBS_INIT}
-                       ${CMAKE_DL_LIBS})
- 
--install (TARGETS gbe LIBRARY DESTINATION lib)
--install (FILES ${pch_object} DESTINATION lib)
-+install (TARGETS gbe LIBRARY DESTINATION ${LIB_INSTALL_DIR})
-+install (FILES ${pch_object} DESTINATION ${LIB_INSTALL_DIR})
- install (FILES backend/program.h DESTINATION include/gen)
- 
- set (PCH_OBJECT_DIR "${pch_object};${CMAKE_INSTALL_PREFIX}/lib/ocl_stdlib.h.pch")
 --- ./utests/CMakeLists.txt~	2013-07-24 20:05:45.000000000 +0100
 +++ ./utests/CMakeLists.txt	2013-07-24 20:13:23.441666449 +0100
 @@ -130,7 +130,7 @@
@@ -43,3 +30,23 @@
                        ${OPTIONAL_EGL_LIBRARY})
 -install (TARGETS cl LIBRARY DESTINATION lib)
 +install (TARGETS OpenCL LIBRARY DESTINATION ${LIB_INSTALL_DIR})
+--- ./backend/src/CMakeLists.txt~	2014-01-02 13:51:22.000000000 +0100
++++ ./backend/src/CMakeLists.txt	2014-01-02 15:30:11.842754617 +0100
+@@ -184,13 +184,13 @@
+ ADD_EXECUTABLE(gbe_bin_generater gbe_bin_generater.cpp)
+ TARGET_LINK_LIBRARIES(gbe_bin_generater gbe)
+ 
+-install (TARGETS gbe LIBRARY DESTINATION lib)
+-install (FILES ${pch_object} DESTINATION lib)
+-install (FILES ${CMAKE_CURRENT_BINARY_DIR}/${pcm_lib} DESTINATION lib)
++install (TARGETS gbe LIBRARY DESTINATION ${LIB_INSTALL_DIR})
++install (FILES ${pch_object} DESTINATION ${LIB_INSTALL_DIR})
++install (FILES ${CMAKE_CURRENT_BINARY_DIR}/${pcm_lib} DESTINATION ${LIB_INSTALL_DIR})
+ install (FILES backend/program.h DESTINATION include/gen)
+ 
+ set (PCH_OBJECT_DIR "${pch_object};${CMAKE_INSTALL_PREFIX}/lib/ocl_stdlib.h.pch")
+-set (PCM_LIB_DIR "${CMAKE_CURRENT_BINARY_DIR}/${pcm_lib};${CMAKE_INSTALL_PREFIX}/lib/${pcm_lib}")
++set (PCM_LIB_DIR "${CMAKE_CURRENT_BINARY_DIR}/${pcm_lib};${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR}/${pcm_lib}")
+ configure_file (
+   "GBEConfig.h.in"
+   "GBEConfig.h"
