@@ -125,7 +125,7 @@ for card in ${INTEL_CARDS}; do
 	RDEPEND="${RDEPEND}
 		video_cards_${card}? (
 								${LIBDRM_DEPSTRING}[video_cards_intel]
-								opencl? ( beignet? ( >=sys-devel/llvm-3.3-r1[-ncurses,${MULTILIB_USEDEP}] ) )
+								opencl? ( beignet? ( >=sys-devel/llvm-3.3-r1[${MULTILIB_USEDEP}] ) )
 		)
 	"
 done
