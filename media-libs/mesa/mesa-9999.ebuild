@@ -267,7 +267,7 @@ beignet_src_configure() {
 	local OLD_CXXFLAGS=${CFLAGS}
 	local mycmakeargs=(
 		-DMESA_SOURCE_PREFIX="${BUILD_DIR}"
-		-DLIB_INSTALL_DIR="/usr/$(get_libdir)/OpenCL/vendors/beignet"
+		-DLIB_INSTALL_DIR="$(get_libdir)/OpenCL/vendors/beignet"
 	)
 	multilib_is_native_abi || mycmakeargs+=(
 		-DLLVM_CONFIG_EXECUTABLE="${EPREFIX}/usr/bin/llvm-config.${ABI}"
