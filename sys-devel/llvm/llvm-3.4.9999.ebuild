@@ -53,7 +53,7 @@ DEPEND="${COMMON_DEPEND}
 	libffi? ( virtual/pkgconfig )
 	${PYTHON_DEPS}"
 RDEPEND="${COMMON_DEPEND}
-	clang? ( !<=sys-devel/clang-9999-r99 )
+	clang? ( !<=sys-devel/clang-${PV}-r99 )
 	abi_x86_32? ( !<=app-emulation/emul-linux-x86-baselibs-20130224-r2
 		!app-emulation/emul-linux-x86-baselibs[-abi_x86_32(-)] )"
 
