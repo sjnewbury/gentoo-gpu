@@ -1,0 +1,89 @@
+diff --git a/include/pci_ids/pci_id_driver_map.h b/include/pci_ids/pci_id_driver_map.h
+index 8a97c6f..1fb0467 100644
+--- a/include/pci_ids/pci_id_driver_map.h
++++ b/include/pci_ids/pci_id_driver_map.h
+@@ -64,10 +64,12 @@ static const struct {
+    int num_chips_ids;
+ } driver_map[] = {
+    { 0x8086, "i915", i915_chip_ids, ARRAY_SIZE(i915_chip_ids) },
+-   { 0x8086, "i965", i965_chip_ids, ARRAY_SIZE(i965_chip_ids) },
+ #ifndef DRIVER_MAP_GALLIUM_ONLY
++   { 0x8086, "i965", i965_chip_ids, ARRAY_SIZE(i965_chip_ids) },
+    { 0x1002, "radeon", r100_chip_ids, ARRAY_SIZE(r100_chip_ids) },
+    { 0x1002, "r200", r200_chip_ids, ARRAY_SIZE(r200_chip_ids) },
++#else
++   { 0x8086, "ilo", i965_chip_ids, ARRAY_SIZE(i965_chip_ids) },
+ #endif
+    { 0x1002, "r300", r300_chip_ids, ARRAY_SIZE(r300_chip_ids) },
+    { 0x1002, "r600", r600_chip_ids, ARRAY_SIZE(r600_chip_ids) },
+diff --git a/src/gallium/targets/dri-ilo/target.c b/src/gallium/targets/dri-ilo/target.c
+index 3ce75e9..d8def80 100644
+--- a/src/gallium/targets/dri-ilo/target.c
++++ b/src/gallium/targets/dri-ilo/target.c
+@@ -24,4 +24,4 @@
+    return screen;
+ }
+ 
+-DRM_DRIVER_DESCRIPTOR("i965", "i915", create_screen, NULL)
++DRM_DRIVER_DESCRIPTOR("ilo", "i915", create_screen, NULL)
+diff --git a/src/gallium/targets/pipe-loader/Makefile.am b/src/gallium/targets/pipe-loader/Makefile.am
+index 6875453..8fa3873 100644
+--- a/src/gallium/targets/pipe-loader/Makefile.am
++++ b/src/gallium/targets/pipe-loader/Makefile.am
+@@ -47,6 +47,23 @@ PIPE_LIBS = \
+ 	-lpthread \
+ 	-lm
+ 
++if HAVE_GALLIUM_ILO
++pipe_LTLIBRARIES += pipe_ilo.la
++pipe_ilo_la_SOURCES = pipe_ilo.c
++pipe_ilo_la_LIBADD = \
++	$(PIPE_LIBS) \
++	$(top_builddir)/src/gallium/winsys/intel/drm/libintelwinsys.la \
++	$(top_builddir)/src/gallium/drivers/ilo/libilo.la \
++	$(LIBDRM_LIBS) \
++	$(INTEL_LIBS)
++pipe_ilo_la_LDFLAGS = -no-undefined -avoid-version -module
++if HAVE_MESA_LLVM
++nodist_EXTRA_pipe_ilo_la_SOURCES = dummy.cpp
++pipe_ilo_la_LIBADD += $(LLVM_LIBS)
++pipe_ilo_la_LDFLAGS += $(LLVM_LDFLAGS)
++endif
++endif
++
+ if HAVE_GALLIUM_I915
+ pipe_LTLIBRARIES += pipe_i915.la
+ pipe_i915_la_SOURCES = pipe_i915.c
+diff --git a/src/gallium/targets/pipe-loader/pipe_ilo.c b/src/gallium/targets/pipe-loader/pipe_ilo.c
+new file mode 100644
+index 0000000..11be2d1
+--- /dev/null
++++ b/src/gallium/targets/pipe-loader/pipe_ilo.c
+@@ -0,0 +1,27 @@
++
++#include "target-helpers/inline_debug_helper.h"
++#include "state_tracker/drm_driver.h"
++#include "intel/intel_winsys.h"
++#include "ilo/ilo_public.h"
++
++static struct pipe_screen *
++create_screen(int fd)
++{
++   struct intel_winsys *iws;
++   struct pipe_screen *screen;
++
++   iws = intel_winsys_create_for_fd(fd);
++   if (!iws)
++      return NULL;
++
++   screen = ilo_screen_create(iws);
++   if (!screen)
++      return NULL;
++
++   screen = debug_screen_wrap(screen);
++
++   return screen;
++}
++
++PUBLIC
++DRM_DRIVER_DESCRIPTOR("ilo", "i915", create_screen, NULL)

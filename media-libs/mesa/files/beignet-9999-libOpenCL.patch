@@ -9,9 +9,33 @@
  
  ADD_EXECUTABLE(utest_run utest_run.cpp)
  TARGET_LINK_LIBRARIES(utest_run utests)
---- ./src/CMakeLists.txt.orig	2013-09-22 22:34:43.056183413 +0100
-+++ ./src/CMakeLists.txt	2013-09-22 22:36:38.494183714 +0100
-@@ -48,9 +48,10 @@
+--- ./backend/src/CMakeLists.txt.orig	2014-01-24 11:32:57.857410968 +0000
++++ ./backend/src/CMakeLists.txt	2014-01-24 12:07:34.264207310 +0000
+@@ -1,4 +1,4 @@
+-set (beignet_install_path ${LIB_INSTALL_DIR}/beignet/)
++set (beignet_install_path ${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR})
+ 
+ 
+ set (ocl_vector_spec_file ${GBE_SOURCE_DIR}/src/builtin_vector_proto.def)
+@@ -191,11 +191,11 @@
+ ADD_EXECUTABLE(gbe_bin_generater gbe_bin_generater.cpp)
+ TARGET_LINK_LIBRARIES(gbe_bin_generater gbe)
+ 
+-#install (TARGETS gbe LIBRARY DESTINATION lib)
++#install (TARGETS gbe LIBRARY DESTINATION ${beignet_install_path})
+ #install (FILES backend/program.h DESTINATION include/gen)
+-install (FILES ${ocl_blob_file} DESTINATION ${LIB_INSTALL_DIR}/beignet)
+-install (FILES ${pch_object} DESTINATION ${LIB_INSTALL_DIR}/beignet)
+-install (FILES ${CMAKE_CURRENT_BINARY_DIR}/${pcm_lib} DESTINATION ${LIB_INSTALL_DIR}/beignet)
++install (FILES ${pch_object} DESTINATION ${beignet_install_path})
++install (FILES ${CMAKE_CURRENT_BINARY_DIR}/${pcm_lib} DESTINATION ${beignet_install_path})
++install (FILES ${ocl_blob_file} DESTINATION ${beignet_install_path})
+ # When build beignet itself, we need to export the local precompiled header file and precompiled module
+ # file to libcl and utests.
+ set (LOCAL_PCH_OBJECT_DIR "${local_pch_object}:${beignet_install_path}/ocl_stdlib.h.pch" PARENT_SCOPE)
+--- ./src/CMakeLists.txt.orig	2014-01-24 11:32:07.878102004 +0000
++++ ./src/CMakeLists.txt	2014-01-24 11:34:47.922886430 +0000
+@@ -67,9 +67,10 @@
  SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-Bsymbolic,--allow-shlib-undefined")
  
  link_directories (${LLVM_LIBRARY_DIR})
@@ -24,29 +48,9 @@
                        gbe
                        ${XLIB_LIBRARY}
                        ${XEXT_LIBRARY}
-@@ -59,4 +60,4 @@
+@@ -78,4 +79,4 @@
                        ${DRM_LIBRARY}
                        ${OPENGL_LIBRARIES}
                        ${OPTIONAL_EGL_LIBRARY})
--install (TARGETS cl LIBRARY DESTINATION lib)
+-install (TARGETS cl LIBRARY DESTINATION ${LIB_INSTALL_DIR}/beignet)
 +install (TARGETS OpenCL LIBRARY DESTINATION ${LIB_INSTALL_DIR})
---- ./backend/src/CMakeLists.txt~	2014-01-02 13:51:22.000000000 +0100
-+++ ./backend/src/CMakeLists.txt	2014-01-02 15:30:11.842754617 +0100
-@@ -184,13 +184,13 @@
- ADD_EXECUTABLE(gbe_bin_generater gbe_bin_generater.cpp)
- TARGET_LINK_LIBRARIES(gbe_bin_generater gbe)
- 
--install (TARGETS gbe LIBRARY DESTINATION lib)
--install (FILES ${pch_object} DESTINATION lib)
--install (FILES ${CMAKE_CURRENT_BINARY_DIR}/${pcm_lib} DESTINATION lib)
-+install (TARGETS gbe LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR})
-+install (FILES ${pch_object} DESTINATION ${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR})
-+install (FILES ${CMAKE_CURRENT_BINARY_DIR}/${pcm_lib} DESTINATION ${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR})
- install (FILES backend/program.h DESTINATION include/gen)
- 
- set (PCH_OBJECT_DIR "${pch_object};${CMAKE_INSTALL_PREFIX}/lib/ocl_stdlib.h.pch")
--set (PCM_LIB_DIR "${CMAKE_CURRENT_BINARY_DIR}/${pcm_lib};${CMAKE_INSTALL_PREFIX}/lib/${pcm_lib}")
-+set (PCM_LIB_DIR "${CMAKE_CURRENT_BINARY_DIR}/${pcm_lib};${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR}/${pcm_lib}")
- configure_file (
-   "GBEConfig.h.in"
-   "GBEConfig.h"

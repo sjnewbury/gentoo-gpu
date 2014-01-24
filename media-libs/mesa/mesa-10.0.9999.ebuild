@@ -4,12 +4,17 @@
 
 EAPI=5
 
-EGIT_REPO_URI="git://anongit.freedesktop.org/mesa/mesa"
+if use nine; then
+	EGIT_REPO_URI="https://github.com/okias/Mesa-3D"
+	EGIT_BRANCH="gallium-nine-10.0"
+else
+	EGIT_REPO_URI="git://anongit.freedesktop.org/mesa/mesa"
+fi
 
-if [[ ${PV} = 9999* ]]; then
+if [[ ${PV} = *9999* ]]; then
 	GIT_ECLASS="git-r3"
 	EXPERIMENTAL="true"
-	B_PV="${PV}"
+	B_PV="9999"
 else
 	B_PV="0.3"
 fi
@@ -31,7 +36,7 @@ DESCRIPTION="OpenGL-like graphic library for Linux"
 HOMEPAGE="http://mesa3d.sourceforge.net/"
 
 #SRC_PATCHES="mirror://gentoo/${P}-gentoo-patches-01.tar.bz2"
-if [[ $PV = 9999* ]]; then
+if [[ $PV = *9999* ]]; then
 	SRC_URI="${SRC_PATCHES}"
 else
 	SRC_URI="ftp://ftp.freedesktop.org/pub/mesa/${FOLDER}/${MY_SRC_P}.tar.bz2
@@ -55,10 +60,11 @@ done
 IUSE="${IUSE_VIDEO_CARDS}
 	bindist +classic debug +egl +gallium gbm gles1 gles2 +llvm +nptl opencl
 	openvg osmesa pax_kernel pic r600-llvm-compiler selinux vdpau
-	wayland xvmc xa xorg kernel_FreeBSD beignet"
+	wayland xvmc xa xorg kernel_FreeBSD beignet nine"
 
 REQUIRED_USE="
 	llvm?   ( gallium )
+	nine?	( gallium )
 	openvg? ( egl gallium )
 	opencl? (
 		video_cards_r600? ( gallium r600-llvm-compiler )
@@ -198,7 +204,7 @@ beignet_src_unpack() {
 
 src_unpack() {
 	default
-	if [[ $PV = 9999* ]] ; then
+	if [[ $PV = *9999* ]] ; then
 		git-r3_fetch
 		EGIT_CHECKOUT_DIR="${S}" git-r3_checkout
 		use opencl && use beignet && beignet_src_unpack
@@ -223,7 +229,7 @@ beignet_src_prepare() {
 
 src_prepare() {
 	# apply patches
-	if [[ ${PV} != 9999* && -n ${SRC_PATCHES} ]]; then
+	if [[ ${PV} != *9999* && -n ${SRC_PATCHES} ]]; then
 		EPATCH_FORCE="yes" \
 		EPATCH_SOURCE="${WORKDIR}/patches" \
 		EPATCH_SUFFIX="patch" \
@@ -234,7 +240,16 @@ src_prepare() {
 	#epatch "${FILESDIR}"/${P}-dont-require-llvm-for-r300.patch
 
 	# fix for hardened pax_kernel, bug 240956
-	[[ ${PV} != 9999* ]] && epatch "${FILESDIR}"/glx_ro_text_segm.patch
+	[[ ${PV} != *9999* ]] && epatch "${FILESDIR}"/glx_ro_text_segm.patch
+
+	# "nine" Gallium Direct3D API support:
+
+	# Make pipe-loader work for ilo
+	epatch "${FILESDIR}"/${P}-ilo.patch
+
+	# ms_abi attribute requires -maccumulate-outgoing-args
+	append-cxxflags -maccumulate-outgoing-args
+	append-ldflags -maccumulate-outgoing-args
 
 	# Solaris needs some recent POSIX stuff in our case
 	if [[ ${CHOST} == *-solaris* ]] ; then
@@ -315,6 +330,7 @@ multilib_src_configure() {
 			$(use_enable r600-llvm-compiler)
 			$(use_enable vdpau)
 			$(use_enable xvmc)
+			$(use_enable nine)
 		"
 		gallium_enable swrast
 		gallium_enable video_cards_vmware svga
