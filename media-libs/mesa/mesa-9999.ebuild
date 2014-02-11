@@ -217,8 +217,17 @@ beignet_src_prepare() {
 	epatch "${FILESDIR}"/beignet-"${B_PV}"-respect-flags.patch
 	epatch "${FILESDIR}"/beignet-"${B_PV}"-libOpenCL.patch
 	epatch "${FILESDIR}"/beignet-"${B_PV}"-llvm-libs-tr.patch
-	epatch "${FILESDIR}"/beignet-"${B_PV}"-llvm35.patch
+#	epatch "${FILESDIR}"/beignet-"${B_PV}"-llvm35.patch
 	epatch "${FILESDIR}"/beignet-"${B_PV}"-mesa-includes.patch
+
+	# gl format changes: gl_format -> mesa_format and changed MESA_FORMATs
+	sed -i \
+			-e 's/gl_format/mesa_format/g' \
+			-e 's/MESA_FORMAT_RGBA8888\b/MESA_FORMAT_A8B8G8R8_UNORM/g' \
+			-e 's/MESA_FORMAT_ARGB8888\b/MESA_FORMAT_B8G8R8A8_UNORM/g'\
+				src/intel/intel_dri_resource_sharing.c \
+				src/intel/intel_dri_resource_sharing.h \
+				src/intel/intel_driver.c || die 'sed failed'
 }
 
 src_prepare() {

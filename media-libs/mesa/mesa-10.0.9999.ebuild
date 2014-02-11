@@ -223,7 +223,7 @@ beignet_src_prepare() {
 	epatch "${FILESDIR}"/beignet-"${B_PV}"-respect-flags.patch
 	epatch "${FILESDIR}"/beignet-"${B_PV}"-libOpenCL.patch
 	epatch "${FILESDIR}"/beignet-"${B_PV}"-llvm-libs-tr.patch
-	epatch "${FILESDIR}"/beignet-"${B_PV}"-llvm35.patch
+#	epatch "${FILESDIR}"/beignet-"${B_PV}"-llvm35.patch
 	epatch "${FILESDIR}"/beignet-"${B_PV}"-mesa-includes.patch
 }
 
