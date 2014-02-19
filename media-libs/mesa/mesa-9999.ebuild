@@ -5,6 +5,8 @@
 EAPI=5
 
 EGIT_REPO_URI="git://anongit.freedesktop.org/mesa/mesa"
+BEIGNET_BRANCH=master
+
 
 if [[ ${PV} = 9999* ]]; then
 	GIT_ECLASS="git-r3"
@@ -191,7 +193,7 @@ pkg_setup() {
 
 beignet_src_unpack() {
 		git-r3_fetch "git://anongit.freedesktop.org/beignet" \
-			"refs/heads/opencl-1.2"
+			"refs/heads/${BEIGNET_BRANCH}"
 		git-r3_checkout "git://anongit.freedesktop.org/beignet" \
 			"${S}"/beignet-${B_PV}
 }
@@ -220,14 +222,8 @@ beignet_src_prepare() {
 #	epatch "${FILESDIR}"/beignet-"${B_PV}"-llvm35.patch
 	epatch "${FILESDIR}"/beignet-"${B_PV}"-mesa-includes.patch
 
-	# gl format changes: gl_format -> mesa_format and changed MESA_FORMATs
-	sed -i \
-			-e 's/gl_format/mesa_format/g' \
-			-e 's/MESA_FORMAT_RGBA8888\b/MESA_FORMAT_A8B8G8R8_UNORM/g' \
-			-e 's/MESA_FORMAT_ARGB8888\b/MESA_FORMAT_B8G8R8A8_UNORM/g'\
-				src/intel/intel_dri_resource_sharing.c \
-				src/intel/intel_dri_resource_sharing.h \
-				src/intel/intel_driver.c || die 'sed failed'
+	# Make beignet master compatible with upstream mesa master changes
+	epatch "${FILESDIR}"/beignet-"${B_PV}"-mesa-master.patch
 }
 
 src_prepare() {
