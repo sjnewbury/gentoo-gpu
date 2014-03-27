@@ -315,7 +315,7 @@ multilib_src_configure() {
 	if use gallium; then
 		myconf+="
 			$(use_enable llvm gallium-llvm)
-			$(use_with llvm llvm-shared-libs)
+			$(use_enable llvm llvm-shared-libs)
 			$(use_enable openvg)
 			$(use_enable r600-llvm-compiler)
 			$(use_enable vdpau)
