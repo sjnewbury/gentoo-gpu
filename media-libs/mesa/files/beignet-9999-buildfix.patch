@@ -1,0 +1,24 @@
+--- ./backend/src/backend/gen_insn_selection.cpp~	2014-06-08 10:50:08.000000000 +0100
++++ ./backend/src/backend/gen_insn_selection.cpp	2014-06-08 11:29:56.000185851 +0100
+@@ -790,10 +790,6 @@
+         }
+ 
+         if (poolOffset > ctx.reservedSpillRegs) {
+-          if (GBE_DEBUG)
+-            std::cerr << "Instruction (#" << (uint32_t)insn.opcode
+-                      << ") src too large pooloffset "
+-                      << (uint32_t)poolOffset << std::endl;
+           return false;
+         }
+         // FIXME, to support post register allocation scheduling,
+@@ -860,10 +856,6 @@
+         }
+ 
+         if (poolOffset > ctx.reservedSpillRegs){
+-          if (GBE_DEBUG)
+-           std::cerr << "Instruction (#" << (uint32_t)insn.opcode
+-                     << ") dst too large pooloffset "
+-                     << (uint32_t)poolOffset << std::endl;
+           return false;
+         }
+         while(!regSet.empty()) {

@@ -1,25 +1,23 @@
-# Copyright 1999-2013 Gentoo Foundation
+# Copyright 1999-2014 Gentoo Foundation
 # Distributed under the terms of the GNU General Public License v2
 # $Header: $
 
 EAPI=5
 
 EGIT_REPO_URI="git://anongit.freedesktop.org/mesa/mesa"
-BEIGNET_BRANCH=master
-
 
 if [[ ${PV} = 9999* ]]; then
 	GIT_ECLASS="git-r3"
 	EXPERIMENTAL="true"
 	B_PV="${PV}"
 else
-	B_PV="0.3"
+	B_PV="0.9"
 fi
 
 PYTHON_COMPAT=( python{2_6,2_7} )
 
 inherit cmake-utils base autotools multilib multilib-minimal flag-o-matic \
-	python-any-r1 toolchain-funcs ${GIT_ECLASS}
+	python-any-r1 toolchain-funcs pax-utils ${GIT_ECLASS}
 
 OPENGL_DIR="xorg-x11"
 
@@ -55,9 +53,9 @@ for card in ${VIDEO_CARDS}; do
 done
 
 IUSE="${IUSE_VIDEO_CARDS}
-	bindist +classic debug +egl +gallium gbm gles1 gles2 +llvm +nptl opencl
-	openvg osmesa pax_kernel pic r600-llvm-compiler selinux vdpau
-	wayland xvmc xa xorg kernel_FreeBSD beignet"
+	bindist +classic debug +dri3 +egl +gallium gbm gles1 gles2 +llvm +nptl
+	opencl openvg osmesa pax_kernel openmax pic r600-llvm-compiler selinux
+	vdpau wayland xvmc xa kernel_FreeBSD beignet beignet-egl beignet-generic"
 
 REQUIRED_USE="
 	llvm?   ( gallium )
@@ -70,12 +68,12 @@ REQUIRED_USE="
 		video_cards_ilo? ( beignet )
 		video_cards_intel? ( beignet )
 	)
+	openmax? ( gallium )
 	gles1?  ( egl )
 	gles2?  ( egl )
 	r600-llvm-compiler? ( gallium llvm || ( video_cards_r600 video_cards_radeonsi video_cards_radeon ) )
-	wayland? ( egl )
+	wayland? ( egl gbm )
 	xa?  ( gallium )
-	xorg?  ( gallium )
 	video_cards_freedreno?  ( gallium )
 	video_cards_intel?  ( || ( classic gallium ) )
 	video_cards_i915?   ( || ( classic gallium ) )
@@ -89,9 +87,10 @@ REQUIRED_USE="
 	video_cards_r600?   ( gallium )
 	video_cards_radeonsi?   ( gallium llvm )
 	video_cards_vmware? ( gallium )
+	${PYTHON_REQUIRED_USE}
 "
 
-LIBDRM_DEPSTRING=">=x11-libs/libdrm-2.4.46"
+LIBDRM_DEPSTRING=">=x11-libs/libdrm-2.4.54"
 # keep correct libdrm and dri2proto dep
 # keep blocks in rdepend for binpkg
 RDEPEND="
@@ -102,23 +101,38 @@ RDEPEND="
 	gallium? ( app-admin/eselect-mesa )
 	>=app-admin/eselect-opengl-1.2.7
 	dev-libs/expat[${MULTILIB_USEDEP}]
-	gbm? ( virtual/udev[${MULTILIB_USEDEP}] )
+	gbm? ( virtual/libudev[${MULTILIB_USEDEP}] )
+	dri3? ( virtual/libudev[${MULTILIB_USEDEP}] )
 	>=x11-libs/libX11-1.3.99.901[${MULTILIB_USEDEP}]
+	>=x11-libs/libxshmfence-1.1[${MULTILIB_USEDEP}]
 	x11-libs/libXdamage[${MULTILIB_USEDEP}]
 	x11-libs/libXext[${MULTILIB_USEDEP}]
 	x11-libs/libXxf86vm[${MULTILIB_USEDEP}]
 	>=x11-libs/libxcb-1.9.3[${MULTILIB_USEDEP}]
-	>=x11-libs/libxshmfence-1.0.0[${MULTILIB_USEDEP}]
+	llvm? (
+		video_cards_radeonsi? ( || (
+			dev-libs/elfutils[${MULTILIB_USEDEP}]
+			dev-libs/libelf[${MULTILIB_USEDEP}]
+			) )
+		video_cards_r600? ( || (
+			dev-libs/elfutils[${MULTILIB_USEDEP}]
+			dev-libs/libelf[${MULTILIB_USEDEP}]
+			) )
+		!video_cards_r600? (
+			video_cards_radeon? ( || (
+				dev-libs/elfutils[${MULTILIB_USEDEP}]
+				dev-libs/libelf[${MULTILIB_USEDEP}]
+				) )
+		)
+		>=sys-devel/llvm-3.3-r3[${MULTILIB_USEDEP}]
+	)
 	opencl? (
 				app-admin/eselect-opencl
 				beignet? ( !dev-libs/beignet )
 			)
+	openmax? ( media-libs/libomxil-bellagio[${MULTILIB_USEDEP}] )
 	vdpau? ( >=x11-libs/libvdpau-0.4.1[${MULTILIB_USEDEP}] )
-	wayland? ( >=dev-libs/wayland-1.0.3[${MULTILIB_USEDEP}] )
-	xorg? (
-		x11-base/xorg-server:=
-		x11-libs/libdrm[libkms]
-	)
+	wayland? ( >=dev-libs/wayland-1.2.0[${MULTILIB_USEDEP}] )
 	xvmc? ( >=x11-libs/libXvMC-1.0.6[${MULTILIB_USEDEP}] )
 	${LIBDRM_DEPSTRING}[video_cards_freedreno?,video_cards_nouveau?,video_cards_vmware?,${MULTILIB_USEDEP}]
 "
@@ -129,7 +143,8 @@ for card in ${INTEL_CARDS}; do
 								opencl? ( beignet? ( || (
 									>=sys-devel/llvm-3.3[${MULTILIB_USEDEP}]
 									>=sys-devel/llvm-3.4[-ncurses,${MULTILIB_USEDEP}]
-										) )
+										)
+										!beignet-generic? ( sys-apps/pciutils ) )
 								)
 		)
 	"
@@ -148,31 +163,30 @@ for card in ${RADEON_CARDS}; do
 done
 
 DEPEND="${RDEPEND}
+	${PYTHON_DEPS}
 	llvm? (
-		>=sys-devel/llvm-3.3[${MULTILIB_USEDEP}]
 		r600-llvm-compiler? ( sys-devel/llvm[video_cards_radeon] )
 		video_cards_radeonsi? ( sys-devel/llvm[video_cards_radeon] )
 	)
 	opencl? (
+				>=sys-devel/llvm-3.3-r3[${MULTILIB_USEDEP}]
 				>=sys-devel/clang-3.3[${MULTILIB_USEDEP}]
 				>=sys-devel/gcc-4.6
 	)
 	sys-devel/bison
 	sys-devel/flex
+	sys-devel/gettext
 	virtual/pkgconfig
 	>=x11-proto/dri2proto-2.6[${MULTILIB_USEDEP}]
-	>=x11-proto/dri3proto-1.0[${MULTILIB_USEDEP}]
-	>=x11-proto/presentproto-1.0[${MULTILIB_USEDEP}]
+	dri3? (
+		>=x11-proto/dri3proto-1.0[${MULTILIB_USEDEP}]
+		>=x11-proto/presentproto-1.0[${MULTILIB_USEDEP}]
+	)
 	>=x11-proto/glproto-1.4.15-r1[${MULTILIB_USEDEP}]
 	>=x11-proto/xextproto-7.0.99.1[${MULTILIB_USEDEP}]
 	x11-proto/xf86driproto[${MULTILIB_USEDEP}]
 	x11-proto/xf86vidmodeproto[${MULTILIB_USEDEP}]
-	$(python_gen_any_dep 'dev-libs/libxml2[python,${PYTHON_USEDEP}]')
 "
-
-python_check_deps() {
-	has_version "dev-libs/libxml2[python,${PYTHON_USEDEP}]"
-}
 
 S="${WORKDIR}/${MY_P}"
 CMAKE_USE_DIR="${S}"/beignet-${B_PV}
@@ -192,8 +206,19 @@ pkg_setup() {
 }
 
 beignet_src_unpack() {
-		git-r3_fetch "git://anongit.freedesktop.org/beignet" \
-			"refs/heads/${BEIGNET_BRANCH}"
+		if [ -n "${BEIGNET_COMMIT}" ]; then
+			git-r3_fetch "git://anongit.freedesktop.org/beignet" \
+				"${BEIGNET_COMMIT}"
+		elif [ -n "${BEIGNET_BRANCH}" ]; then
+			git-r3_fetch "git://anongit.freedesktop.org/beignet" \
+				"refs/heads/${BEIGNET_BRANCH}"
+		elif [ -n "${BEIGNET_TAG}" ]; then
+			git-r3_fetch "git://anongit.freedesktop.org/beignet" \
+				"refs/tags/${BEIGNET_TAG}"
+		else
+			git-r3_fetch "git://anongit.freedesktop.org/beignet" \
+				"refs/heads/master"
+		fi		
 		git-r3_checkout "git://anongit.freedesktop.org/beignet" \
 			"${S}"/beignet-${B_PV}
 }
@@ -217,13 +242,11 @@ beignet_src_prepare() {
 
 	# Fix linking
 	epatch "${FILESDIR}"/beignet-"${B_PV}"-respect-flags.patch
+
+	# Make resulting OpenCL library conform expected 
 	epatch "${FILESDIR}"/beignet-"${B_PV}"-libOpenCL.patch
 	epatch "${FILESDIR}"/beignet-"${B_PV}"-llvm-libs-tr.patch
-#	epatch "${FILESDIR}"/beignet-"${B_PV}"-llvm35.patch
-	epatch "${FILESDIR}"/beignet-"${B_PV}"-mesa-includes.patch
-
-	# Make beignet master compatible with upstream mesa master changes
-	epatch "${FILESDIR}"/beignet-"${B_PV}"-mesa-master.patch
+	epatch "${FILESDIR}"/beignet-"${B_PV}"-buildfix.patch
 }
 
 src_prepare() {
@@ -262,14 +285,31 @@ beignet_src_configure() {
 	local OLD_CFLAGS=${CFLAGS}
 	local OLD_CXXFLAGS=${CFLAGS}
 	local mycmakeargs=(
-		-DMESA_SOURCE_PREFIX="${BUILD_DIR}"
-		-DLIB_INSTALL_DIR="$(get_libdir)/OpenCL/vendors/beignet"
+		-DBEIGNET_INSTALL_DIR="/usr/$(get_libdir)/OpenCL/vendors/beignet"
 	)
+
+	if ! use beignet-generic; then
+		mycmakeargs+=(
+			-DGEN_PCI_ID=$("${FILESDIR}"/GetGenID.sh)
+		)
+	fi
+	# Currently broken FIXME!
+	if use beignet-egl; then
+		mycmakeargs+=(
+			-DMESA_SOURCE_PREFIX="${BUILD_DIR}"
+		)
+	fi
+
 	multilib_is_native_abi || mycmakeargs+=(
 		-DLLVM_CONFIG_EXECUTABLE="${EPREFIX}/usr/bin/llvm-config.${ABI}"
 	)
+	# Use clang (we're depending upon it anyway)
 	# LTO currently doesn't work with beignet
-	filter-flags -flto*
+	# and clang doesn't support graphite or
+	# linker plugins
+	filter-flags -flto* -fgraphite -fuse-linker-plugin -mfpmath*
+	# [currently doesn't work as beignet uses g++ variable length array extension]
+	#CC=clang CXX=clang++
 	BUILD_DIR=${BUILD_DIR}/beignet-${B_PV} cmake-utils_src_configure
 	CFLAGS=${OLD_CFLAGS}
 	CXXFLAGS=${OLD_CXXFLAGS}
@@ -277,7 +317,6 @@ beignet_src_configure() {
 }
 
 multilib_src_configure() {
-
 	local myconf
 
 	if use classic; then
@@ -306,19 +345,18 @@ multilib_src_configure() {
 	fi
 
 	if use egl; then
-		myconf+="
-			--with-egl-platforms=x11$(use wayland && echo ",wayland")$(use gbm && echo ",drm")
-			$(use_enable gallium gallium-egl)
-		"
+		myconf+="--with-egl-platforms=x11,$(use wayland && echo ",wayland")$(use gbm && echo ",drm")"
 	fi
 
 	if use gallium; then
 		myconf+="
 			$(use_enable llvm gallium-llvm)
-			$(use_enable llvm llvm-shared-libs)
 			$(use_enable openvg)
+			$(use_enable openvg gallium-egl)
+			$(use_enable openmax omx)
 			$(use_enable r600-llvm-compiler)
 			$(use_enable vdpau)
+			$(use_enable xa)
 			$(use_enable xvmc)
 		"
 		gallium_enable swrast
@@ -363,8 +401,7 @@ multilib_src_configure() {
 	use userland_GNU || export INDENT=cat
 
 	if ! multilib_is_native_abi; then
-		myconf+="--disable-xorg
-			LLVM_CONFIG=${EPREFIX}/usr/bin/llvm-config.${ABI}"
+			LLVM_CONFIG="${EPREFIX}/usr/bin/llvm-config.${ABI}"
 	fi
 
 	econf \
@@ -373,14 +410,15 @@ multilib_src_configure() {
 		--enable-shared-glapi \
 		$(use_enable !bindist texture-float) \
 		$(use_enable debug) \
+		$(use_enable dri3) \
 		$(use_enable egl) \
 		$(use_enable gbm) \
 		$(use_enable gles1) \
 		$(use_enable gles2) \
 		$(use_enable nptl glx-tls) \
 		$(use_enable osmesa) \
-		$(use_enable xa) \
-		$(use_enable xorg) \
+		$(use_enable !pic asm) \
+		--enable-llvm-shared-libs \
 		--with-dri-drivers=${DRI_DRIVERS} \
 		--with-gallium-drivers=${GALLIUM_DRIVERS} \
 		PYTHON2="${PYTHON}" \
@@ -429,6 +467,7 @@ multilib_src_install() {
 			fi
 		done
 	eend $?
+
 	if use classic || use gallium; then
 			ebegin "Moving DRI/Gallium drivers for dynamic switching"
 			local gallium_drivers=( i915_dri.so ilo_dri.so i965_dri.so r300_dri.so r600_dri.so swrast_dri.so )
@@ -488,6 +527,12 @@ multilib_src_install() {
 			eend $?
 		fi
 	fi
+
+	if use openmax; then
+		echo "XDG_DATA_DIRS=\"${EPREFIX}/usr/share/mesa/xdg\"" > "${T}/99mesaxdgomx"
+		doenvd "${T}"/99mesaxdgomx
+		keepdir /usr/share/mesa/xdg
+	fi
 }
 
 multilib_src_install_all() {
@@ -501,6 +546,17 @@ multilib_src_install_all() {
 	# Install config file for eselect mesa
 	insinto /usr/share/mesa
 	newins "${FILESDIR}/eselect-mesa.conf.10.1" eselect-mesa.conf
+}
+
+multilib_src_test() {
+	if use llvm; then
+		local llvm_tests='lp_test_arit lp_test_arit lp_test_blend lp_test_blend lp_test_conv lp_test_conv lp_test_format lp_test_format lp_test_printf lp_test_printf'
+		pushd src/gallium/drivers/llvmpipe >/dev/null || die
+		emake ${llvm_tests}
+		pax-mark m ${llvm_tests}
+		popd >/dev/null || die
+	fi
+	emake check
 }
 
 pkg_postinst() {
@@ -525,6 +581,15 @@ pkg_postinst() {
 		eselect opencl set --use-old ${PN}
 	fi
 
+	# run omxregister-bellagio to make the OpenMAX drivers known system-wide
+	if use openmax; then
+		ebegin "Registering OpenMAX drivers"
+		BELLAGIO_SEARCH_PATH="${EPREFIX}/usr/$(get_libdir)/libomxil-bellagio0" \
+			OMX_BELLAGIO_REGISTRY=${EPREFIX}/usr/share/mesa/xdg/.omxregister \
+			omxregister-bellagio
+		eend $?
+	fi
+
 	# warn about patent encumbered texture-float
 	if use !bindist; then
 		elog "USE=\"bindist\" was not set. Potentially patent encumbered code was"
@@ -543,6 +608,12 @@ pkg_postinst() {
 		elog "Note that in order to have full S3TC support, it is necessary to install"
 		elog "media-libs/libtxc_dxtn as well. This may be necessary to get nice"
 		elog "textures in some apps, and some others even require this to run."
+	fi
+}
+
+pkg_prerm() {
+	if use openmax; then
+		rm "${EPREFIX}"/usr/share/mesa/xdg/.omxregister
 	fi
 }
 
