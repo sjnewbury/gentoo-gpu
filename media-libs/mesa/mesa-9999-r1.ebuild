@@ -49,7 +49,7 @@ RESTRICT="!bindist? ( bindist )"
 
 INTEL_CARDS="i915 i965 ilo intel"
 RADEON_CARDS="r100 r200 r300 r600 radeon radeonsi"
-VIDEO_CARDS="${INTEL_CARDS} ${RADEON_CARDS} freedreno nouveau vmware"
+VIDEO_CARDS="${INTEL_CARDS} ${RADEON_CARDS} freedreno nouveau vmware virgl"
 for card in ${VIDEO_CARDS}; do
 	IUSE_VIDEO_CARDS+=" video_cards_${card}"
 done
@@ -58,7 +58,7 @@ IUSE="${IUSE_VIDEO_CARDS}
 	bindist +classic d3d9 debug +dri3 +egl +gallium +gbm gles1 gles2 +llvm
 	+nptl opencl osmesa pax_kernel openmax pic selinux +udev vaapi vdpau
 	wayland xvmc xa kernel_FreeBSD beignet beignet-egl beignet-generic
-	beignet-icd"
+	opencl-icd"
 
 #  Not available at present unfortunately
 #	openvg? ( egl gallium )
@@ -94,6 +94,7 @@ REQUIRED_USE="
 	video_cards_r600?   ( gallium )
 	video_cards_radeonsi?   ( gallium llvm )
 	video_cards_vmware? ( gallium )
+	video_cards_virgl? ( gallium )
 	${PYTHON_REQUIRED_USE}
 "
 
@@ -134,13 +135,14 @@ RDEPEND="
 	opencl? (
 				app-eselect/eselect-opencl
 				beignet? ( 	!dev-libs/beignet
-						beignet-icd? ( dev-libs/ocl-icd )
+						opencl-icd? ( dev-libs/ocl-icd )
 					 )
 				gallium? (
 					dev-libs/libclc
 					|| (
 						>=dev-libs/elfutils-0.155-r1:=[${MULTILIB_USEDEP}]
 						>=dev-libs/libelf-0.8.13-r2:=[${MULTILIB_USEDEP}]
+						opencl-icd? ( dev-libs/ocl-icd )
 					)
 				)
 			)
@@ -149,7 +151,7 @@ RDEPEND="
 	vdpau? ( >=x11-libs/libvdpau-0.7:=[${MULTILIB_USEDEP}] )
 	wayland? ( >=dev-libs/wayland-1.2.0:=[${MULTILIB_USEDEP}] )
 	xvmc? ( >=x11-libs/libXvMC-1.0.8:=[${MULTILIB_USEDEP}] )
-	${LIBDRM_DEPSTRING}[video_cards_freedreno?,video_cards_nouveau?,video_cards_vmware?,${MULTILIB_USEDEP}]
+	${LIBDRM_DEPSTRING}[video_cards_freedreno?,video_cards_nouveau?,video_cards_vmware?,video_cards_virgl?,${MULTILIB_USEDEP}]
 "
 for card in ${INTEL_CARDS}; do
 	RDEPEND="${RDEPEND}
@@ -288,7 +290,7 @@ beignet_src_prepare() {
 	sed -i -e 's/libcl/libOpenCL/g' intel-beignet.icd.in
 
 	# optionally enable support for ICD
-	use beignet-icd || sed -i -e '/Find_Package(OCLIcd)/s/^/#/' \
+	use opencl-icd || sed -i -e '/Find_Package(OCLIcd)/s/^/#/' \
 		CMakeLists.txt || die
 }
 
@@ -415,6 +417,7 @@ multilib_src_configure() {
 		"
 		gallium_enable swrast
 		gallium_enable video_cards_vmware svga
+		gallium_enable video_cards_virgl virgl
 		gallium_enable video_cards_nouveau nouveau
 		gallium_enable video_cards_i915 i915
 		gallium_enable video_cards_ilo ilo
@@ -437,6 +440,7 @@ multilib_src_configure() {
 			if use video_cards_r600 || use video_cards_radeonsi ; then
 				myconf+="
 					$(use_enable opencl)
+					$(use_enable opencl-icd)
 					--with-opencl-libdir="${EPREFIX}/usr/$(get_libdir)/OpenCL/vendors/mesa"
 					--with-clang-libdir="${EPREFIX}/usr/${LIBDIR_default}"
 					"
