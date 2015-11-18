@@ -1,0 +1,117 @@
+From commendsarnex@gmail.com Fri Sep 12 23:21:00 2014
+Return-Path: <commendsarnex@gmail.com>
+Received: from mail.snewbury.org.uk ([unix socket]) by mail.snewbury.org.uk
+ (Cyrus v2.4.17) with LMTPA; Fri, 12 Sep 2014 23:21:00 +0100
+X-Sieve: CMU Sieve 2.4
+X-Virus-Scanned: amavisd-new at snewbury.org.uk
+X-Spam-Flag: NO
+X-Spam-Score: 3
+X-Spam-Level: ***
+X-Spam-Status: No, score=3 tagged_above=0 required=6.2
+ tests=[BAYES_00=-1.9, BOTNET=5, DKIM_SIGNED=0.1, DKIM_VALID=-0.1,
+ DKIM_VALID_AU=-0.1, FREEMAIL_FROM=0.001, SPF_PASS=-0.001] autolearn=no
+ autolearn_force=no
+Authentication-Results: mail.snewbury.org.uk (amavisd-new); dkim=pass
+ (2048-bit key) header.d=gmail.com
+Received: from mail-qg0-x236.google.com (mail-qg0-x236.google.com
+ [IPv6:2607:f8b0:400d:c04::236]) by mail.snewbury.org.uk (8.14.9/8.14.9)
+ with ESMTP id s8CMKttd020912 (version=TLSv1/SSLv3 cipher=RC4-SHA bits=128
+ verify=OK) for <steve@snewbury.org.uk>; Fri, 12 Sep 2014 23:20:56 +0100
+Received: by mail-qg0-f54.google.com with SMTP id z60so1517016qgd.27 for
+ <steve@snewbury.org.uk>; Fri, 12 Sep 2014 15:20:49 -0700 (PDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com;
+ s=20120113; h=from:to:cc:subject:date:message-id;
+ bh=IyPrwnPVDQsEkg2+ruwH0fHHwTwiXesCABoc8QLf63k=;
+ b=V2zhrJRQCkCeAAYB2BEluadWdfJ5ZNfdEyzHJPkiHyokRzu7mieASS2Pmr0K21E+JH
+ SxkW7PlBNqPZUtpZDY1QK1C/v1PayH9iHT0UkTsouJAonowRqwQUu6J1JDJedYwT1QUp
+ trT70gayVBvnKE8BFBlD57O0OPVXQ3lq4ZhUMulM/LbxFXqvBaViA3kxFvetL3yV4pKV
+ riiMjhDE1R08VBNno+W/dte12gyVP69Xiu6UdpCcshgcAWS8cLBxPdhLdiQJ44fWF52l
+ IXeW+QSbARE1nLFhIlQ4tvhJOtpv+ClT9/TGw/l/i1fC85tsh5W1EKGgHvgms8GPt9HR XL/g==
+X-Received: by 10.140.96.86 with SMTP id
+ j80mr11407457qge.106.1410560449637; Fri, 12 Sep 2014 15:20:49 -0700 (PDT)
+Received: from pc.wireless.umass.edu
+ (1x-vl936-72-19-76-174.wireless.umass.edu. [72.19.76.174]) by mx.google.com
+ with ESMTPSA id l10sm4005148qai.4.2014.09.12.15.20.48 for <multiple
+ recipients> (version=TLSv1.2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
+ Fri, 12 Sep 2014 15:20:49 -0700 (PDT)
+From: Nick Sarnie <commendsarnex@gmail.com>
+To: mesa-dev@lists.freedesktop.org
+Cc: steve@snewbury.org.uk, Nick Sarnie <commendsarnex@gmail.com>
+Subject: [PATCH] ilo: Build pipe-loader for ilo
+Date: Fri, 12 Sep 2014 18:20:46 -0400
+Message-Id: <1410560446-28676-1-git-send-email-commendsarnex@gmail.com>
+X-Mailer: git-send-email 2.1.0
+X-Evolution-Source: 1389266509.29991.2@artifact
+Content-Transfer-Encoding: 8bit
+Mime-Version: 1.0
+
+Trivial patch to create the pipe loader for ilo. All the code was already there.
+
+Signed-off-by: Nick Sarnie <commendsarnex@gmail.com>
+---
+ src/gallium/targets/pipe-loader/Makefile.am | 14 ++++++++++++++
+ src/gallium/targets/pipe-loader/pipe_i965.c | 26 ++++++++++++++++++++++++++
+ 2 files changed, 40 insertions(+)
+ create mode 100644 src/gallium/targets/pipe-loader/pipe_i965.c
+
+diff --git a/src/gallium/targets/pipe-loader/Makefile.am b/src/gallium/targets/pipe-loader/Makefile.am
+index ee93078..e94cf4d 100644
+--- a/src/gallium/targets/pipe-loader/Makefile.am
++++ b/src/gallium/targets/pipe-loader/Makefile.am
+@@ -75,6 +75,20 @@ pipe_i915_la_LIBADD = \
+ 
+ endif
+ 
++if HAVE_GALLIUM_ILO
++pipe_LTLIBRARIES += pipe_i965.la
++
++pipe_i965_la_SOURCES = pipe_i965.c
++nodist_EXTRA_pipe_i965_la_SOURCES = dummy.cpp
++pipe_i965_la_LIBADD = \
++	$(PIPE_LIBS) \
++	$(top_builddir)/src/gallium/winsys/intel/drm/libintelwinsys.la \
++	$(top_builddir)/src/gallium/drivers/ilo/libilo.la \
++	$(LIBDRM_LIBS) \
++	$(INTEL_LIBS)
++
++endif
++
+ if HAVE_GALLIUM_NOUVEAU
+ pipe_LTLIBRARIES += pipe_nouveau.la
+ 
+diff --git a/src/gallium/targets/pipe-loader/pipe_i965.c b/src/gallium/targets/pipe-loader/pipe_i965.c
+new file mode 100644
+index 0000000..f4d447c
+--- /dev/null
++++ b/src/gallium/targets/pipe-loader/pipe_i965.c
+@@ -0,0 +1,26 @@
++#include "target-helpers/inline_debug_helper.h"
++#include "state_tracker/drm_driver.h"
++#include "intel/drm/intel_drm_public.h"
++#include "ilo/ilo_public.h"
++
++static struct pipe_screen *
++create_screen(int fd)
++{
++   struct intel_winsys *iws;
++   struct pipe_screen *screen;
++
++   iws = intel_winsys_create_for_fd(fd);
++   if (!iws)
++      return NULL;
++
++   screen = ilo_screen_create(iws);
++   if (!screen)
++      return NULL;
++
++   screen = debug_screen_wrap(screen);
++
++   return screen;
++}
++
++PUBLIC
++DRM_DRIVER_DESCRIPTOR("i965", "i915", create_screen, NULL)
+-- 
+2.1.0
+
+

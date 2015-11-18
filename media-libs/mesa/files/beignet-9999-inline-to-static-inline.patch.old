@@ -1,0 +1,66 @@
+From a6a3253ede8fcfeadbc4159f4776b48be5b76dd7 Mon Sep 17 00:00:00 2001
+From: Koop Mast <kwm@rainbow-runner.nl>
+Date: Tue, 3 Feb 2015 23:18:16 +0100
+Subject: [PATCH 2/2] Change inline to static inline.
+
+Clang defaults to gnu99 standard which has a different meaning for the
+inline keyword.
+---
+ src/cl_api.c     | 2 +-
+ src/cl_event.c   | 2 +-
+ src/cl_program.c | 6 ++++--
+ 3 files changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/src/cl_api.c b/src/cl_api.c
+index 972c687..f435d44 100644
+--- a/src/cl_api.c
++++ b/src/cl_api.c
+@@ -64,7 +64,7 @@ typedef intptr_t cl_device_partition_property;
+ 	  return RET; \
+ 	} while(0)
+ 
+-inline cl_int
++static inline cl_int
+ handle_events(cl_command_queue queue, cl_int num, const cl_event *wait_list,
+               cl_event* event, enqueue_data* data, cl_command_type type)
+ {
+diff --git a/src/cl_event.c b/src/cl_event.c
+index f70e531..965dd32 100644
+--- a/src/cl_event.c
++++ b/src/cl_event.c
+@@ -28,7 +28,7 @@
+ #include <assert.h>
+ #include <stdio.h>
+ 
+-inline cl_bool
++static inline cl_bool
+ cl_event_is_gpu_command_type(cl_command_type type)
+ {
+   switch(type) {
+diff --git a/src/cl_program.c b/src/cl_program.c
+index c30f85e..c8b8311 100644
+--- a/src/cl_program.c
++++ b/src/cl_program.c
+@@ -166,7 +166,8 @@ error:
+   return err;
+ }
+ 
+-inline cl_bool isBitcodeWrapper(const unsigned char *BufPtr, const unsigned char *BufEnd)
++static inline cl_bool
++isBitcodeWrapper(const unsigned char *BufPtr, const unsigned char *BufEnd)
+ {
+   // See if you can find the hidden message in the magic bytes :-).
+   // (Hint: it's a little-endian encoding.)
+@@ -177,7 +178,8 @@ inline cl_bool isBitcodeWrapper(const unsigned char *BufPtr, const unsigned char
+     BufPtr[3] == 0x0B;
+ }
+ 
+-inline cl_bool isRawBitcode(const unsigned char *BufPtr, const unsigned char *BufEnd)
++static inline cl_bool
++isRawBitcode(const unsigned char *BufPtr, const unsigned char *BufEnd)
+ {
+   // These bytes sort of have a hidden message, but it's not in
+   // little-endian this time, and it's a little redundant.
+-- 
+2.2.2
+

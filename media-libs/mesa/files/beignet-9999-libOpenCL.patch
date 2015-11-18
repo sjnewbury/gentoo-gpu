@@ -1,14 +1,3 @@
---- ./utests/CMakeLists.txt.orig	2014-04-17 18:57:54.070188272 +0100
-+++ ./utests/CMakeLists.txt	2014-04-17 18:59:37.666542828 +0100
-@@ -210,7 +210,7 @@
- 
- ADD_LIBRARY(utests SHARED ${ADDMATHFUNC} ${utests_sources})
- 
--TARGET_LINK_LIBRARIES(utests cl m ${OPENGL_LIBRARIES} ${UTESTS_REQUIRED_EGL_LIB} ${CMAKE_THREAD_LIBS_INIT})
-+TARGET_LINK_LIBRARIES(utests OpenCL m ${OPENGL_LIBRARIES} ${UTESTS_REQUIRED_EGL_LIB} ${CMAKE_THREAD_LIBS_INIT})
- 
- ADD_EXECUTABLE(utest_run utest_run.cpp)
- TARGET_LINK_LIBRARIES(utest_run utests)
 --- ./benchmark/CMakeLists.txt~	2014-04-30 18:19:34.000000000 +0100
 +++ ./benchmark/CMakeLists.txt	2014-04-30 18:26:23.314810046 +0100
 @@ -14,8 +14,8 @@
@@ -22,22 +11,35 @@
  
  ADD_EXECUTABLE(benchmark_run benchmark_run.cpp)
  TARGET_LINK_LIBRARIES(benchmark_run benchmarks)
---- ./src/CMakeLists.txt~	2014-06-25 08:02:39.000000000 +0100
-+++ ./src/CMakeLists.txt	2014-06-25 08:05:00.597273720 +0100
-@@ -103,9 +103,10 @@
+--- ./utests/CMakeLists.txt.orig	2014-11-27 21:49:11.591745360 +0000
++++ ./utests/CMakeLists.txt	2014-11-27 21:50:31.355739020 +0000
+@@ -257,7 +257,7 @@
+ 
+ ADD_LIBRARY(utests SHARED ${ADDMATHFUNC} ${utests_sources})
+ 
+-TARGET_LINK_LIBRARIES(utests cl m ${OPENGL_LIBRARIES} ${UTESTS_REQUIRED_EGL_LIB} ${CMAKE_THREAD_LIBS_INIT} ${UTESTS_REQUIRED_X11_LIB})
++TARGET_LINK_LIBRARIES(utests OpenCL m ${OPENGL_LIBRARIES} ${UTESTS_REQUIRED_EGL_LIB} ${CMAKE_THREAD_LIBS_INIT} ${UTESTS_REQUIRED_X11_LIB})
+ 
+ ADD_EXECUTABLE(utest_run utest_run.cpp)
+ TARGET_LINK_LIBRARIES(utest_run utests)
+--- ./src/CMakeLists.txt.orig	2015-11-18 12:00:27.672061250 +0000
++++ ./src/CMakeLists.txt	2015-11-18 14:07:14.901418719 +0000
+@@ -140,10 +140,11 @@
  SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-Bsymbolic,--allow-shlib-undefined")
  
  link_directories (${LLVM_LIBRARY_DIR} ${DRM_LIBDIR})
 -add_library(cl SHARED ${OPENCL_SRC})
+-ADD_DEPENDENCIES(cl ${GIT_SHA1})
 +add_library(OpenCL SHARED ${OPENCL_SRC})
 +set_target_properties(OpenCL PROPERTIES VERSION 1.0.0 SOVERSION 1)
++ADD_DEPENDENCIES(OpenCL ${GIT_SHA1})
  target_link_libraries(
 -                      cl
 +                      OpenCL
+                       rt
                        ${X11_LIBRARIES}
                        ${XEXT_LIBRARIES}
-                       ${XFIXES_LIBRARIES}
-@@ -115,4 +116,4 @@
+@@ -154,4 +155,4 @@
                        ${CMAKE_DL_LIBS}
                        ${OPENGL_LIBRARIES}
                        ${OPTIONAL_EGL_LIBRARY})

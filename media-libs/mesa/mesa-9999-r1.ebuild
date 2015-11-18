@@ -1,10 +1,11 @@
-# Copyright 1999-2014 Gentoo Foundation
+# Copyright 1999-2015 Gentoo Foundation
 # Distributed under the terms of the GNU General Public License v2
 # $Header: $
 
 EAPI=5
 
 EGIT_REPO_URI="git://anongit.freedesktop.org/mesa/mesa"
+#EGIT_REPO_URI="https://github.com/iXit/Mesa-3D.git"
 
 if [[ ${PV} = 9999* ]]; then
 	GIT_ECLASS="git-r3"
@@ -44,6 +45,7 @@ fi
 LICENSE="MIT SGI-B-2.0"
 SLOT="0"
 KEYWORDS=""
+RESTRICT="!bindist? ( bindist )"
 
 INTEL_CARDS="i915 i965 ilo intel"
 RADEON_CARDS="r100 r200 r300 r600 radeon radeonsi"
@@ -53,17 +55,21 @@ for card in ${VIDEO_CARDS}; do
 done
 
 IUSE="${IUSE_VIDEO_CARDS}
-	bindist +classic debug +dri3 +egl +gallium gbm gles1 gles2 +llvm +nptl
-	opencl openvg osmesa pax_kernel openmax pic r600-llvm-compiler selinux
-	vdpau wayland xvmc xa kernel_FreeBSD beignet beignet-egl beignet-generic"
+	bindist +classic d3d9 debug +dri3 +egl +gallium +gbm gles1 gles2 +llvm
+	+nptl opencl osmesa pax_kernel openmax pic selinux +udev vaapi vdpau
+	wayland xvmc xa kernel_FreeBSD beignet beignet-egl beignet-generic
+	beignet-icd"
+
+#  Not available at present unfortunately
+#	openvg? ( egl gallium )
 
 REQUIRED_USE="
 	llvm?   ( gallium )
-	openvg? ( egl gallium )
+	d3d9?   ( dri3 gallium )
 	opencl? (
-		video_cards_r600? ( gallium r600-llvm-compiler )
-		video_cards_radeon? ( gallium r600-llvm-compiler )
-		video_cards_radeonsi? ( gallium r600-llvm-compiler )
+		video_cards_r600? ( gallium )
+		video_cards_radeon? ( gallium )
+		video_cards_radeonsi? ( gallium )
 		video_cards_i965? ( beignet )
 		video_cards_ilo? ( beignet )
 		video_cards_intel? ( beignet )
@@ -71,11 +77,12 @@ REQUIRED_USE="
 	openmax? ( gallium )
 	gles1?  ( egl )
 	gles2?  ( egl )
-	r600-llvm-compiler? ( gallium llvm || ( video_cards_r600 video_cards_radeonsi video_cards_radeon ) )
+	vaapi? ( gallium )
+	vdpau? ( gallium )
 	wayland? ( egl gbm )
 	xa?  ( gallium )
 	video_cards_freedreno?  ( gallium )
-	video_cards_intel?  ( || ( classic gallium ) )
+	video_cards_intel?  ( || ( classic ) )
 	video_cards_i915?   ( || ( classic gallium ) )
 	video_cards_i965?   ( classic )
 	video_cards_ilo?    ( gallium )
@@ -90,50 +97,58 @@ REQUIRED_USE="
 	${PYTHON_REQUIRED_USE}
 "
 
-LIBDRM_DEPSTRING=">=x11-libs/libdrm-2.4.54"
+LIBDRM_DEPSTRING=">=x11-libs/libdrm-2.4.57"
 # keep correct libdrm and dri2proto dep
 # keep blocks in rdepend for binpkg
 RDEPEND="
 	!<x11-base/xorg-server-1.7
 	!<=x11-proto/xf86driproto-2.0.3
 	abi_x86_32? ( !app-emulation/emul-linux-x86-opengl[-abi_x86_32(-)] )
-	classic? ( app-admin/eselect-mesa )
-	gallium? ( app-admin/eselect-mesa )
-	>=app-admin/eselect-opengl-1.2.7
-	dev-libs/expat[${MULTILIB_USEDEP}]
-	gbm? ( virtual/libudev[${MULTILIB_USEDEP}] )
-	dri3? ( virtual/libudev[${MULTILIB_USEDEP}] )
-	>=x11-libs/libX11-1.3.99.901[${MULTILIB_USEDEP}]
-	>=x11-libs/libxshmfence-1.1[${MULTILIB_USEDEP}]
-	x11-libs/libXdamage[${MULTILIB_USEDEP}]
-	x11-libs/libXext[${MULTILIB_USEDEP}]
-	x11-libs/libXxf86vm[${MULTILIB_USEDEP}]
-	>=x11-libs/libxcb-1.9.3[${MULTILIB_USEDEP}]
+	classic? ( app-eselect/eselect-mesa )
+	gallium? ( app-eselect/eselect-mesa )
+	>=app-eselect/eselect-opengl-1.3.0
+	udev? ( kernel_linux? ( >=virtual/libudev-215:=[${MULTILIB_USEDEP}] ) )
+	>=dev-libs/expat-2.1.0-r3:=[${MULTILIB_USEDEP}]
+	gbm? ( >=virtual/libudev-215:=[${MULTILIB_USEDEP}] )
+	dri3? ( >=virtual/libudev-215:=[${MULTILIB_USEDEP}] )
+	>=x11-libs/libX11-1.6.2:=[${MULTILIB_USEDEP}]
+	>=x11-libs/libxshmfence-1.1:=[${MULTILIB_USEDEP}]
+	>=x11-libs/libXdamage-1.1.4-r1:=[${MULTILIB_USEDEP}]
+	>=x11-libs/libXext-1.3.2:=[${MULTILIB_USEDEP}]
+	>=x11-libs/libXxf86vm-1.1.3:=[${MULTILIB_USEDEP}]
+	>=x11-libs/libxcb-1.9.3:=[${MULTILIB_USEDEP}]
+	x11-libs/libXfixes:=[${MULTILIB_USEDEP}]
 	llvm? (
 		video_cards_radeonsi? ( || (
-			dev-libs/elfutils[${MULTILIB_USEDEP}]
-			dev-libs/libelf[${MULTILIB_USEDEP}]
-			) )
-		video_cards_r600? ( || (
-			dev-libs/elfutils[${MULTILIB_USEDEP}]
-			dev-libs/libelf[${MULTILIB_USEDEP}]
+			>=dev-libs/elfutils-0.155-r1:=[${MULTILIB_USEDEP}]
+			>=dev-libs/libelf-0.8.13-r2:=[${MULTILIB_USEDEP}]
 			) )
 		!video_cards_r600? (
 			video_cards_radeon? ( || (
-				dev-libs/elfutils[${MULTILIB_USEDEP}]
-				dev-libs/libelf[${MULTILIB_USEDEP}]
+				>=dev-libs/elfutils-0.155-r1:=[${MULTILIB_USEDEP}]
+				>=dev-libs/libelf-0.8.13-r2:=[${MULTILIB_USEDEP}]
 				) )
 		)
-		>=sys-devel/llvm-3.3-r3[${MULTILIB_USEDEP}]
+		>=sys-devel/llvm-3.5.0:=[${MULTILIB_USEDEP}]
 	)
 	opencl? (
-				app-admin/eselect-opencl
-				beignet? ( !dev-libs/beignet )
+				app-eselect/eselect-opencl
+				beignet? ( 	!dev-libs/beignet
+						beignet-icd? ( dev-libs/ocl-icd )
+					 )
+				gallium? (
+					dev-libs/libclc
+					|| (
+						>=dev-libs/elfutils-0.155-r1:=[${MULTILIB_USEDEP}]
+						>=dev-libs/libelf-0.8.13-r2:=[${MULTILIB_USEDEP}]
+					)
+				)
 			)
-	openmax? ( media-libs/libomxil-bellagio[${MULTILIB_USEDEP}] )
-	vdpau? ( >=x11-libs/libvdpau-0.4.1[${MULTILIB_USEDEP}] )
-	wayland? ( >=dev-libs/wayland-1.2.0[${MULTILIB_USEDEP}] )
-	xvmc? ( >=x11-libs/libXvMC-1.0.6[${MULTILIB_USEDEP}] )
+	openmax? ( >=media-libs/libomxil-bellagio-0.9.3:=[${MULTILIB_USEDEP}] )
+	vaapi? ( >=x11-libs/libva-0.35.0:=[${MULTILIB_USEDEP}] )
+	vdpau? ( >=x11-libs/libvdpau-0.7:=[${MULTILIB_USEDEP}] )
+	wayland? ( >=dev-libs/wayland-1.2.0:=[${MULTILIB_USEDEP}] )
+	xvmc? ( >=x11-libs/libXvMC-1.0.8:=[${MULTILIB_USEDEP}] )
 	${LIBDRM_DEPSTRING}[video_cards_freedreno?,video_cards_nouveau?,video_cards_vmware?,${MULTILIB_USEDEP}]
 "
 for card in ${INTEL_CARDS}; do
@@ -163,29 +178,32 @@ for card in ${RADEON_CARDS}; do
 done
 
 DEPEND="${RDEPEND}
-	${PYTHON_DEPS}
 	llvm? (
-		r600-llvm-compiler? ( sys-devel/llvm[video_cards_radeon] )
 		video_cards_radeonsi? ( sys-devel/llvm[video_cards_radeon] )
 	)
 	opencl? (
-				>=sys-devel/llvm-3.3-r3[${MULTILIB_USEDEP}]
-				>=sys-devel/clang-3.3[${MULTILIB_USEDEP}]
+				>=sys-devel/llvm-3.5:=[${MULTILIB_USEDEP}]
+				>=sys-devel/clang-3.5:=[${MULTILIB_USEDEP}]
 				>=sys-devel/gcc-4.6
 	)
-	sys-devel/bison
-	sys-devel/flex
 	sys-devel/gettext
 	virtual/pkgconfig
-	>=x11-proto/dri2proto-2.6[${MULTILIB_USEDEP}]
+	beignet? ( sys-apps/sed )
+	>=x11-proto/dri2proto-2.8-r1:=[${MULTILIB_USEDEP}]
 	dri3? (
-		>=x11-proto/dri3proto-1.0[${MULTILIB_USEDEP}]
-		>=x11-proto/presentproto-1.0[${MULTILIB_USEDEP}]
+		>=x11-proto/dri3proto-1.0:=[${MULTILIB_USEDEP}]
+		>=x11-proto/presentproto-1.0:=[${MULTILIB_USEDEP}]
 	)
-	>=x11-proto/glproto-1.4.15-r1[${MULTILIB_USEDEP}]
-	>=x11-proto/xextproto-7.0.99.1[${MULTILIB_USEDEP}]
-	x11-proto/xf86driproto[${MULTILIB_USEDEP}]
-	x11-proto/xf86vidmodeproto[${MULTILIB_USEDEP}]
+	>=x11-proto/glproto-1.4.17-r1:=[${MULTILIB_USEDEP}]
+	>=x11-proto/xextproto-7.2.1-r1:=[${MULTILIB_USEDEP}]
+	>=x11-proto/xf86driproto-2.1.1-r1:=[${MULTILIB_USEDEP}]
+	>=x11-proto/xf86vidmodeproto-2.3.1-r1:=[${MULTILIB_USEDEP}]
+	${PYTHON_DEPS}
+	$(python_gen_any_dep ">=dev-python/mako-0.7.3[\${PYTHON_USEDEP}]")
+"
+[[ ${PV} == "9999" ]] && DEPEND+="
+	sys-devel/bison
+	sys-devel/flex
 "
 
 S="${WORKDIR}/${MY_P}"
@@ -193,15 +211,15 @@ CMAKE_USE_DIR="${S}"/beignet-${B_PV}
 
 # It is slow without texrels, if someone wants slow
 # mesa without texrels +pic use is worth the shot
-QA_EXECSTACK="usr/lib*/opengl/xorg-x11/lib/libGL.so*"
-QA_WX_LOAD="usr/lib*/opengl/xorg-x11/lib/libGL.so*"
-
-# Think about: ggi, fbcon, no-X configs
+QA_EXECSTACK="usr/lib*/libGL.so*"
+QA_WX_LOAD="usr/lib*/libGL.so*"
 
 pkg_setup() {
-	# workaround toc-issue wrt #386545
-	use ppc64 && append-flags -mminimal-toc
-
+	# warning message for bug 459306
+	if use llvm && has_version sys-devel/llvm[!debug=]; then
+		ewarn "Mismatch between debug USE flags in media-libs/mesa and sys-devel/llvm"
+		ewarn "detected! This can cause problems. For details, see bug 459306."
+	fi
 	python-any-r1_pkg_setup
 }
 
@@ -229,6 +247,13 @@ src_unpack() {
 		git-r3_fetch
 		EGIT_CHECKOUT_DIR="${S}" git-r3_checkout
 		use opencl && use beignet && beignet_src_unpack
+		# We want to make sure the mesa repo HEAD gets stored not beignet
+		# so set the EGIT_VERSION ourselves. 
+		cd "${S}"
+		local new_commit_id=$(
+			git rev-parse --verify HEAD
+		)
+		export EGIT_VERSION=${new_commit_id}
 	else
 		# keep beignet sources in mesa source tree so they 
 		# get copied with for multilib build
@@ -241,12 +266,30 @@ beignet_src_prepare() {
 	cmake-utils_src_prepare
 
 	# Fix linking
-	epatch "${FILESDIR}"/beignet-"${B_PV}"-respect-flags.patch
+	# no longer needed
+	#epatch "${FILESDIR}"/beignet-"${B_PV}"-respect-flags.patch
 
-	# Make resulting OpenCL library conform expected 
+	# Build beignet libcl as libOpenCL so that it can be handled
+	# by the Gentoo eselect opencl
 	epatch "${FILESDIR}"/beignet-"${B_PV}"-libOpenCL.patch
 	epatch "${FILESDIR}"/beignet-"${B_PV}"-llvm-libs-tr.patch
-	epatch "${FILESDIR}"/beignet-"${B_PV}"-buildfix.patch
+	#epatch "${FILESDIR}"/beignet-"${B_PV}"-buildfix.patch
+	epatch "${FILESDIR}"/beignet-"${B_PV}"-bitcode-path-fix.patch
+	epatch "${FILESDIR}"/beignet-"${B_PV}"-silence-dri2-failure.patch
+#	epatch "${FILESDIR}"/fix-beignet.patch
+	epatch "${FILESDIR}"/beignet-"${B_PV}"-inline-to-static-inline.patch
+
+	# Beignet hasn't been converted to use the new PassManager yet
+#	epatch "${FILESDIR}"/beignet-"${B_PV}"-llvm37.patch
+#	sed -i -e 's/\(PassManager\.h\)/IR\/Legacy\1/' $(find -name '*.cpp')
+#	sed -i -e 's/\(::PassManager\)/::legacy\1/' $(find -name '*.cpp')
+
+#	Change ICD name as above
+	sed -i -e 's/libcl/libOpenCL/g' intel-beignet.icd.in
+
+	# optionally enable support for ICD
+	use beignet-icd || sed -i -e '/Find_Package(OCLIcd)/s/^/#/' \
+		CMakeLists.txt || die
 }
 
 src_prepare() {
@@ -290,7 +333,7 @@ beignet_src_configure() {
 
 	if ! use beignet-generic; then
 		mycmakeargs+=(
-			-DGEN_PCI_ID=$("${FILESDIR}"/GetGenID.sh)
+			-DGEN_PCI_ID=$(. "${FILESDIR}"/GetGenID.sh)
 		)
 	fi
 	# Currently broken FIXME!
@@ -301,15 +344,23 @@ beignet_src_configure() {
 	fi
 
 	multilib_is_native_abi || mycmakeargs+=(
-		-DLLVM_CONFIG_EXECUTABLE="${EPREFIX}/usr/bin/llvm-config.${ABI}"
+		-DLLVM_CONFIG_EXECUTABLE="${EPREFIX}/usr/bin/$(get_abi_CHOST ${ABI})-llvm-config"
 	)
 	# Use clang (we're depending upon it anyway)
-	# LTO currently doesn't work with beignet
-	# and clang doesn't support graphite or
-	# linker plugins
-	filter-flags -flto* -fgraphite -fuse-linker-plugin -mfpmath*
+	# and clang doesn't support graphite
 	# [currently doesn't work as beignet uses g++ variable length array extension]
 	#CC=clang CXX=clang++
+
+	if [[ ${CC} == clang ]]; then
+		filter-flags -f*graphite -f*loop-*
+		filter-flags -mfpmath* -freorder-blocks-and-partition
+	fi
+
+	# Pre-compiled headers otherwise result in redefined symbols (gcc only)
+	if [[ ${CC} == gcc* ]]; then
+		append-flags -fpch-deps
+	fi
+
 	BUILD_DIR=${BUILD_DIR}/beignet-${B_PV} cmake-utils_src_configure
 	CFLAGS=${OLD_CFLAGS}
 	CXXFLAGS=${OLD_CXXFLAGS}
@@ -320,10 +371,10 @@ multilib_src_configure() {
 	local myconf
 
 	if use classic; then
-	# Configurable DRI drivers
+		# Configurable DRI drivers
 		driver_enable swrast
 
-	# Intel code
+		# Intel code
 		driver_enable video_cards_i915 i915
 		driver_enable video_cards_i965 i965
 		if ! use video_cards_i915 && \
@@ -345,16 +396,19 @@ multilib_src_configure() {
 	fi
 
 	if use egl; then
-		myconf+="--with-egl-platforms=x11,$(use wayland && echo ",wayland")$(use gbm && echo ",drm")"
+			myconf+="--with-egl-platforms=x11$(use wayland && echo ",wayland")$(use gbm && echo ",drm") "
 	fi
+
+# FIXME
+#			$(use_enable openvg)
+#			$(use_enable openvg gallium-egl)
 
 	if use gallium; then
 		myconf+="
+			$(use_enable d3d9 nine)
 			$(use_enable llvm gallium-llvm)
-			$(use_enable openvg)
-			$(use_enable openvg gallium-egl)
 			$(use_enable openmax omx)
-			$(use_enable r600-llvm-compiler)
+			$(use_enable vaapi va)
 			$(use_enable vdpau)
 			$(use_enable xa)
 			$(use_enable xvmc)
@@ -404,11 +458,13 @@ multilib_src_configure() {
 			LLVM_CONFIG="${EPREFIX}/usr/bin/llvm-config.${ABI}"
 	fi
 
+	ECONF_SOURCE="${S}" \
 	econf \
 		--enable-dri \
 		--enable-glx \
 		--enable-shared-glapi \
 		$(use_enable !bindist texture-float) \
+		$(use_enable d3d9 nine) \
 		$(use_enable debug) \
 		$(use_enable dri3) \
 		$(use_enable egl) \
@@ -417,7 +473,7 @@ multilib_src_configure() {
 		$(use_enable gles2) \
 		$(use_enable nptl glx-tls) \
 		$(use_enable osmesa) \
-		$(use_enable !pic asm) \
+		$(use_enable !udev sysfs) \
 		--enable-llvm-shared-libs \
 		--with-dri-drivers=${DRI_DRIVERS} \
 		--with-gallium-drivers=${GALLIUM_DRIVERS} \
@@ -442,49 +498,20 @@ multilib_src_compile() {
 multilib_src_install() {
 	emake install DESTDIR="${D}"
 
-	# Move libGL and others from /usr/lib to /usr/lib/opengl/blah/lib
-	# because user can eselect desired GL provider.
-	ebegin "Moving libGL and friends for dynamic switching"
-		local x
-		local gl_dir="/usr/$(get_libdir)/opengl/${OPENGL_DIR}/"
-		dodir ${gl_dir}/{lib,extensions,include/GL}
-		for x in "${ED}"/usr/$(get_libdir)/lib{EGL,GL*,OpenVG}.{la,a,so*}; do
-			if [ -f ${x} -o -L ${x} ]; then
-				mv -f "${x}" "${ED}${gl_dir}"/lib \
-					|| die "Failed to move ${x}"
-			fi
-		done
-		for x in "${ED}"/usr/include/GL/{gl.h,glx.h,glext.h,glxext.h}; do
-			if [ -f ${x} -o -L ${x} ]; then
-				mv -f "${x}" "${ED}${gl_dir}"/include/GL \
-					|| die "Failed to move ${x}"
-			fi
-		done
-		for x in "${ED}"/usr/include/{EGL,GLES*,VG,KHR}; do
-			if [ -d ${x} ]; then
-				mv -f "${x}" "${ED}${gl_dir}"/include \
-					|| die "Failed to move ${x}"
-			fi
-		done
-	eend $?
-
 	if use classic || use gallium; then
 			ebegin "Moving DRI/Gallium drivers for dynamic switching"
-			local gallium_drivers=( i915_dri.so ilo_dri.so i965_dri.so r300_dri.so r600_dri.so swrast_dri.so )
+			local gallium_drivers=( i915_dri.so i965_dri.so r300_dri.so r600_dri.so swrast_dri.so )
 			keepdir /usr/$(get_libdir)/dri
 			dodir /usr/$(get_libdir)/mesa
 			for x in ${gallium_drivers[@]}; do
 				if [ -f "$(get_libdir)/gallium/${x}" ]; then
-					insinto "/usr/$(get_libdir)/dri/"
-					doins "$(get_libdir)/gallium/${x}"
-					if [ -f "$(get_libdir)/${x}" ]; then
-						mv -f "${ED}/usr/$(get_libdir)/dri/${x}" "${ED}/usr/$(get_libdir)/dri/${x/_dri.so/g_dri.so}" \
-							|| die "Failed to move ${x}"
-						insopts -m0755
-						doins "$(get_libdir)/${x}"
-					fi
+					mv -f "${ED}/usr/$(get_libdir)/dri/${x}" "${ED}/usr/$(get_libdir)/dri/${x/_dri.so/g_dri.so}" \
+						|| die "Failed to move ${x}"
 				fi
 			done
+			if use classic; then
+				emake -C "${BUILD_DIR}/src/mesa/drivers/dri" DESTDIR="${D}" install
+			fi
 			for x in "${ED}"/usr/$(get_libdir)/dri/*.so; do
 				if [ -f ${x} -o -L ${x} ]; then
 					mv -f "${x}" "${x/dri/mesa}" \
@@ -564,13 +591,6 @@ pkg_postinst() {
 	echo
 	eselect opengl set --use-old ${OPENGL_DIR}
 
-	# switch to xorg-x11 and back if necessary, bug #374647 comment 11
-	OLD_IMPLEM="$(eselect opengl show)"
-	if [[ ${OPENGL_DIR}x != ${OLD_IMPLEM}x ]]; then
-		eselect opengl set ${OPENGL_DIR}
-		eselect opengl set ${OLD_IMPLEM}
-	fi
-
 	# Select classic/gallium drivers
 	if use classic || use gallium; then
 		eselect mesa set --auto
@@ -596,15 +616,7 @@ pkg_postinst() {
 		elog "enabled. Please see patents.txt for an explanation."
 	fi
 
-	local using_radeon r_flag
-	for r_flag in ${RADEON_CARDS}; do
-		if use video_cards_${r_flag}; then
-			using_radeon=1
-			break
-		fi
-	done
-
-	if [[ ${using_radeon} = 1 ]] && ! has_version media-libs/libtxc_dxtn; then
+	if ! has_version media-libs/libtxc_dxtn; then
 		elog "Note that in order to have full S3TC support, it is necessary to install"
 		elog "media-libs/libtxc_dxtn as well. This may be necessary to get nice"
 		elog "textures in some apps, and some others even require this to run."

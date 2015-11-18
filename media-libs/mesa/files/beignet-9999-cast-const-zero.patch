@@ -1,0 +1,22 @@
+--- ./backend/src/llvm/llvm_bitcode_link.cpp~	2015-03-01 11:11:36.000000000 +0000
++++ ./backend/src/llvm/llvm_bitcode_link.cpp	2015-03-01 11:40:34.179790177 +0000
+@@ -243,7 +243,7 @@
+ #if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR <= 5
+     if(LLVMLinkModules(wrap(clonedLib), wrap(mod), LLVMLinkerDestroySource, &errorMsg)) {
+ #else
+-    if(LLVMLinkModules(wrap(clonedLib), wrap(mod), 0, &errorMsg)) {
++    if(LLVMLinkModules(wrap(clonedLib), wrap(mod), (LLVMLinkerMode) 0, &errorMsg)) {
+ #endif
+       delete clonedLib;
+       printf("Fatal Error: link the bitcode error:\n%s\n", errorMsg);
+--- ./backend/src/backend/gen_program.cpp~	2015-03-01 11:52:27.000000000 +0000
++++ ./backend/src/backend/gen_program.cpp	2015-03-01 12:03:39.792618155 +0000
+@@ -391,7 +391,7 @@
+ #if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR <= 5
+       if (LLVMLinkModules(wrap(dst), wrap(src), LLVMLinkerPreserveSource, &errMsg)) {
+ #else
+-      if (LLVMLinkModules(wrap(dst), wrap(src), 0, &errMsg)) {
++      if (LLVMLinkModules(wrap(dst), wrap(src), (LLVMLinkerMode) 0, &errMsg)) {
+ #endif
+         if (err != NULL && errSize != NULL && stringSize > 0u) {
+           strncpy(err, errMsg, stringSize-1);

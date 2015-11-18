@@ -1,0 +1,1033 @@
+From beignet-bounces@lists.freedesktop.org Sun Apr 19 12:48:12 2015
+Return-Path: <beignet-bounces@lists.freedesktop.org>
+Received: from mail.snewbury.org.uk ([unix socket]) by mail.snewbury.org.uk
+ (Cyrus v2.4.17) with LMTPA; Sun, 19 Apr 2015 12:48:12 +0100
+X-Sieve: CMU Sieve 2.4
+X-Virus-Scanned: amavisd-new at snewbury.org.uk
+Received: from gabe.freedesktop.org (gabe.freedesktop.org
+ [131.252.210.177]) by mail.snewbury.org.uk (8.14.9/8.14.9) with ESMTP id
+ t3JBm5mf032306 for <steve@snewbury.org.uk>; Sun, 19 Apr 2015 12:48:05 +0100
+Received: from gabe.freedesktop.org (localhost [127.0.0.1]) by
+ gabe.freedesktop.org (Postfix) with ESMTP id 7ABDA6E073; Sun, 19 Apr 2015
+ 04:48:04 -0700 (PDT)
+X-Original-To: beignet@lists.freedesktop.org
+Delivered-To: beignet@lists.freedesktop.org
+X-Greylist: delayed 307 seconds by postgrey-1.34 at gabe; Sun, 19 Apr 2015
+ 04:48:03 PDT
+Received: from xcpp.org (xcpp.org [134.255.239.46]) by gabe.freedesktop.org
+ (Postfix) with ESMTP id 086076E073 for <beignet@lists.freedesktop.org>;
+ Sun, 19 Apr 2015 04:48:02 -0700 (PDT)
+To: beignet@lists.freedesktop.org
+Date: Sun, 19 Apr 2015 13:19:14 +0200
+Message-ID: <1429442354-25432-1-git-send-email-linedot@xcpp.org>
+From: "linedot" <linedot@xcpp.org>
+Received: from localhost.localdomain
+ (ip-109-91-219-11.hsi12.unitymediagroup.de [109.91.219.11]) by xcpp.org;
+ Sun, 19 Apr 2015 13:42:36 +0200
+X-Mailer: git-send-email 2.3.5
+Cc: linedot <linedot@xcpp.org>
+Subject: [Beignet] [PATCH] LLVM/Clang 3.7 compatibility
+X-BeenThere: beignet@lists.freedesktop.org
+X-Mailman-Version: 2.1.18
+Precedence: list
+List-Id: An open source open CL implemenation for Intel platform
+ <beignet.lists.freedesktop.org>
+List-Unsubscribe: <http://lists.freedesktop.org/mailman/options/beignet>,
+ <mailto:beignet-request@lists.freedesktop.org?subject=unsubscribe>
+List-Archive: <http://lists.freedesktop.org/archives/beignet>
+List-Post: <mailto:beignet@lists.freedesktop.org>
+List-Help: <mailto:beignet-request@lists.freedesktop.org?subject=help>
+List-Subscribe: <http://lists.freedesktop.org/mailman/listinfo/beignet>,
+ <mailto:beignet-request@lists.freedesktop.org?subject=subscribe>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+Errors-To: beignet-bounces@lists.freedesktop.org
+Sender: "Beignet" <beignet-bounces@lists.freedesktop.org>
+X-Evolution-Source: 1389266509.29991.2@artifact
+Content-Transfer-Encoding: 8bit
+
+
+I have modified some files to allow beignet to compile with the current
+git version of LLVM. I ran the utests with the -a option on an Intel HD
+4000 and had mostly
+successes except for
+
+builtin_pow()
+compiler_function_qualifiers()
+test_load_program_from_spir()
+
+Those are probably unrelated to the changes I made, but I haven't tested
+with a lower llvm version.
+
+I'm not sure about how to deal with the changes in ocl_mem*.ll, but for
+everything in cpp code I used version guards.
+
+The old pass managers moved to llvm/IR/LegacyPassManager.h, I have used
+those and had to use some pass wrappers.
+
+LLVMLinkerPreserveSource was removed, The value is still in the enum as
+LLVMLinkerPreserveSource_Removed, but it has no effect.
+
+>From llvm release notes: "The DataLayout is no longer optional. All the
+IR level optimizations expects it to be present and the API has been
+changed to use a reference instead of a pointer to make it explicit. The
+Module owns the datalayout and it has to match the one attached to the
+TargetMachine for generating code.". I'm not sure if that's the right
+way to do this, but I passed the DataLayout from the runModulePass
+function to createLoadStoreOptimizationPass() and removed addition of
+DataLayout passes everywhere.
+
+There was also a typo in llvm_to_gen.cpp: runFuntionPass -> runFunctionPass
+---
+ backend/src/backend/gen_program.cpp              |   4 +
+ backend/src/libocl/src/ocl_memcpy.ll             | 168 +++++++++++------------
+ backend/src/libocl/src/ocl_memset.ll             |  12 +-
+ backend/src/llvm/llvm_bitcode_link.cpp           |  10 +-
+ backend/src/llvm/llvm_gen_backend.cpp            |  25 +++-
+ backend/src/llvm/llvm_gen_backend.hpp            |   4 +
+ backend/src/llvm/llvm_loadstore_optimization.cpp |  16 ++-
+ backend/src/llvm/llvm_passes.cpp                 |   8 ++
+ backend/src/llvm/llvm_sampler_fix.cpp            |   8 ++
+ backend/src/llvm/llvm_scalarize.cpp              |   4 +
+ backend/src/llvm/llvm_to_gen.cpp                 |  76 ++++++++--
+ backend/src/llvm/llvm_unroll.cpp                 |   9 ++
+ 12 files changed, 239 insertions(+), 105 deletions(-)
+
+diff --git a/backend/src/backend/gen_program.cpp b/backend/src/backend/gen_program.cpp
+index f4c74f8..8b12d09 100644
+--- a/backend/src/backend/gen_program.cpp
++++ b/backend/src/backend/gen_program.cpp
+@@ -393,7 +393,11 @@ namespace gbe {
+       llvm::Module* src = (llvm::Module*)((GenProgram*)src_program)->module;
+       llvm::Module* dst = (llvm::Module*)((GenProgram*)dst_program)->module;
+ 
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 7
++      if (LLVMLinkModules(wrap(dst), wrap(src), LLVMLinkerPreserveSource_Removed, &errMsg)) {
++#else
+       if (LLVMLinkModules(wrap(dst), wrap(src), LLVMLinkerPreserveSource, &errMsg)) {
++#endif
+         if (err != NULL && errSize != NULL && stringSize > 0u) {
+           strncpy(err, errMsg, stringSize-1);
+           err[stringSize-1] = '\0';
+diff --git a/backend/src/libocl/src/ocl_memcpy.ll b/backend/src/libocl/src/ocl_memcpy.ll
+index b3fadb2..dae3166 100644
+--- a/backend/src/libocl/src/ocl_memcpy.ll
++++ b/backend/src/libocl/src/ocl_memcpy.ll
+@@ -22,10 +22,10 @@ while.cond:                                       ; preds = %while.body, %entry
+   br i1 %cmp, label %while.cond3, label %while.body
+ 
+ while.body:                                       ; preds = %while.cond
+-  %add.ptr = getelementptr inbounds i8 addrspace(1)* %src, i32 %index.0
++  %add.ptr = getelementptr inbounds i8, i8 addrspace(1)* %src, i32 %index.0
+   %0 = bitcast i8 addrspace(1)* %add.ptr to i32 addrspace(1)*
+-  %1 = load i32 addrspace(1)* %0, align 4
+-  %add.ptr1 = getelementptr inbounds i8 addrspace(1)* %dst, i32 %index.0
++  %1 = load i32, i32 addrspace(1)* %0, align 4
++  %add.ptr1 = getelementptr inbounds i8, i8 addrspace(1)* %dst, i32 %index.0
+   %2 = bitcast i8 addrspace(1)* %add.ptr1 to i32 addrspace(1)*
+   store i32 %1, i32 addrspace(1)* %2, align 4
+   br label %while.cond
+@@ -36,9 +36,9 @@ while.cond3:                                      ; preds = %while.cond, %while.
+   br i1 %cmp4, label %while.body5, label %while.end7
+ 
+ while.body5:                                      ; preds = %while.cond3
+-  %arrayidx = getelementptr inbounds i8 addrspace(1)* %src, i32 %index.1
+-  %3 = load i8 addrspace(1)* %arrayidx, align 1
+-  %arrayidx6 = getelementptr inbounds i8 addrspace(1)* %dst, i32 %index.1
++  %arrayidx = getelementptr inbounds i8, i8 addrspace(1)* %src, i32 %index.1
++  %3 = load i8, i8 addrspace(1)* %arrayidx, align 1
++  %arrayidx6 = getelementptr inbounds i8, i8 addrspace(1)* %dst, i32 %index.1
+   store i8 %3, i8 addrspace(1)* %arrayidx6, align 1
+   %inc = add i32 %index.1, 1
+   br label %while.cond3
+@@ -58,10 +58,10 @@ while.cond:                                       ; preds = %while.body, %entry
+   br i1 %cmp, label %while.cond3, label %while.body
+ 
+ while.body:                                       ; preds = %while.cond
+-  %add.ptr = getelementptr inbounds i8 addrspace(0)* %src, i32 %index.0
++  %add.ptr = getelementptr inbounds i8, i8 addrspace(0)* %src, i32 %index.0
+   %0 = bitcast i8 addrspace(0)* %add.ptr to i32 addrspace(0)*
+-  %1 = load i32 addrspace(0)* %0, align 4
+-  %add.ptr1 = getelementptr inbounds i8 addrspace(1)* %dst, i32 %index.0
++  %1 = load i32, i32 addrspace(0)* %0, align 4
++  %add.ptr1 = getelementptr inbounds i8, i8 addrspace(1)* %dst, i32 %index.0
+   %2 = bitcast i8 addrspace(1)* %add.ptr1 to i32 addrspace(1)*
+   store i32 %1, i32 addrspace(1)* %2, align 4
+   br label %while.cond
+@@ -72,9 +72,9 @@ while.cond3:                                      ; preds = %while.cond, %while.
+   br i1 %cmp4, label %while.body5, label %while.end7
+ 
+ while.body5:                                      ; preds = %while.cond3
+-  %arrayidx = getelementptr inbounds i8 addrspace(0)* %src, i32 %index.1
+-  %3 = load i8 addrspace(0)* %arrayidx, align 1
+-  %arrayidx6 = getelementptr inbounds i8 addrspace(1)* %dst, i32 %index.1
++  %arrayidx = getelementptr inbounds i8, i8 addrspace(0)* %src, i32 %index.1
++  %3 = load i8, i8 addrspace(0)* %arrayidx, align 1
++  %arrayidx6 = getelementptr inbounds i8, i8 addrspace(1)* %dst, i32 %index.1
+   store i8 %3, i8 addrspace(1)* %arrayidx6, align 1
+   %inc = add i32 %index.1, 1
+   br label %while.cond3
+@@ -94,10 +94,10 @@ while.cond:                                       ; preds = %while.body, %entry
+   br i1 %cmp, label %while.cond3, label %while.body
+ 
+ while.body:                                       ; preds = %while.cond
+-  %add.ptr = getelementptr inbounds i8 addrspace(3)* %src, i32 %index.0
++  %add.ptr = getelementptr inbounds i8, i8 addrspace(3)* %src, i32 %index.0
+   %0 = bitcast i8 addrspace(3)* %add.ptr to i32 addrspace(3)*
+-  %1 = load i32 addrspace(3)* %0, align 4
+-  %add.ptr1 = getelementptr inbounds i8 addrspace(1)* %dst, i32 %index.0
++  %1 = load i32, i32 addrspace(3)* %0, align 4
++  %add.ptr1 = getelementptr inbounds i8, i8 addrspace(1)* %dst, i32 %index.0
+   %2 = bitcast i8 addrspace(1)* %add.ptr1 to i32 addrspace(1)*
+   store i32 %1, i32 addrspace(1)* %2, align 4
+   br label %while.cond
+@@ -108,9 +108,9 @@ while.cond3:                                      ; preds = %while.cond, %while.
+   br i1 %cmp4, label %while.body5, label %while.end7
+ 
+ while.body5:                                      ; preds = %while.cond3
+-  %arrayidx = getelementptr inbounds i8 addrspace(3)* %src, i32 %index.1
+-  %3 = load i8 addrspace(3)* %arrayidx, align 1
+-  %arrayidx6 = getelementptr inbounds i8 addrspace(1)* %dst, i32 %index.1
++  %arrayidx = getelementptr inbounds i8, i8 addrspace(3)* %src, i32 %index.1
++  %3 = load i8, i8 addrspace(3)* %arrayidx, align 1
++  %arrayidx6 = getelementptr inbounds i8, i8 addrspace(1)* %dst, i32 %index.1
+   store i8 %3, i8 addrspace(1)* %arrayidx6, align 1
+   %inc = add i32 %index.1, 1
+   br label %while.cond3
+@@ -130,10 +130,10 @@ while.cond:                                       ; preds = %while.body, %entry
+   br i1 %cmp, label %while.cond3, label %while.body
+ 
+ while.body:                                       ; preds = %while.cond
+-  %add.ptr = getelementptr inbounds i8 addrspace(1)* %src, i32 %index.0
++  %add.ptr = getelementptr inbounds i8, i8 addrspace(1)* %src, i32 %index.0
+   %0 = bitcast i8 addrspace(1)* %add.ptr to i32 addrspace(1)*
+-  %1 = load i32 addrspace(1)* %0, align 4
+-  %add.ptr1 = getelementptr inbounds i8 addrspace(0)* %dst, i32 %index.0
++  %1 = load i32, i32 addrspace(1)* %0, align 4
++  %add.ptr1 = getelementptr inbounds i8, i8 addrspace(0)* %dst, i32 %index.0
+   %2 = bitcast i8 addrspace(0)* %add.ptr1 to i32 addrspace(0)*
+   store i32 %1, i32 addrspace(0)* %2, align 4
+   br label %while.cond
+@@ -144,9 +144,9 @@ while.cond3:                                      ; preds = %while.cond, %while.
+   br i1 %cmp4, label %while.body5, label %while.end7
+ 
+ while.body5:                                      ; preds = %while.cond3
+-  %arrayidx = getelementptr inbounds i8 addrspace(1)* %src, i32 %index.1
+-  %3 = load i8 addrspace(1)* %arrayidx, align 1
+-  %arrayidx6 = getelementptr inbounds i8 addrspace(0)* %dst, i32 %index.1
++  %arrayidx = getelementptr inbounds i8, i8 addrspace(1)* %src, i32 %index.1
++  %3 = load i8, i8 addrspace(1)* %arrayidx, align 1
++  %arrayidx6 = getelementptr inbounds i8, i8 addrspace(0)* %dst, i32 %index.1
+   store i8 %3, i8 addrspace(0)* %arrayidx6, align 1
+   %inc = add i32 %index.1, 1
+   br label %while.cond3
+@@ -166,10 +166,10 @@ while.cond:                                       ; preds = %while.body, %entry
+   br i1 %cmp, label %while.cond3, label %while.body
+ 
+ while.body:                                       ; preds = %while.cond
+-  %add.ptr = getelementptr inbounds i8 addrspace(0)* %src, i32 %index.0
++  %add.ptr = getelementptr inbounds i8, i8 addrspace(0)* %src, i32 %index.0
+   %0 = bitcast i8 addrspace(0)* %add.ptr to i32 addrspace(0)*
+-  %1 = load i32 addrspace(0)* %0, align 4
+-  %add.ptr1 = getelementptr inbounds i8 addrspace(0)* %dst, i32 %index.0
++  %1 = load i32, i32 addrspace(0)* %0, align 4
++  %add.ptr1 = getelementptr inbounds i8, i8 addrspace(0)* %dst, i32 %index.0
+   %2 = bitcast i8 addrspace(0)* %add.ptr1 to i32 addrspace(0)*
+   store i32 %1, i32 addrspace(0)* %2, align 4
+   br label %while.cond
+@@ -180,9 +180,9 @@ while.cond3:                                      ; preds = %while.cond, %while.
+   br i1 %cmp4, label %while.body5, label %while.end7
+ 
+ while.body5:                                      ; preds = %while.cond3
+-  %arrayidx = getelementptr inbounds i8 addrspace(0)* %src, i32 %index.1
+-  %3 = load i8 addrspace(0)* %arrayidx, align 1
+-  %arrayidx6 = getelementptr inbounds i8 addrspace(0)* %dst, i32 %index.1
++  %arrayidx = getelementptr inbounds i8, i8 addrspace(0)* %src, i32 %index.1
++  %3 = load i8, i8 addrspace(0)* %arrayidx, align 1
++  %arrayidx6 = getelementptr inbounds i8, i8 addrspace(0)* %dst, i32 %index.1
+   store i8 %3, i8 addrspace(0)* %arrayidx6, align 1
+   %inc = add i32 %index.1, 1
+   br label %while.cond3
+@@ -202,10 +202,10 @@ while.cond:                                       ; preds = %while.body, %entry
+   br i1 %cmp, label %while.cond3, label %while.body
+ 
+ while.body:                                       ; preds = %while.cond
+-  %add.ptr = getelementptr inbounds i8 addrspace(3)* %src, i32 %index.0
++  %add.ptr = getelementptr inbounds i8, i8 addrspace(3)* %src, i32 %index.0
+   %0 = bitcast i8 addrspace(3)* %add.ptr to i32 addrspace(3)*
+-  %1 = load i32 addrspace(3)* %0, align 4
+-  %add.ptr1 = getelementptr inbounds i8 addrspace(0)* %dst, i32 %index.0
++  %1 = load i32, i32 addrspace(3)* %0, align 4
++  %add.ptr1 = getelementptr inbounds i8, i8 addrspace(0)* %dst, i32 %index.0
+   %2 = bitcast i8 addrspace(0)* %add.ptr1 to i32 addrspace(0)*
+   store i32 %1, i32 addrspace(0)* %2, align 4
+   br label %while.cond
+@@ -216,9 +216,9 @@ while.cond3:                                      ; preds = %while.cond, %while.
+   br i1 %cmp4, label %while.body5, label %while.end7
+ 
+ while.body5:                                      ; preds = %while.cond3
+-  %arrayidx = getelementptr inbounds i8 addrspace(3)* %src, i32 %index.1
+-  %3 = load i8 addrspace(3)* %arrayidx, align 1
+-  %arrayidx6 = getelementptr inbounds i8 addrspace(0)* %dst, i32 %index.1
++  %arrayidx = getelementptr inbounds i8, i8 addrspace(3)* %src, i32 %index.1
++  %3 = load i8, i8 addrspace(3)* %arrayidx, align 1
++  %arrayidx6 = getelementptr inbounds i8, i8 addrspace(0)* %dst, i32 %index.1
+   store i8 %3, i8 addrspace(0)* %arrayidx6, align 1
+   %inc = add i32 %index.1, 1
+   br label %while.cond3
+@@ -238,10 +238,10 @@ while.cond:                                       ; preds = %while.body, %entry
+   br i1 %cmp, label %while.cond3, label %while.body
+ 
+ while.body:                                       ; preds = %while.cond
+-  %add.ptr = getelementptr inbounds i8 addrspace(1)* %src, i32 %index.0
++  %add.ptr = getelementptr inbounds i8, i8 addrspace(1)* %src, i32 %index.0
+   %0 = bitcast i8 addrspace(1)* %add.ptr to i32 addrspace(1)*
+-  %1 = load i32 addrspace(1)* %0, align 4
+-  %add.ptr1 = getelementptr inbounds i8 addrspace(3)* %dst, i32 %index.0
++  %1 = load i32, i32 addrspace(1)* %0, align 4
++  %add.ptr1 = getelementptr inbounds i8, i8 addrspace(3)* %dst, i32 %index.0
+   %2 = bitcast i8 addrspace(3)* %add.ptr1 to i32 addrspace(3)*
+   store i32 %1, i32 addrspace(3)* %2, align 4
+   br label %while.cond
+@@ -252,9 +252,9 @@ while.cond3:                                      ; preds = %while.cond, %while.
+   br i1 %cmp4, label %while.body5, label %while.end7
+ 
+ while.body5:                                      ; preds = %while.cond3
+-  %arrayidx = getelementptr inbounds i8 addrspace(1)* %src, i32 %index.1
+-  %3 = load i8 addrspace(1)* %arrayidx, align 1
+-  %arrayidx6 = getelementptr inbounds i8 addrspace(3)* %dst, i32 %index.1
++  %arrayidx = getelementptr inbounds i8, i8 addrspace(1)* %src, i32 %index.1
++  %3 = load i8, i8 addrspace(1)* %arrayidx, align 1
++  %arrayidx6 = getelementptr inbounds i8, i8 addrspace(3)* %dst, i32 %index.1
+   store i8 %3, i8 addrspace(3)* %arrayidx6, align 1
+   %inc = add i32 %index.1, 1
+   br label %while.cond3
+@@ -274,10 +274,10 @@ while.cond:                                       ; preds = %while.body, %entry
+   br i1 %cmp, label %while.cond3, label %while.body
+ 
+ while.body:                                       ; preds = %while.cond
+-  %add.ptr = getelementptr inbounds i8 addrspace(0)* %src, i32 %index.0
++  %add.ptr = getelementptr inbounds i8, i8 addrspace(0)* %src, i32 %index.0
+   %0 = bitcast i8 addrspace(0)* %add.ptr to i32 addrspace(0)*
+-  %1 = load i32 addrspace(0)* %0, align 4
+-  %add.ptr1 = getelementptr inbounds i8 addrspace(3)* %dst, i32 %index.0
++  %1 = load i32, i32 addrspace(0)* %0, align 4
++  %add.ptr1 = getelementptr inbounds i8, i8 addrspace(3)* %dst, i32 %index.0
+   %2 = bitcast i8 addrspace(3)* %add.ptr1 to i32 addrspace(3)*
+   store i32 %1, i32 addrspace(3)* %2, align 4
+   br label %while.cond
+@@ -288,9 +288,9 @@ while.cond3:                                      ; preds = %while.cond, %while.
+   br i1 %cmp4, label %while.body5, label %while.end7
+ 
+ while.body5:                                      ; preds = %while.cond3
+-  %arrayidx = getelementptr inbounds i8 addrspace(0)* %src, i32 %index.1
+-  %3 = load i8 addrspace(0)* %arrayidx, align 1
+-  %arrayidx6 = getelementptr inbounds i8 addrspace(3)* %dst, i32 %index.1
++  %arrayidx = getelementptr inbounds i8, i8 addrspace(0)* %src, i32 %index.1
++  %3 = load i8, i8 addrspace(0)* %arrayidx, align 1
++  %arrayidx6 = getelementptr inbounds i8, i8 addrspace(3)* %dst, i32 %index.1
+   store i8 %3, i8 addrspace(3)* %arrayidx6, align 1
+   %inc = add i32 %index.1, 1
+   br label %while.cond3
+@@ -310,10 +310,10 @@ while.cond:                                       ; preds = %while.body, %entry
+   br i1 %cmp, label %while.cond3, label %while.body
+ 
+ while.body:                                       ; preds = %while.cond
+-  %add.ptr = getelementptr inbounds i8 addrspace(3)* %src, i32 %index.0
++  %add.ptr = getelementptr inbounds i8, i8 addrspace(3)* %src, i32 %index.0
+   %0 = bitcast i8 addrspace(3)* %add.ptr to i32 addrspace(3)*
+-  %1 = load i32 addrspace(3)* %0, align 4
+-  %add.ptr1 = getelementptr inbounds i8 addrspace(3)* %dst, i32 %index.0
++  %1 = load i32, i32 addrspace(3)* %0, align 4
++  %add.ptr1 = getelementptr inbounds i8, i8 addrspace(3)* %dst, i32 %index.0
+   %2 = bitcast i8 addrspace(3)* %add.ptr1 to i32 addrspace(3)*
+   store i32 %1, i32 addrspace(3)* %2, align 4
+   br label %while.cond
+@@ -324,9 +324,9 @@ while.cond3:                                      ; preds = %while.cond, %while.
+   br i1 %cmp4, label %while.body5, label %while.end7
+ 
+ while.body5:                                      ; preds = %while.cond3
+-  %arrayidx = getelementptr inbounds i8 addrspace(3)* %src, i32 %index.1
+-  %3 = load i8 addrspace(3)* %arrayidx, align 1
+-  %arrayidx6 = getelementptr inbounds i8 addrspace(3)* %dst, i32 %index.1
++  %arrayidx = getelementptr inbounds i8, i8 addrspace(3)* %src, i32 %index.1
++  %3 = load i8, i8 addrspace(3)* %arrayidx, align 1
++  %arrayidx6 = getelementptr inbounds i8, i8 addrspace(3)* %dst, i32 %index.1
+   store i8 %3, i8 addrspace(3)* %arrayidx6, align 1
+   %inc = add i32 %index.1, 1
+   br label %while.cond3
+@@ -354,7 +354,7 @@ while.body:                                       ; preds = %entry, %while.body
+   %0 = ptrtoint i8 addrspace(1)* %src to i32
+   %1 = add i32 %0, %index.05
+   %2 = inttoptr i32 %1 to i8 addrspace(1)*
+-  %3 = load i8 addrspace(1)* %2, align 1
++  %3 = load i8, i8 addrspace(1)* %2, align 1
+   %4 = ptrtoint i8 addrspace(1)* %dst to i32
+   %5 = add i32 %4, %index.05
+   %6 = inttoptr i32 %5 to i8 addrspace(1)*
+@@ -377,7 +377,7 @@ while.body:                                       ; preds = %entry, %while.body
+   %0 = ptrtoint i8 addrspace(0)* %src to i32
+   %1 = add i32 %0, %index.05
+   %2 = inttoptr i32 %1 to i8 addrspace(0)*
+-  %3 = load i8 addrspace(0)* %2, align 1
++  %3 = load i8, i8 addrspace(0)* %2, align 1
+   %4 = ptrtoint i8 addrspace(1)* %dst to i32
+   %5 = add i32 %4, %index.05
+   %6 = inttoptr i32 %5 to i8 addrspace(1)*
+@@ -400,7 +400,7 @@ while.body:                                       ; preds = %entry, %while.body
+   %0 = ptrtoint i8 addrspace(3)* %src to i32
+   %1 = add i32 %0, %index.05
+   %2 = inttoptr i32 %1 to i8 addrspace(3)*
+-  %3 = load i8 addrspace(3)* %2, align 1
++  %3 = load i8, i8 addrspace(3)* %2, align 1
+   %4 = ptrtoint i8 addrspace(1)* %dst to i32
+   %5 = add i32 %4, %index.05
+   %6 = inttoptr i32 %5 to i8 addrspace(1)*
+@@ -423,7 +423,7 @@ while.body:                                       ; preds = %entry, %while.body
+   %0 = ptrtoint i8 addrspace(1)* %src to i32
+   %1 = add i32 %0, %index.05
+   %2 = inttoptr i32 %1 to i8 addrspace(1)*
+-  %3 = load i8 addrspace(1)* %2, align 1
++  %3 = load i8, i8 addrspace(1)* %2, align 1
+   %4 = ptrtoint i8 addrspace(0)* %dst to i32
+   %5 = add i32 %4, %index.05
+   %6 = inttoptr i32 %5 to i8 addrspace(0)*
+@@ -446,7 +446,7 @@ while.body:                                       ; preds = %entry, %while.body
+   %0 = ptrtoint i8 addrspace(0)* %src to i32
+   %1 = add i32 %0, %index.05
+   %2 = inttoptr i32 %1 to i8 addrspace(0)*
+-  %3 = load i8 addrspace(0)* %2, align 1
++  %3 = load i8, i8 addrspace(0)* %2, align 1
+   %4 = ptrtoint i8 addrspace(0)* %dst to i32
+   %5 = add i32 %4, %index.05
+   %6 = inttoptr i32 %5 to i8 addrspace(0)*
+@@ -469,7 +469,7 @@ while.body:                                       ; preds = %entry, %while.body
+   %0 = ptrtoint i8 addrspace(3)* %src to i32
+   %1 = add i32 %0, %index.05
+   %2 = inttoptr i32 %1 to i8 addrspace(3)*
+-  %3 = load i8 addrspace(3)* %2, align 1
++  %3 = load i8, i8 addrspace(3)* %2, align 1
+   %4 = ptrtoint i8 addrspace(0)* %dst to i32
+   %5 = add i32 %4, %index.05
+   %6 = inttoptr i32 %5 to i8 addrspace(0)*
+@@ -492,7 +492,7 @@ while.body:                                       ; preds = %entry, %while.body
+   %0 = ptrtoint i8 addrspace(1)* %src to i32
+   %1 = add i32 %0, %index.05
+   %2 = inttoptr i32 %1 to i8 addrspace(1)*
+-  %3 = load i8 addrspace(1)* %2, align 1
++  %3 = load i8, i8 addrspace(1)* %2, align 1
+   %4 = ptrtoint i8 addrspace(3)* %dst to i32
+   %5 = add i32 %4, %index.05
+   %6 = inttoptr i32 %5 to i8 addrspace(3)*
+@@ -515,7 +515,7 @@ while.body:                                       ; preds = %entry, %while.body
+   %0 = ptrtoint i8 addrspace(0)* %src to i32
+   %1 = add i32 %0, %index.05
+   %2 = inttoptr i32 %1 to i8 addrspace(0)*
+-  %3 = load i8 addrspace(0)* %2, align 1
++  %3 = load i8, i8 addrspace(0)* %2, align 1
+   %4 = ptrtoint i8 addrspace(3)* %dst to i32
+   %5 = add i32 %4, %index.05
+   %6 = inttoptr i32 %5 to i8 addrspace(3)*
+@@ -538,7 +538,7 @@ while.body:                                       ; preds = %entry, %while.body
+   %0 = ptrtoint i8 addrspace(3)* %src to i32
+   %1 = add i32 %0, %index.05
+   %2 = inttoptr i32 %1 to i8 addrspace(3)*
+-  %3 = load i8 addrspace(3)* %2, align 1
++  %3 = load i8, i8 addrspace(3)* %2, align 1
+   %4 = ptrtoint i8 addrspace(3)* %dst to i32
+   %5 = add i32 %4, %index.05
+   %6 = inttoptr i32 %5 to i8 addrspace(3)*
+@@ -562,10 +562,10 @@ while.cond:                                       ; preds = %while.body, %entry
+   br i1 %cmp, label %while.cond3, label %while.body
+ 
+ while.body:                                       ; preds = %while.cond
+-  %add.ptr = getelementptr inbounds i8 addrspace(2)* %src, i32 %index.0
++  %add.ptr = getelementptr inbounds i8, i8 addrspace(2)* %src, i32 %index.0
+   %0 = bitcast i8 addrspace(2)* %add.ptr to i32 addrspace(2)*
+-  %1 = load i32 addrspace(2)* %0, align 4
+-  %add.ptr1 = getelementptr inbounds i8 addrspace(1)* %dst, i32 %index.0
++  %1 = load i32, i32 addrspace(2)* %0, align 4
++  %add.ptr1 = getelementptr inbounds i8, i8 addrspace(1)* %dst, i32 %index.0
+   %2 = bitcast i8 addrspace(1)* %add.ptr1 to i32 addrspace(1)*
+   store i32 %1, i32 addrspace(1)* %2, align 4
+   br label %while.cond
+@@ -576,9 +576,9 @@ while.cond3:                                      ; preds = %while.cond, %while.
+   br i1 %cmp4, label %while.body5, label %while.end7
+ 
+ while.body5:                                      ; preds = %while.cond3
+-  %arrayidx = getelementptr inbounds i8 addrspace(2)* %src, i32 %index.1
+-  %3 = load i8 addrspace(2)* %arrayidx, align 1
+-  %arrayidx6 = getelementptr inbounds i8 addrspace(1)* %dst, i32 %index.1
++  %arrayidx = getelementptr inbounds i8, i8 addrspace(2)* %src, i32 %index.1
++  %3 = load i8, i8 addrspace(2)* %arrayidx, align 1
++  %arrayidx6 = getelementptr inbounds i8, i8 addrspace(1)* %dst, i32 %index.1
+   store i8 %3, i8 addrspace(1)* %arrayidx6, align 1
+   %inc = add i32 %index.1, 1
+   br label %while.cond3
+@@ -598,10 +598,10 @@ while.cond:                                       ; preds = %while.body, %entry
+   br i1 %cmp, label %while.cond3, label %while.body
+ 
+ while.body:                                       ; preds = %while.cond
+-  %add.ptr = getelementptr inbounds i8 addrspace(2)* %src, i32 %index.0
++  %add.ptr = getelementptr inbounds i8, i8 addrspace(2)* %src, i32 %index.0
+   %0 = bitcast i8 addrspace(2)* %add.ptr to i32 addrspace(2)*
+-  %1 = load i32 addrspace(2)* %0, align 4
+-  %add.ptr1 = getelementptr inbounds i8 addrspace(0)* %dst, i32 %index.0
++  %1 = load i32, i32 addrspace(2)* %0, align 4
++  %add.ptr1 = getelementptr inbounds i8, i8 addrspace(0)* %dst, i32 %index.0
+   %2 = bitcast i8 addrspace(0)* %add.ptr1 to i32 addrspace(0)*
+   store i32 %1, i32 addrspace(0)* %2, align 4
+   br label %while.cond
+@@ -612,9 +612,9 @@ while.cond3:                                      ; preds = %while.cond, %while.
+   br i1 %cmp4, label %while.body5, label %while.end7
+ 
+ while.body5:                                      ; preds = %while.cond3
+-  %arrayidx = getelementptr inbounds i8 addrspace(2)* %src, i32 %index.1
+-  %3 = load i8 addrspace(2)* %arrayidx, align 1
+-  %arrayidx6 = getelementptr inbounds i8 addrspace(0)* %dst, i32 %index.1
++  %arrayidx = getelementptr inbounds i8, i8 addrspace(2)* %src, i32 %index.1
++  %3 = load i8, i8 addrspace(2)* %arrayidx, align 1
++  %arrayidx6 = getelementptr inbounds i8, i8 addrspace(0)* %dst, i32 %index.1
+   store i8 %3, i8 addrspace(0)* %arrayidx6, align 1
+   %inc = add i32 %index.1, 1
+   br label %while.cond3
+@@ -634,10 +634,10 @@ while.cond:                                       ; preds = %while.body, %entry
+   br i1 %cmp, label %while.cond3, label %while.body
+ 
+ while.body:                                       ; preds = %while.cond
+-  %add.ptr = getelementptr inbounds i8 addrspace(2)* %src, i32 %index.0
++  %add.ptr = getelementptr inbounds i8, i8 addrspace(2)* %src, i32 %index.0
+   %0 = bitcast i8 addrspace(2)* %add.ptr to i32 addrspace(2)*
+-  %1 = load i32 addrspace(2)* %0, align 4
+-  %add.ptr1 = getelementptr inbounds i8 addrspace(3)* %dst, i32 %index.0
++  %1 = load i32, i32 addrspace(2)* %0, align 4
++  %add.ptr1 = getelementptr inbounds i8, i8 addrspace(3)* %dst, i32 %index.0
+   %2 = bitcast i8 addrspace(3)* %add.ptr1 to i32 addrspace(3)*
+   store i32 %1, i32 addrspace(3)* %2, align 4
+   br label %while.cond
+@@ -648,9 +648,9 @@ while.cond3:                                      ; preds = %while.cond, %while.
+   br i1 %cmp4, label %while.body5, label %while.end7
+ 
+ while.body5:                                      ; preds = %while.cond3
+-  %arrayidx = getelementptr inbounds i8 addrspace(2)* %src, i32 %index.1
+-  %3 = load i8 addrspace(2)* %arrayidx, align 1
+-  %arrayidx6 = getelementptr inbounds i8 addrspace(3)* %dst, i32 %index.1
++  %arrayidx = getelementptr inbounds i8, i8 addrspace(2)* %src, i32 %index.1
++  %3 = load i8, i8 addrspace(2)* %arrayidx, align 1
++  %arrayidx6 = getelementptr inbounds i8, i8 addrspace(3)* %dst, i32 %index.1
+   store i8 %3, i8 addrspace(3)* %arrayidx6, align 1
+   %inc = add i32 %index.1, 1
+   br label %while.cond3
+@@ -669,7 +669,7 @@ while.body:                                       ; preds = %entry, %while.body
+   %0 = ptrtoint i8 addrspace(2)* %src to i32
+   %1 = add i32 %0, %index.05
+   %2 = inttoptr i32 %1 to i8 addrspace(2)*
+-  %3 = load i8 addrspace(2)* %2, align 1
++  %3 = load i8, i8 addrspace(2)* %2, align 1
+   %4 = ptrtoint i8 addrspace(0)* %dst to i32
+   %5 = add i32 %4, %index.05
+   %6 = inttoptr i32 %5 to i8 addrspace(0)*
+@@ -692,7 +692,7 @@ while.body:                                       ; preds = %entry, %while.body
+   %0 = ptrtoint i8 addrspace(2)* %src to i32
+   %1 = add i32 %0, %index.05
+   %2 = inttoptr i32 %1 to i8 addrspace(2)*
+-  %3 = load i8 addrspace(2)* %2, align 1
++  %3 = load i8, i8 addrspace(2)* %2, align 1
+   %4 = ptrtoint i8 addrspace(1)* %dst to i32
+   %5 = add i32 %4, %index.05
+   %6 = inttoptr i32 %5 to i8 addrspace(1)*
+@@ -715,7 +715,7 @@ while.body:                                       ; preds = %entry, %while.body
+   %0 = ptrtoint i8 addrspace(2)* %src to i32
+   %1 = add i32 %0, %index.05
+   %2 = inttoptr i32 %1 to i8 addrspace(2)*
+-  %3 = load i8 addrspace(2)* %2, align 1
++  %3 = load i8, i8 addrspace(2)* %2, align 1
+   %4 = ptrtoint i8 addrspace(3)* %dst to i32
+   %5 = add i32 %4, %index.05
+   %6 = inttoptr i32 %5 to i8 addrspace(3)*
+diff --git a/backend/src/libocl/src/ocl_memset.ll b/backend/src/libocl/src/ocl_memset.ll
+index 665eac4..6506a69 100644
+--- a/backend/src/libocl/src/ocl_memset.ll
++++ b/backend/src/libocl/src/ocl_memset.ll
+@@ -30,7 +30,7 @@ while.cond:                                       ; preds = %while.body, %entry
+   br i1 %cmp, label %while.cond10, label %while.body
+ 
+ while.body:                                       ; preds = %while.cond
+-  %add.ptr = getelementptr inbounds i8* %dst, i32 %index.0
++  %add.ptr = getelementptr inbounds i8, i8* %dst, i32 %index.0
+   %0 = bitcast i8* %add.ptr to i32*
+   store i32 %or7, i32* %0, align 4
+   br label %while.cond
+@@ -41,7 +41,7 @@ while.cond10:                                     ; preds = %while.cond, %while.
+   br i1 %cmp11, label %while.body13, label %while.end14
+ 
+ while.body13:                                     ; preds = %while.cond10
+-  %arrayidx = getelementptr inbounds i8* %dst, i32 %index.1
++  %arrayidx = getelementptr inbounds i8, i8* %dst, i32 %index.1
+   store i8 %val, i8* %arrayidx, align 1
+   %inc = add i32 %index.1, 1
+   br label %while.cond10
+@@ -68,7 +68,7 @@ while.cond:                                       ; preds = %while.body, %entry
+   br i1 %cmp, label %while.cond10, label %while.body
+ 
+ while.body:                                       ; preds = %while.cond
+-  %add.ptr = getelementptr inbounds i8 addrspace(1)* %dst, i32 %index.0
++  %add.ptr = getelementptr inbounds i8, i8 addrspace(1)* %dst, i32 %index.0
+   %0 = bitcast i8 addrspace(1)* %add.ptr to i32 addrspace(1)*
+   store i32 %or7, i32 addrspace(1)* %0, align 4
+   br label %while.cond
+@@ -79,7 +79,7 @@ while.cond10:                                     ; preds = %while.cond, %while.
+   br i1 %cmp11, label %while.body13, label %while.end14
+ 
+ while.body13:                                     ; preds = %while.cond10
+-  %arrayidx = getelementptr inbounds i8 addrspace(1)* %dst, i32 %index.1
++  %arrayidx = getelementptr inbounds i8, i8 addrspace(1)* %dst, i32 %index.1
+   store i8 %val, i8 addrspace(1)* %arrayidx, align 1
+   %inc = add i32 %index.1, 1
+   br label %while.cond10
+@@ -106,7 +106,7 @@ while.cond:                                       ; preds = %while.body, %entry
+   br i1 %cmp, label %while.cond10, label %while.body
+ 
+ while.body:                                       ; preds = %while.cond
+-  %add.ptr = getelementptr inbounds i8 addrspace(3)* %dst, i32 %index.0
++  %add.ptr = getelementptr inbounds i8, i8 addrspace(3)* %dst, i32 %index.0
+   %0 = bitcast i8 addrspace(3)* %add.ptr to i32 addrspace(3)*
+   store i32 %or7, i32 addrspace(3)* %0, align 4
+   br label %while.cond
+@@ -117,7 +117,7 @@ while.cond10:                                     ; preds = %while.cond, %while.
+   br i1 %cmp11, label %while.body13, label %while.end14
+ 
+ while.body13:                                     ; preds = %while.cond10
+-  %arrayidx = getelementptr inbounds i8 addrspace(3)* %dst, i32 %index.1
++  %arrayidx = getelementptr inbounds i8, i8 addrspace(3)* %dst, i32 %index.1
+   store i8 %val, i8 addrspace(3)* %arrayidx, align 1
+   %inc = add i32 %index.1, 1
+   br label %while.cond10
+diff --git a/backend/src/llvm/llvm_bitcode_link.cpp b/backend/src/llvm/llvm_bitcode_link.cpp
+index ebf4386..40040f9 100644
+--- a/backend/src/llvm/llvm_bitcode_link.cpp
++++ b/backend/src/llvm/llvm_bitcode_link.cpp
+@@ -25,7 +25,11 @@
+ #include "llvm/IR/Instructions.h"
+ #include "llvm/IR/Module.h"
+ #include "llvm/IRReader/IRReader.h"
+-#include "llvm/PassManager.h"
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 7
++#include "llvm/IR/LegacyPassManager.h"
++#else
++#include "llvm/PassManager"
++#endif
+ #include "llvm/Pass.h"
+ #include "llvm/IR/IRBuilder.h"
+ #include "llvm/Support/FileSystem.h"
+@@ -249,7 +253,11 @@ namespace gbe
+       return NULL;
+     }
+ 
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 7
++    llvm::legacy::PassManager passes;
++#else
+     llvm::PassManager passes;
++#endif
+ 
+     passes.add(createInternalizePass(kernels));
+     passes.add(createGlobalDCEPass());
+diff --git a/backend/src/llvm/llvm_gen_backend.cpp b/backend/src/llvm/llvm_gen_backend.cpp
+index 9f4ed48..cab9957 100644
+--- a/backend/src/llvm/llvm_gen_backend.cpp
++++ b/backend/src/llvm/llvm_gen_backend.cpp
+@@ -86,7 +86,12 @@
+ #include "llvm/IR/Instructions.h"
+ #endif  /* LLVM_VERSION_MINOR <= 2 */
+ #include "llvm/Pass.h"
++
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 7
++#include "llvm/IR/LegacyPassManager.h"
++#else
+ #include "llvm/PassManager.h"
++#endif
+ #include "llvm/IR/IRBuilder.h"
+ #if LLVM_VERSION_MINOR <= 2
+ #include "llvm/Intrinsics.h"
+@@ -100,7 +105,11 @@
+ #include "llvm/ADT/StringExtras.h"
+ #include "llvm/ADT/SmallString.h"
+ #include "llvm/ADT/STLExtras.h"
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 7
++#include "llvm/IR/InstIterator.h"
++#else
+ #include "llvm/Analysis/ConstantsScanner.h"
++#endif
+ #include "llvm/Analysis/LoopInfo.h"
+ #include "llvm/Analysis/ValueTracking.h"
+ #include "llvm/CodeGen/Passes.h"
+@@ -527,14 +536,22 @@
+         TheModule(0),
+         btiBase(BTI_RESERVED_NUM)
+     {
+-      initializeLoopInfoPass(*PassRegistry::getPassRegistry());
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 7
++        initializeLoopInfoWrapperPassPass(*PassRegistry::getPassRegistry());
++#else
++        initializeLoopInfoPass(*PassRegistry::getPassRegistry());
++#endif
+       pass = PASS_EMIT_REGISTERS;
+     }
+ 
+     virtual const char *getPassName() const { return "Gen Back-End"; }
+ 
+     void getAnalysisUsage(AnalysisUsage &AU) const {
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 7
++      AU.addRequired<LoopInfoWrapperPass>();
++#else
+       AU.addRequired<LoopInfo>();
++#endif
+       AU.setPreservesAll();
+     }
+ 
+@@ -563,8 +580,11 @@
+       Func = &F;
+       assignBti(F);
+       analyzePointerOrigin(F);
+-
+-      LI = &getAnalysis<LoopInfo>();
++      #if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 7
++        LI = &getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
++      #else
++        LI = &getAnalysis<LoopInfo>();
++      #endif
+       emitFunction(F);
+       phiMap.clear();
+       globalPointer.clear();
+diff --git a/backend/src/llvm/llvm_gen_backend.hpp b/backend/src/llvm/llvm_gen_backend.hpp
+index 1f16557..e87c05b 100644
+--- a/backend/src/llvm/llvm_gen_backend.hpp
++++ b/backend/src/llvm/llvm_gen_backend.hpp
+@@ -133,7 +133,11 @@ namespace gbe
+   llvm::BasicBlockPass *createRemoveGEPPass(const ir::Unit &unit);
+ 
+   /*! Merge load/store if possible */
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 7
++  llvm::BasicBlockPass *createLoadStoreOptimizationPass(const llvm::DataLayout* DL);
++#else
+   llvm::BasicBlockPass *createLoadStoreOptimizationPass();
++#endif
+ 
+   /*! Scalarize all vector op instructions */
+   llvm::FunctionPass* createScalarizePass();
+diff --git a/backend/src/llvm/llvm_loadstore_optimization.cpp b/backend/src/llvm/llvm_loadstore_optimization.cpp
+index c6349fa..a258f55 100644
+--- a/backend/src/llvm/llvm_loadstore_optimization.cpp
++++ b/backend/src/llvm/llvm_loadstore_optimization.cpp
+@@ -24,7 +24,11 @@
+ 
+ #include "llvm/IR/Instructions.h"
+ #include "llvm/Pass.h"
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 7
++#include "llvm/IR/LegacyPassManager.h"
++#else
+ #include "llvm/PassManager.h"
++#endif
+ 
+ #include "llvm/Config/llvm-config.h"
+ #include "llvm/ADT/DenseMap.h"
+@@ -62,7 +66,11 @@ namespace gbe {
+     static char ID;
+     ScalarEvolution *SE;
+     const DataLayout *TD;
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 7
++    GenLoadStoreOptimization(const DataLayout* DL) : BasicBlockPass(ID), TD(DL) {}
++#else
+     GenLoadStoreOptimization() : BasicBlockPass(ID) {}
++#endif
+ 
+     void getAnalysisUsage(AnalysisUsage &AU) const {
+       AU.addRequired<ScalarEvolution>();
+@@ -72,7 +80,8 @@ namespace gbe {
+ 
+     virtual bool runOnBasicBlock(BasicBlock &BB) {
+       SE = &getAnalysis<ScalarEvolution>();
+-      #if LLVM_VERSION_MINOR >= 5
++      #if LLVM_VERSION_MINOR == 7
++      #elif LLVM_VERSION_MINOR >= 5
+         DataLayoutPass *DLP = getAnalysisIfAvailable<DataLayoutPass>();
+         TD = DLP ? &DLP->getDataLayout() : nullptr;
+       #else
+@@ -278,8 +287,13 @@ namespace gbe {
+     return changed;
+   }
+ 
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 7
++  BasicBlockPass *createLoadStoreOptimizationPass(const DataLayout* DL) {
++    return new GenLoadStoreOptimization(DL);
++#else
+   BasicBlockPass *createLoadStoreOptimizationPass() {
+     return new GenLoadStoreOptimization();
++#endif
+   }
+ };
+ 
+diff --git a/backend/src/llvm/llvm_passes.cpp b/backend/src/llvm/llvm_passes.cpp
+index 223f61b..5b3d22f 100644
+--- a/backend/src/llvm/llvm_passes.cpp
++++ b/backend/src/llvm/llvm_passes.cpp
+@@ -45,7 +45,11 @@
+ #include "llvm/IR/Instructions.h"
+ #endif  /* LLVM_VERSION_MINOR <= 2 */
+ #include "llvm/Pass.h"
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 7
++#include "llvm/IR/LegacyPassManager.h"
++#else
+ #include "llvm/PassManager.h"
++#endif
+ #if LLVM_VERSION_MINOR <= 2
+ #include "llvm/Intrinsics.h"
+ #include "llvm/IntrinsicInst.h"
+@@ -58,7 +62,11 @@
+ #include "llvm/ADT/StringExtras.h"
+ #include "llvm/ADT/SmallString.h"
+ #include "llvm/ADT/STLExtras.h"
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 7
++#include "llvm/IR/InstIterator.h"
++#else
+ #include "llvm/Analysis/ConstantsScanner.h"
++#endif
+ #include "llvm/Analysis/LoopInfo.h"
+ #include "llvm/Analysis/ValueTracking.h"
+ #include "llvm/CodeGen/Passes.h"
+diff --git a/backend/src/llvm/llvm_sampler_fix.cpp b/backend/src/llvm/llvm_sampler_fix.cpp
+index 8c76324..a2a57f4 100644
+--- a/backend/src/llvm/llvm_sampler_fix.cpp
++++ b/backend/src/llvm/llvm_sampler_fix.cpp
+@@ -22,7 +22,11 @@
+  */
+ #include "llvm/IR/Instructions.h"
+ #include "llvm/Pass.h"
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 7
++#include "llvm/IR/LegacyPassManager.h"
++#else
+ #include "llvm/PassManager.h"
++#endif
+ 
+ #include "llvm/Config/llvm-config.h"
+ #include "llvm/ADT/DenseMap.h"
+@@ -40,7 +44,11 @@
+ #include "llvm/Support/CFG.h"
+ #endif
+ 
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 7
++#include "llvm/IR/InstIterator.h"
++#else
+ #include "llvm/Analysis/ConstantsScanner.h"
++#endif
+ 
+ #include "llvm_gen_backend.hpp"
+ #include "ocl_common_defines.h"
+diff --git a/backend/src/llvm/llvm_scalarize.cpp b/backend/src/llvm/llvm_scalarize.cpp
+index bc985c6..d9475c7 100644
+--- a/backend/src/llvm/llvm_scalarize.cpp
++++ b/backend/src/llvm/llvm_scalarize.cpp
+@@ -128,7 +128,11 @@ namespace gbe {
+ 
+     Scalarize() : FunctionPass(ID)
+     {
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 7
++      initializeLoopInfoWrapperPassPass(*PassRegistry::getPassRegistry());
++#else
+       initializeLoopInfoPass(*PassRegistry::getPassRegistry());
++#endif
+ #if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 5
+       initializeDominatorTreeWrapperPassPass(*PassRegistry::getPassRegistry());
+ #else
+diff --git a/backend/src/llvm/llvm_to_gen.cpp b/backend/src/llvm/llvm_to_gen.cpp
+index 4ea722a..4bae3f9 100644
+--- a/backend/src/llvm/llvm_to_gen.cpp
++++ b/backend/src/llvm/llvm_to_gen.cpp
+@@ -32,11 +32,19 @@
+ #include "llvm/IR/Module.h"
+ #include "llvm/IR/DataLayout.h"
+ #endif  /* LLVM_VERSION_MINOR <= 2 */
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 7
++#include "llvm/IR/LegacyPassManager.h"
++#else
+ #include "llvm/PassManager.h"
++#endif
+ #include "llvm/Pass.h"
+ #include "llvm/Analysis/Passes.h"
+ #include "llvm/Transforms/IPO.h"
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 7
++#include "llvm/Analysis/TargetLibraryInfo.h"
++#else
+ #include "llvm/Target/TargetLibraryInfo.h"
++#endif
+ #include "llvm/ADT/Triple.h"
+ #if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR <= 2
+ #include "llvm/Support/IRReader.h"
+@@ -77,12 +85,21 @@ namespace gbe
+   BVAR(OCL_OUTPUT_CFG_GEN_IR, false);
+   using namespace llvm;
+ 
+-  void runFuntionPass(Module &mod, TargetLibraryInfo *libraryInfo, const DataLayout &DL)
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 7
++  void runFunctionPass(Module &mod, TargetLibraryInfoImpl *libraryInfo, const DataLayout &DL)
++#else
++  void runFunctionPass(Module &mod, TargetLibraryInfo *libraryInfo, const DataLayout &DL)
++#endif
+   {
+-    FunctionPassManager FPM(&mod);
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 7
++      llvm::legacy::FunctionPassManager FPM(&mod);
++#else
++      FunctionPassManager FPM(&mod);
++#endif
+ 
+-#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 6
+-    FPM.add(new DataLayoutPass());
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 7
++#elif LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 6
++    FPM.add(new DataLayout(DL));
+ #elif LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 5
+     FPM.add(new DataLayoutPass(DL));
+ #else
+@@ -94,7 +111,12 @@ namespace gbe
+ #else
+     FPM.add(createVerifierPass());
+ #endif
++
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 7
++    FPM.add(new TargetLibraryInfoWrapperPass(*libraryInfo));
++#else
+     FPM.add(new TargetLibraryInfo(*libraryInfo));
++#endif
+     FPM.add(createTypeBasedAliasAnalysisPass());
+     FPM.add(createBasicAliasAnalysisPass());
+     FPM.add(createCFGSimplificationPass());
+@@ -110,18 +132,27 @@ namespace gbe
+     FPM.doFinalization();
+   }
+ 
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 7
++  void runModulePass(Module &mod, TargetLibraryInfoImpl *libraryInfo, const DataLayout &DL, int optLevel, bool strictMath)
++#else
+   void runModulePass(Module &mod, TargetLibraryInfo *libraryInfo, const DataLayout &DL, int optLevel, bool strictMath)
++#endif
+   {
+-    llvm::PassManager MPM;
++    llvm::legacy::PassManager MPM;
+ 
+-#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 6
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 7
++#elif LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 6
+     MPM.add(new DataLayoutPass());
+ #elif LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 5
+     MPM.add(new DataLayoutPass(DL));
+ #else
+     MPM.add(new DataLayout(DL));
+ #endif
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 7
++    MPM.add(new TargetLibraryInfoWrapperPass(*libraryInfo));
++#else
+     MPM.add(new TargetLibraryInfo(*libraryInfo));
++#endif
+     MPM.add(createTypeBasedAliasAnalysisPass());
+     MPM.add(createBasicAliasAnalysisPass());
+     MPM.add(createIntrinsicLoweringPass());
+@@ -199,7 +230,15 @@ namespace gbe
+   }
+ 
+ 
+-#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 5
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 7
++#define OUTPUT_BITCODE(STAGE, MOD)  do {         \
++   llvm::legacy::PassManager passes__;                   \
++   if (OCL_OUTPUT_LLVM_##STAGE) {                \
++     passes__.add(createPrintModulePass(*o));    \
++     passes__.run(MOD);                          \
++   }                                             \
++ }while(0)
++#elif LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 5
+ #define OUTPUT_BITCODE(STAGE, MOD)  do {         \
+    llvm::PassManager passes__;                   \
+    if (OCL_OUTPUT_LLVM_##STAGE) {                \
+@@ -260,15 +299,26 @@ namespace gbe
+     DataLayout DL(&mod);
+ 
+     Triple TargetTriple(mod.getTargetTriple());
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 7
++    TargetLibraryInfoImpl *libraryInfo = new TargetLibraryInfoImpl(TargetTriple);
++#else
+     TargetLibraryInfo *libraryInfo = new TargetLibraryInfo(TargetTriple);
++#endif
+     libraryInfo->disableAllFunctions();
+ 
+     OUTPUT_BITCODE(AFTER_LINK, mod);
+ 
+-    runFuntionPass(mod, libraryInfo, DL);
++    runFunctionPass(mod, libraryInfo, DL);
+     runModulePass(mod, libraryInfo, DL, optLevel, strictMath);
++
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 7
++    llvm::legacy::PassManager passes;
++#else
+     llvm::PassManager passes;
+-#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 6
++#endif
++
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 7 
++#elif LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 6
+     passes.add(new DataLayoutPass());
+ #elif LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 5
+     passes.add(new DataLayoutPass(DL));
+@@ -278,9 +328,13 @@ namespace gbe
+     // Print the code before further optimizations
+     passes.add(createIntrinsicLoweringPass());
+     passes.add(createStripAttributesPass());     // Strip unsupported attributes and calling conventions.
+-    passes.add(createFunctionInliningPass(20000));
+-    passes.add(createScalarReplAggregatesPass(64, true, -1, -1, 64));
++    passes.add(createFunctionInliningPass(200000));
++    passes.add(createScalarReplAggregatesPass(64, true, -1, -1, 64)); 
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 7
++    passes.add(createLoadStoreOptimizationPass(&DL));
++#else
+     passes.add(createLoadStoreOptimizationPass());
++#endif
+     passes.add(createConstantPropagationPass());
+     passes.add(createPromoteMemoryToRegisterPass());
+     if(optLevel > 0)
+diff --git a/backend/src/llvm/llvm_unroll.cpp b/backend/src/llvm/llvm_unroll.cpp
+index 5d3fad8..685c297 100644
+--- a/backend/src/llvm/llvm_unroll.cpp
++++ b/backend/src/llvm/llvm_unroll.cpp
+@@ -40,7 +40,11 @@
+ #include "llvm/IR/IRBuilder.h"
+ #endif /* LLVM_VERSION_MINOR <= 1 */
+ #include "llvm/Support/raw_ostream.h"
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 7
++#include "llvm/IR/LegacyPassManager.h"
++#else
+ #include "llvm/PassManager.h"
++#endif
+ #include "llvm/Transforms/Scalar.h"
+ #include "llvm/Analysis/ScalarEvolution.h"
+ #include "llvm/Analysis/LoopPass.h"
+@@ -61,8 +65,13 @@ namespace gbe {
+        LoopPass(ID) {}
+ 
+       void getAnalysisUsage(AnalysisUsage &AU) const {
++#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 7
++        AU.addRequired<LoopInfoWrapperPass>();
++        AU.addPreserved<LoopInfoWrapperPass>();
++#else
+         AU.addRequired<LoopInfo>();
+         AU.addPreserved<LoopInfo>();
++#endif
+         AU.addRequiredID(LoopSimplifyID);
+         AU.addPreservedID(LoopSimplifyID);
+         AU.addRequiredID(LCSSAID);
+-- 
+2.3.5
+
+_______________________________________________
+Beignet mailing list
+Beignet@lists.freedesktop.org
+http://lists.freedesktop.org/mailman/listinfo/beignet
