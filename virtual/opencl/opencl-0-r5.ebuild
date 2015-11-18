@@ -18,7 +18,7 @@ IUSE="${CARDS[@]/#/video_cards_}"
 
 DEPEND=""
 # intel-ocl-sdk is amd64-only
-RDEPEND="app-admin/eselect-opencl
+RDEPEND="app-eselect/eselect-opencl
 	|| (
 		media-libs/mesa[opencl,${MULTILIB_USEDEP}]
 		video_cards_fglrx? (
