@@ -5,7 +5,8 @@
 EAPI=5
 
 EGIT_REPO_URI="git://anongit.freedesktop.org/mesa/mesa"
-#EGIT_REPO_URI="https://github.com/iXit/Mesa-3D.git"
+#EGIT_REPO_URI="http://cgit.freedesktop.org/~jljusten/mesa"
+#EGIT_BRANCH=simd32
 
 if [[ ${PV} = 9999* ]]; then
 	GIT_ECLASS="git-r3"
@@ -273,16 +274,21 @@ beignet_src_prepare() {
 
 	# Build beignet libcl as libOpenCL so that it can be handled
 	# by the Gentoo eselect opencl
-	epatch "${FILESDIR}"/beignet-"${B_PV}"-libOpenCL.patch
+	if [[ -n "${BEIGNET_BRANCH}"  ]]; then
+		epatch "${FILESDIR}"/beignet-${BEIGNET_BRANCH}-"${B_PV}"-libOpenCL.patch
+		epatch "${FILESDIR}"/beignet-${BEIGNET_BRANCH}-"${B_PV}"-inline-to-static-inline.patch
+	else
+		epatch "${FILESDIR}"/beignet-"${B_PV}"-llvm37.patch
+		epatch "${FILESDIR}"/beignet-"${B_PV}"-libOpenCL.patch
+	fi
+	epatch "${FILESDIR}"/beignet-"${B_PV}"-fix-FindLLVM.patch
 	epatch "${FILESDIR}"/beignet-"${B_PV}"-llvm-libs-tr.patch
 	#epatch "${FILESDIR}"/beignet-"${B_PV}"-buildfix.patch
 	epatch "${FILESDIR}"/beignet-"${B_PV}"-bitcode-path-fix.patch
 	epatch "${FILESDIR}"/beignet-"${B_PV}"-silence-dri2-failure.patch
 #	epatch "${FILESDIR}"/fix-beignet.patch
-	epatch "${FILESDIR}"/beignet-"${B_PV}"-inline-to-static-inline.patch
 
 	# Beignet hasn't been converted to use the new PassManager yet
-#	epatch "${FILESDIR}"/beignet-"${B_PV}"-llvm37.patch
 #	sed -i -e 's/\(PassManager\.h\)/IR\/Legacy\1/' $(find -name '*.cpp')
 #	sed -i -e 's/\(::PassManager\)/::legacy\1/' $(find -name '*.cpp')
 
