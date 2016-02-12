@@ -1,0 +1,159 @@
+From 465f3a9378902e1a2d2e6d20ac62719899a22d6a Mon Sep 17 00:00:00 2001
+From: Kyle Brenneman <kbrenneman@nvidia.com>
+Date: Wed, 4 Nov 2015 13:56:04 -0700
+Subject: [PATCH 3/3] Update to match libglvnd commit
+ e356f84554da42825e141d9957cb119ec5f1e531.
+
+---
+ include/libglvnd/GLdispatchABI.h |  9 ---------
+ include/libglvnd/libglxabi.h     | 40 ++++++++++++++++++++++++++++++----------
+ src/glx/glxglvnd.c               |  7 +------
+ src/glx/glxglvnddispatchfuncs.h  |  8 ++++----
+ 4 files changed, 35 insertions(+), 29 deletions(-)
+
+diff --git a/include/libglvnd/GLdispatchABI.h b/include/libglvnd/GLdispatchABI.h
+index 289811b..d16de2d 100644
+--- a/include/libglvnd/GLdispatchABI.h
++++ b/include/libglvnd/GLdispatchABI.h
+@@ -44,15 +44,6 @@ extern "C" {
+  * these client ABIs.
+  */
+ 
+-/*!
+- * This opaque structure describes the core GL dispatch table.
+- */
+-typedef struct __GLdispatchTableRec __GLdispatchTable;
+-
+-typedef void (*__GLdispatchProc)(void);
+-
+-typedef void *(*__GLgetProcAddressCallback)(const GLubyte *procName);
+-
+ /*
+  * Thread-local implementation used by libglvnd.  This is passed into
+  * the patch function callback via the type parameter.
+diff --git a/include/libglvnd/libglxabi.h b/include/libglvnd/libglxabi.h
+index ccf7eee..f0ecab4 100644
+--- a/include/libglvnd/libglxabi.h
++++ b/include/libglvnd/libglxabi.h
+@@ -132,19 +132,23 @@ typedef struct __GLXapiExportsRec {
+     /*!
+      * Looks up the screen and vendor for a context.
+      *
+-     * If no mapping is found, then \p retScreen and \p retVendor will be set
+-     * to -1 and NULL, respectively.
++     * If no mapping is found, then \p retScreen will be set to -1, and
++     * \p retVendor and \p retDisplay will be set to NULL.
+      *
+-     * Either of \p retScreen or \p retVendor may be NULL if the screen or
+-     * vendor are not required.
++     * \p retScreen, \p retVendor, and \p retDisplay may be NULL if the screen,
++     * vendor, or display are not required.
++     *
++     * Note that this function does not take a display connection, since
++     * there are cases (e.g., glXGetContextIDEXT) that take a GLXContext but
++     * not a display. Instead, it will return the display that the context was
++     * created on.
+      *
+-     * \param dpy The display connection.
+      * \param context The context to look up.
+      * \param[out] retScreen Returns the screen number.
+      * \param[out] retVendor Returns the vendor.
+      * \return Zero if a match was found, or non-zero if it was not.
+      */
+-    int (*vendorFromContext)(Display *dpy, GLXContext context, int *retScreen, __GLXvendorInfo **retVendor);
++    int (*vendorFromContext)(GLXContext context, Display **retDisplay, int *retScreen, __GLXvendorInfo **retVendor);
+ 
+     void (*addScreenFBConfigMapping)(Display *dpy, GLXFBConfig config, int screen, __GLXvendorInfo *vendor);
+     void (*removeScreenFBConfigMapping)(Display *dpy, GLXFBConfig config);
+@@ -224,11 +228,27 @@ typedef struct __GLXapiImportsRec {
+     void        (*setDispatchIndex)      (const GLubyte *procName, int index);
+ 
+     /*!
+-     * This notifies the vendor library when an X error should be generated
+-     * due to a detected error in the GLX API stream.
++     * (OPTIONAL) This notifies the vendor library when an X error was
++     * generated due to a detected error in the GLX API stream.
++     *
++     * This may be \c NULL, in which case the vendor library is not notified of
++     * any errors.
++     *
++     * \note this is a notification only -- libGLX takes care of actually
++     * reporting the error.
++     *
++     * \param dpy The display connection.
++     * \param error The error code.
++     * \param resid The XID associated with the error, if any.
++     * \param opcode The minor opcode of the function that generated the error.
++     * \param coreX11error True if the error code is a core X11 error, or False
++     * if it's a GLX error code.
++     *
++     * \return True if libGLX should report the error to the application.
+      */
+-    void        (*notifyError)  (Display *dpy, char error,
+-                                 char opcode, XID resid);
++    Bool        (*notifyError)  (Display *dpy, unsigned char error,
++                                 XID resid, unsigned char opcode,
++                                 Bool coreX11error);
+ 
+     /*!
+      * (OPTIONAL) Callbacks by which the vendor library may re-write libglvnd's
+diff --git a/src/glx/glxglvnd.c b/src/glx/glxglvnd.c
+index 94dea70..09dfea9 100644
+--- a/src/glx/glxglvnd.c
++++ b/src/glx/glxglvnd.c
+@@ -59,18 +59,13 @@ static void __glXGLVNDSetDispatchIndex(const GLubyte *procName, int index)
+     }
+ }
+ 
+-static void __glXGLVNDNotifyError(Display *dpy, char error, char opcode, XID resid)
+-{
+-    __glXSendError(dpy, error, resid, opcode, True);
+-}
+-
+ static __GLXapiImports glvndImports =
+ {
+     __glXGLVNDSupportsScreen, // checkSupportsScreen
+     __glXGLVNDGetProcAddress, // getProcAddress
+     __glXGLVNDGetDispatchAddress, // getDispatchAddress
+     __glXGLVNDSetDispatchIndex, // setDispatchIndex
+-    __glXGLVNDNotifyError, // notifyError
++    NULL, // notifyError
+     NULL // patchCallbacks
+ };
+ 
+diff --git a/src/glx/glxglvnddispatchfuncs.h b/src/glx/glxglvnddispatchfuncs.h
+index 9d3a182..6cd65fe 100644
+--- a/src/glx/glxglvnddispatchfuncs.h
++++ b/src/glx/glxglvnddispatchfuncs.h
+@@ -17,7 +17,7 @@ static inline int GET_CURRENT_SCREEN(void)
+         return -1;
+     }
+ 
+-    __VND.vendorFromContext(glXGetCurrentDisplay(), context, &screen, NULL);
++    __VND.vendorFromContext(context, NULL, &screen, NULL);
+     assert(screen >= 0);
+ 
+     return screen;
+@@ -84,16 +84,16 @@ static inline void GetDispatchFromDrawable(Display *dpy, GLXDrawable drawable,
+ static inline void GetDispatchFromContext(Display *dpy, GLXContext ctx,
+         int *retScreen, __GLXvendorInfo **retVendor)
+ {
+-    __VND.vendorFromContext(dpy, ctx, retScreen, retVendor);
++    __VND.vendorFromContext(ctx, NULL, retScreen, retVendor);
+ }
+ 
+ static inline __GLXvendorInfo *GetDispatchFromMultiContext(Display *dpy, GLXContext ctx1, GLXContext ctx2)
+ {
+     __GLXvendorInfo *vendor = NULL;
+-    if (__VND.vendorFromContext(dpy, ctx1, NULL, &vendor) == 0) {
++    if (__VND.vendorFromContext(ctx1, NULL, NULL, &vendor) == 0) {
+         return vendor;
+     }
+-    if (__VND.vendorFromContext(dpy, ctx2, NULL, &vendor) == 0) {
++    if (__VND.vendorFromContext(ctx2, NULL, NULL, &vendor) == 0) {
+         return vendor;
+     }
+     return __VND.getCurrentDynDispatch();
+-- 
+2.7.0
+

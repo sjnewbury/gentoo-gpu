@@ -5,8 +5,6 @@
 EAPI=5
 
 EGIT_REPO_URI="git://anongit.freedesktop.org/mesa/mesa"
-#EGIT_REPO_URI="http://cgit.freedesktop.org/~jljusten/mesa"
-#EGIT_BRANCH=simd32
 
 if [[ ${PV} = 9999* ]]; then
 	GIT_ECLASS="git-r3"
@@ -16,7 +14,7 @@ else
 	B_PV="0.9"
 fi
 
-PYTHON_COMPAT=( python{2_6,2_7} )
+PYTHON_COMPAT=( python2_7 )
 
 inherit cmake-utils base autotools multilib multilib-minimal flag-o-matic \
 	python-any-r1 toolchain-funcs pax-utils ${GIT_ECLASS}
@@ -41,11 +39,8 @@ else
 		http://cgit.freedesktop.org/beignet/snapshot/Release_v${B_PV}.tar.gz"
 fi
 
-# The code is MIT/X11.
-# GLES[2]/gl[2]{,ext,platform}.h are SGI-B-2.0
-LICENSE="MIT SGI-B-2.0"
+LICENSE="MIT"
 SLOT="0"
-KEYWORDS=""
 RESTRICT="!bindist? ( bindist )"
 
 INTEL_CARDS="i915 i965 ilo intel"
@@ -59,7 +54,7 @@ IUSE="${IUSE_VIDEO_CARDS}
 	bindist +classic d3d9 debug +dri3 +egl +gallium +gbm gles1 gles2 +llvm
 	+nptl opencl osmesa pax_kernel openmax pic selinux +udev vaapi vdpau
 	wayland xvmc xa kernel_FreeBSD beignet beignet-egl beignet-generic
-	opencl-icd"
+	opencl-icd glvnd"
 
 #  Not available at present unfortunately
 #	openvg? ( egl gallium )
@@ -99,7 +94,7 @@ REQUIRED_USE="
 	${PYTHON_REQUIRED_USE}
 "
 
-LIBDRM_DEPSTRING=">=x11-libs/libdrm-2.4.57"
+LIBDRM_DEPSTRING=">=x11-libs/libdrm-2.4.64"
 # keep correct libdrm and dri2proto dep
 # keep blocks in rdepend for binpkg
 RDEPEND="
@@ -120,7 +115,7 @@ RDEPEND="
 	>=x11-libs/libXxf86vm-1.1.3:=[${MULTILIB_USEDEP}]
 	>=x11-libs/libxcb-1.9.3:=[${MULTILIB_USEDEP}]
 	x11-libs/libXfixes:=[${MULTILIB_USEDEP}]
-	llvm? (
+	llvm? ( !kernel_FreeBSD? (
 		video_cards_radeonsi? ( || (
 			>=dev-libs/elfutils-0.155-r1:=[${MULTILIB_USEDEP}]
 			>=dev-libs/libelf-0.8.13-r2:=[${MULTILIB_USEDEP}]
@@ -130,8 +125,8 @@ RDEPEND="
 				>=dev-libs/elfutils-0.155-r1:=[${MULTILIB_USEDEP}]
 				>=dev-libs/libelf-0.8.13-r2:=[${MULTILIB_USEDEP}]
 				) )
-		)
-		>=sys-devel/llvm-3.5.0:=[${MULTILIB_USEDEP}]
+		) )
+		>=sys-devel/llvm-3.7.0:=[${MULTILIB_USEDEP}]
 	)
 	opencl? (
 				app-eselect/eselect-opencl
@@ -179,14 +174,17 @@ for card in ${RADEON_CARDS}; do
 		)
 	"
 done
+RDEPEND="${RDEPEND}
+	video_cards_radeonsi? ( ${LIBDRM_DEPSTRING}[video_cards_amdgpu] )
+"
 
 DEPEND="${RDEPEND}
 	llvm? (
 		video_cards_radeonsi? ( sys-devel/llvm[video_cards_radeon] )
 	)
 	opencl? (
-				>=sys-devel/llvm-3.5:=[${MULTILIB_USEDEP}]
-				>=sys-devel/clang-3.5:=[${MULTILIB_USEDEP}]
+				>=sys-devel/llvm-3.7:=[${MULTILIB_USEDEP}]
+				>=sys-devel/clang-3.7:=[${MULTILIB_USEDEP}]
 				>=sys-devel/gcc-4.6
 	)
 	sys-devel/gettext
@@ -204,7 +202,7 @@ DEPEND="${RDEPEND}
 	${PYTHON_DEPS}
 	$(python_gen_any_dep ">=dev-python/mako-0.7.3[\${PYTHON_USEDEP}]")
 "
-[[ ${PV} == "9999" ]] && DEPEND+="
+[[ ${PV} == 9999 ]] && DEPEND+="
 	sys-devel/bison
 	sys-devel/flex
 "
@@ -212,10 +210,16 @@ DEPEND="${RDEPEND}
 S="${WORKDIR}/${MY_P}"
 CMAKE_USE_DIR="${S}"/beignet-${B_PV}
 
-# It is slow without texrels, if someone wants slow
-# mesa without texrels +pic use is worth the shot
-QA_EXECSTACK="usr/lib*/libGL.so*"
-QA_WX_LOAD="usr/lib*/libGL.so*"
+QA_WX_LOAD="
+x86? (
+	!pic? (
+		usr/lib*/libglapi.so.0.0.0
+		usr/lib*/libGLESv1_CM.so.1.1.0
+		usr/lib*/libGLESv2.so.2.0.0
+		usr/lib*/libGL.so.1.2.0
+		usr/lib*/libOSMesa.so.8.0.0
+	)
+)"
 
 pkg_setup() {
 	# warning message for bug 459306
@@ -278,10 +282,9 @@ beignet_src_prepare() {
 		epatch "${FILESDIR}"/beignet-${BEIGNET_BRANCH}-"${B_PV}"-libOpenCL.patch
 		epatch "${FILESDIR}"/beignet-${BEIGNET_BRANCH}-"${B_PV}"-inline-to-static-inline.patch
 	else
-		epatch "${FILESDIR}"/beignet-"${B_PV}"-llvm37.patch
 		epatch "${FILESDIR}"/beignet-"${B_PV}"-libOpenCL.patch
 	fi
-	epatch "${FILESDIR}"/beignet-"${B_PV}"-fix-FindLLVM.patch
+#	epatch "${FILESDIR}"/beignet-"${B_PV}"-fix-FindLLVM.patch
 	epatch "${FILESDIR}"/beignet-"${B_PV}"-llvm-libs-tr.patch
 	#epatch "${FILESDIR}"/beignet-"${B_PV}"-buildfix.patch
 	epatch "${FILESDIR}"/beignet-"${B_PV}"-bitcode-path-fix.patch
@@ -298,6 +301,11 @@ beignet_src_prepare() {
 	# optionally enable support for ICD
 	use opencl-icd || sed -i -e '/Find_Package(OCLIcd)/s/^/#/' \
 		CMakeLists.txt || die
+}
+
+copy_src_for_glvnd() {
+	einfo "Copying mesa sources for glvnd build"
+	cp -p -R "${S}" "${BUILD_DIR}"/glvnd_build
 }
 
 src_prepare() {
@@ -320,6 +328,12 @@ src_prepare() {
 		sed -i -e "s/-DSVR4/-D_POSIX_C_SOURCE=200112L/" configure.ac || die
 	fi
 
+	# libglvnd patches
+	epatch "${FILESDIR}"/0001-Add-an-flag-to-not-export-GL-and-GLX-functions.patch
+	epatch "${FILESDIR}"/0002-GLX-Implement-the-libglvnd-interface.patch
+	epatch "${FILESDIR}"/0003-Update-to-match-libglvnd-commit-e356f84554da42825e14.patch
+	epatch "${FILESDIR}"/fix-GL_LIBS-linking.patch
+
 	base_src_prepare
 
 	eautoreconf
@@ -329,6 +343,37 @@ src_prepare() {
 
 	multilib_copy_sources
 
+	use glvnd && multilib_foreach_abi copy_src_for_glvnd
+}
+
+glvnd_src_configure() {
+	pushd "${BUILD_DIR}"/glvnd_build
+	# For now only GLX is supported, shared glapi will only work when
+	# glvnd stops using its own internal copy
+	ECONF_SOURCE="${S}" \
+	econf \
+		${myconf} \
+		--enable-dri \
+		--enable-glx \
+		--enable-shared-glapi \
+		$(use_enable !bindist texture-float) \
+		$(use_enable debug) \
+		$(use_enable dri3) \
+		$(use_enable egl) \
+		$(use_enable gbm) \
+		$(use_enable gles1) \
+		$(use_enable gles2) \
+		$(use_enable nptl glx-tls) \
+		--disable-osmesa \
+		$(use_enable !udev sysfs) \
+		--enable-llvm-shared-libs \
+		--without-dri-drivers \
+		--without-gallium-drivers \
+		--enable-libglvnd \
+		--disable-nine \
+		--disable-opencl \
+		PYTHON2="${PYTHON}"
+	popd
 }
 
 beignet_src_configure() {
@@ -404,7 +449,7 @@ multilib_src_configure() {
 	fi
 
 	if use egl; then
-			myconf+="--with-egl-platforms=x11$(use wayland && echo ",wayland")$(use gbm && echo ",drm") "
+		myconf+="--with-egl-platforms=x11$(use wayland && echo ",wayland")$(use gbm && echo ",drm") "
 	fi
 
 # FIXME
@@ -421,6 +466,9 @@ multilib_src_configure() {
 			$(use_enable xa)
 			$(use_enable xvmc)
 		"
+
+		use vaapi && myconf+=" --with-va-libdir=/usr/$(get_libdir)/va/drivers"
+
 		gallium_enable swrast
 		gallium_enable video_cards_vmware svga
 		gallium_enable video_cards_virgl virgl
@@ -441,24 +489,25 @@ multilib_src_configure() {
 		fi
 
 		gallium_enable video_cards_freedreno freedreno
-		# opencl stuff (currently only supported for radeon r600 and newer)
+		# opencl stuff
 		if use opencl; then
-			if use video_cards_r600 || use video_cards_radeonsi ; then
-				myconf+="
-					$(use_enable opencl)
-					$(use_enable opencl-icd)
-					--with-opencl-libdir="${EPREFIX}/usr/$(get_libdir)/OpenCL/vendors/mesa"
-					--with-clang-libdir="${EPREFIX}/usr/${LIBDIR_default}"
-					"
-			fi
+			myconf+="
+				$(use_enable opencl)
+				$(use_enable opencl-icd)
+				--with-opencl-libdir="${EPREFIX}/usr/$(get_libdir)/OpenCL/vendors/mesa"
+				--with-clang-libdir="${EPREFIX}/usr/${LIBDIR_default}"
+				"
 		fi
 	fi
 
 	# x86 hardened pax_kernel needs glx-rts, bug 240956
-	if use pax_kernel; then
-		myconf+="
-			$(use_enable x86 glx-rts)
-		"
+	if [[ ${ABI} == x86 ]]; then
+		myconf+=" $(use_enable pax_kernel glx-read-only-text)"
+	fi
+
+	# on abi_x86_32 hardened we need to have asm disable
+	if [[ ${ABI} == x86* ]] && use pic; then
+		myconf+=" --disable-asm"
 	fi
 
 	# build fails with BSD indent, bug #428112
@@ -490,6 +539,8 @@ multilib_src_configure() {
 		PYTHON2="${PYTHON}" \
 		${myconf}
 
+	use glvnd && glvnd_src_configure
+
 	# intel opencl stuff
 	use opencl && use beignet && beignet_src_configure
 }
@@ -497,15 +548,39 @@ multilib_src_configure() {
 #		$(use_enable !pic asm) \
 
 multilib_src_compile() {
+	if use glvnd ; then
+		pushd "${BUILD_DIR}"/glvnd_build
+			emake
+		popd
+	fi
 
 	default
+
 	if use opencl && use beignet ; then
-		cd "${BUILD_DIR}"/beignet-${B_PV}
-		emake		
-	fi
+		pushd "${BUILD_DIR}"/beignet-${B_PV}
+		emake
+		popd
+	fi	
 }
 
 multilib_src_install() {
+	if use glvnd ; then
+		pushd "${BUILD_DIR}"/glvnd_build
+			emake install DESTDIR="${D}"
+			ebegin "Moving glvnd-mesa libs to glvnd directory"
+			local x
+			local gl_dir="/usr/$(get_libdir)/opengl/glvnd/"
+			dodir ${gl_dir}/lib
+			for x in "${ED}"/usr/$(get_libdir)/lib*mesa.{la,a,so*}; do
+				if [ -f ${x} -o -L ${x} ]; then
+					mv -f "${x}" "${ED}${gl_dir}"/lib \
+						|| die "Failed to move ${x}"
+				fi
+			done
+		eend $?
+		popd
+	fi
+
 	emake install DESTDIR="${D}"
 
 	if use classic || use gallium; then
@@ -551,6 +626,10 @@ multilib_src_install() {
 			if [ -f "${ED}/usr/include/CL/opencl.h" ]; then
 				mv -f "${ED}"/usr/include/CL \
 				"${ED}"${cl_dir}/include
+			fi
+			if [ ! -f "${ED}"${cl_dir}/lib/* ]; then
+				einfo "No Gallium/Clover OpenCL driver, removing ICD config"
+				rm -f "${ED}"/etc/OpenCL/vendors/mesa.icd
 			fi
 			eend $?
 		fi
