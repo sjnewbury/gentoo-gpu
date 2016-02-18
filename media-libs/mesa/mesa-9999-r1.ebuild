@@ -387,6 +387,7 @@ src_prepare() {
 
 	if use vulkan ; then
 		pushd "${S}"/vulkan-${V_PV}
+			epatch "${FILESDIR}"/0001-Revert-anv-formats-Don-t-use-a-compound-literal-to-i.patch
 			eautoreconf
 		popd
 	fi
@@ -404,7 +405,7 @@ glvnd_src_configure() {
 		${myconf} \
 		--enable-dri \
 		--enable-glx \
-		--enable-shared-glapi \
+		--disable-shared-glapi \
 		--disable-gles1 \
 		--disable-gles2 \
 		--disable-gbm \
@@ -650,17 +651,11 @@ multilib_src_install() {
 
 	if use glvnd ; then
 		pushd "${BUILD_DIR}"/glvnd_build
-			emake install DESTDIR="${D}"
-			ebegin "Moving glvnd-mesa libs to glvnd directory"
-			local x
-			local gl_dir="/usr/$(get_libdir)/opengl/glvnd/"
-			dodir ${gl_dir}/lib
-			for x in "${ED}"/usr/$(get_libdir)/lib*mesa.{la,a,so*}; do
-				if [ -f ${x} -o -L ${x} ]; then
-					mv -f "${x}" "${ED}${gl_dir}"/lib \
-						|| die "Failed to move ${x}"
-				fi
-			done
+			ebegin "Installing glvnd-mesa libs to glvnd directory"
+			local glvnd_dir="/usr/$(get_libdir)/opengl/glvnd/"
+			dodir ${glvnd_dir}/lib
+			insinto ${glvnd_dir}/lib
+			doins lib*/*.so
 		eend $?
 		popd
 	fi
@@ -672,7 +667,7 @@ multilib_src_install() {
 			dodir /etc/vulkan/icd.d
 			local vulkan_drivers=( intel )
 			for x in ${vulkan_drivers[@]}; do
-				doins src/vulkan/${x}_icd.json
+				doins src/${x}/vulkan/${x}_icd.json
 			done
 			eend $?
 		popd
