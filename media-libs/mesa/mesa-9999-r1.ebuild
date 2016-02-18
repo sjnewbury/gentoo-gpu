@@ -404,14 +404,14 @@ glvnd_src_configure() {
 		${myconf} \
 		--enable-dri \
 		--enable-glx \
-		--enable-shared-glapi \
+		--disable-shared-glapi \
+		--disable-gles1 \
+		--disable-gles2 \
+		--disable-gbm \
+		--disable-egl \
 		$(use_enable !bindist texture-float) \
 		$(use_enable debug) \
 		$(use_enable dri3) \
-		$(use_enable egl) \
-		$(use_enable gbm) \
-		$(use_enable gles1) \
-		$(use_enable gles2) \
 		$(use_enable nptl glx-tls) \
 		--disable-osmesa \
 		$(use_enable !udev sysfs) \
