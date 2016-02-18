@@ -10,14 +10,14 @@ if [[ ${PV} = 9999* ]]; then
 	GIT_ECLASS="git-r3"
 	EXPERIMENTAL="true"
 	B_PV="${PV}"
+	V_PV="${PV}"
+	VULKAN_BRANCH=vulkan
 else
 	B_PV="0.9"
 fi
 
-PYTHON_COMPAT=( python2_7 )
-
 inherit cmake-utils base autotools multilib multilib-minimal flag-o-matic \
-	python-any-r1 toolchain-funcs pax-utils ${GIT_ECLASS}
+	python-utils-r1 toolchain-funcs pax-utils ${GIT_ECLASS}
 
 OPENGL_DIR="xorg-x11"
 
@@ -54,7 +54,7 @@ IUSE="${IUSE_VIDEO_CARDS}
 	bindist +classic d3d9 debug +dri3 +egl +gallium +gbm gles1 gles2 +llvm
 	+nptl opencl osmesa pax_kernel openmax pic selinux +udev vaapi vdpau
 	wayland xvmc xa kernel_FreeBSD beignet beignet-egl beignet-generic
-	opencl-icd glvnd"
+	opencl-icd glvnd vulkan"
 
 #  Not available at present unfortunately
 #	openvg? ( egl gallium )
@@ -91,7 +91,6 @@ REQUIRED_USE="
 	video_cards_radeonsi?   ( gallium llvm )
 	video_cards_vmware? ( gallium )
 	video_cards_virgl? ( gallium )
-	${PYTHON_REQUIRED_USE}
 "
 
 LIBDRM_DEPSTRING=">=x11-libs/libdrm-2.4.64"
@@ -199,8 +198,9 @@ DEPEND="${RDEPEND}
 	>=x11-proto/xextproto-7.2.1-r1:=[${MULTILIB_USEDEP}]
 	>=x11-proto/xf86driproto-2.1.1-r1:=[${MULTILIB_USEDEP}]
 	>=x11-proto/xf86vidmodeproto-2.3.1-r1:=[${MULTILIB_USEDEP}]
-	${PYTHON_DEPS}
-	$(python_gen_any_dep ">=dev-python/mako-0.7.3[\${PYTHON_USEDEP}]")
+	dev-lang/python:2.7
+	vulkan? ( =dev-lang/python-3* )
+	>=dev-python/mako-0.7.3[python_targets_python2_7]
 "
 [[ ${PV} == 9999 ]] && DEPEND+="
 	sys-devel/bison
@@ -227,10 +227,11 @@ pkg_setup() {
 		ewarn "Mismatch between debug USE flags in media-libs/mesa and sys-devel/llvm"
 		ewarn "detected! This can cause problems. For details, see bug 459306."
 	fi
-	python-any-r1_pkg_setup
+	use vulkan && [[ ${PV} != 9999 ]] && die "Vulkan is currently git only"
 }
 
 beignet_src_unpack() {
+		export EGIT_MIN_CLONE_TYPE=shallow
 		if [ -n "${BEIGNET_COMMIT}" ]; then
 			git-r3_fetch "git://anongit.freedesktop.org/beignet" \
 				"${BEIGNET_COMMIT}"
@@ -248,12 +249,39 @@ beignet_src_unpack() {
 			"${S}"/beignet-${B_PV}
 }
 
+glvnd_src_unpack() {
+		export EGIT_MIN_CLONE_TYPE=mirror
+		# Clone Mesa branch (EGIT_REPO_URI)
+		git-r3_checkout "" "${S}"/glvnd_build "${CATEGORY}/${PN}/${SLOT%/*}-MesaGL"
+}
+
+vulkan_src_unpack() {
+		export EGIT_MIN_CLONE_TYPE=mirror
+		# Same repo as Mesa (EGIT_REPO_URI)
+		if [ -n "${VULKAN_COMMIT}" ]; then
+			git-r3_fetch "" "${VULKAN_COMMIT}" "${CATEGORY}/${PN}/${SLOT%/*}-MesaVulkan"
+		elif [ -n "${VULKAN_BRANCH}" ]; then
+			git-r3_fetch "" "refs/heads/${VULKAN_BRANCH}" "${CATEGORY}/${PN}/${SLOT%/*}-MesaVulkan"
+		elif [ -n "${VULKAN_TAG}" ]; then
+			git-r3_fetch "" "refs/tags/${VULKAN_TAG}" "${CATEGORY}/${PN}/${SLOT%/*}-MesaVulkan"
+		else
+			git-r3_fetch "" "refs/heads/master" "${CATEGORY}/${PN}/${SLOT%/*}-MesaVulkan"
+		fi		
+		git-r3_checkout "" "${S}"/vulkan-${V_PV} "${CATEGORY}/${PN}/${SLOT%/*}-MesaVulkan"
+}
+
 src_unpack() {
 	default
 	if [[ $PV = 9999* ]] ; then
-		git-r3_fetch
-		EGIT_CHECKOUT_DIR="${S}" git-r3_checkout
+		export EGIT_MIN_CLONE_TYPE=mirror
+		git-r3_fetch "" "" "${CATEGORY}/${PN}/${SLOT%/*}-MesaGL"
+		git-r3_checkout "" "${S}" "${CATEGORY}/${PN}/${SLOT%/*}-MesaGL"
 		use opencl && use beignet && beignet_src_unpack
+		# Until vulkan is merged with mesa proper, check out vulkan
+		# branch
+		use vulkan && vulkan_src_unpack
+		use glvnd && glvnd_src_unpack
+
 		# We want to make sure the mesa repo HEAD gets stored not beignet
 		# so set the EGIT_VERSION ourselves. 
 		cd "${S}"
@@ -265,11 +293,17 @@ src_unpack() {
 		# keep beignet sources in mesa source tree so they 
 		# get copied with for multilib build
   		use beignet && mv "${WORKDIR}"/beignet-${B_PV} "${S}"
+		if use glvnd ; then
+			ebegin "Copying Mesa sources for GLVND build"
+			cp -p -R "${S}" "${T}"/glvnd_build
+			mv "${T}"/glvnd_build "${S}"
+			eend $?
+		fi
 	fi
 }
 
 beignet_src_prepare() {
-	cd "${S}"/beignet-${B_PV}
+	pushd "${S}"/beignet-${B_PV}
 	cmake-utils_src_prepare
 
 	# Fix linking
@@ -301,14 +335,10 @@ beignet_src_prepare() {
 	# optionally enable support for ICD
 	use opencl-icd || sed -i -e '/Find_Package(OCLIcd)/s/^/#/' \
 		CMakeLists.txt || die
+	popd
 }
 
-copy_src_for_glvnd() {
-	einfo "Copying mesa sources for glvnd build"
-	cp -p -R "${S}" "${BUILD_DIR}"/glvnd_build
-}
-
-src_prepare() {
+apply_mesa_patches() {
 	# apply patches
 	if [[ ${PV} != 9999* && -n ${SRC_PATCHES} ]]; then
 		EPATCH_FORCE="yes" \
@@ -327,23 +357,42 @@ src_prepare() {
 	if [[ ${CHOST} == *-solaris* ]] ; then
 		sed -i -e "s/-DSVR4/-D_POSIX_C_SOURCE=200112L/" configure.ac || die
 	fi
+}
 
-	# libglvnd patches
-	epatch "${FILESDIR}"/0001-Add-an-flag-to-not-export-GL-and-GLX-functions.patch
-	epatch "${FILESDIR}"/0002-GLX-Implement-the-libglvnd-interface.patch
-	epatch "${FILESDIR}"/0003-Update-to-match-libglvnd-commit-e356f84554da42825e14.patch
-	epatch "${FILESDIR}"/fix-GL_LIBS-linking.patch
+src_prepare() {
+	apply_mesa_patches
 
 	base_src_prepare
 
 	eautoreconf
 
+	if use glvnd ; then
+		pushd "${S}"/glvnd_build
+			apply_mesa_patches
+
+			# libglvnd patches
+			epatch "${FILESDIR}"/0001-Add-an-flag-to-not-export-GL-and-GLX-functions.patch
+			epatch "${FILESDIR}"/0002-GLX-Implement-the-libglvnd-interface.patch
+			epatch "${FILESDIR}"/0003-Update-to-match-libglvnd-commit-e356f84554da42825e14.patch
+			epatch "${FILESDIR}"/fix-GL_LIBS-linking.patch
+
+			base_src_prepare
+
+			eautoreconf
+		popd
+	fi
+
 	# prepare beignet (intel opencl support) using cmake
 	use opencl && use beignet && beignet_src_prepare
 
+	if use vulkan ; then
+		pushd "${S}"/vulkan-${V_PV}
+			eautoreconf
+		popd
+	fi
+
 	multilib_copy_sources
 
-	use glvnd && multilib_foreach_abi copy_src_for_glvnd
 }
 
 glvnd_src_configure() {
@@ -376,6 +425,27 @@ glvnd_src_configure() {
 	popd
 }
 
+vulkan_src_configure() {
+	pushd "${BUILD_DIR}"/vulkan-${B_PV}
+	ECONF_SOURCE="${S}"/vulkan-${V_PV} \
+	econf \
+		$(use_enable !bindist texture-float) \
+		$(use_enable debug) \
+		$(use_enable !udev sysfs) \
+		--with-dri-drivers=${DRI_DRIVERS} \
+		--with-gallium-drivers= \
+		PYTHON2="${PYTHON}" \
+		--disable-nine \
+		--disable-gallium-llvm \
+		--disable-omx \
+		--disable-va \
+		--disable-vdpau \
+		--disable-xa \
+		--disable-xvmc \
+		${eglconf}
+	popd
+}
+
 beignet_src_configure() {
 	pushd "${BUILD_DIR}"/beignet-${B_PV}
 	local OLD_CFLAGS=${CFLAGS}
@@ -389,7 +459,6 @@ beignet_src_configure() {
 			-DGEN_PCI_ID=$(. "${FILESDIR}"/GetGenID.sh)
 		)
 	fi
-	# Currently broken FIXME!
 	if use beignet-egl; then
 		mycmakeargs+=(
 			-DMESA_SOURCE_PREFIX="${BUILD_DIR}"
@@ -421,7 +490,10 @@ beignet_src_configure() {
 }
 
 multilib_src_configure() {
-	local myconf
+	# Most Mesa Python build scripts are Python2
+	python_export python2.7 PYTHON
+
+	local myconf eglconf
 
 	if use classic; then
 		# Configurable DRI drivers
@@ -449,7 +521,7 @@ multilib_src_configure() {
 	fi
 
 	if use egl; then
-		myconf+="--with-egl-platforms=x11$(use wayland && echo ",wayland")$(use gbm && echo ",drm") "
+		eglconf+="--with-egl-platforms=x11$(use wayland && echo ",wayland")$(use gbm && echo ",drm") "
 	fi
 
 # FIXME
@@ -537,8 +609,10 @@ multilib_src_configure() {
 		--with-dri-drivers=${DRI_DRIVERS} \
 		--with-gallium-drivers=${GALLIUM_DRIVERS} \
 		PYTHON2="${PYTHON}" \
+		${eglconf} \
 		${myconf}
 
+	use vulkan && vulkan_src_configure
 	use glvnd && glvnd_src_configure
 
 	# intel opencl stuff
@@ -548,13 +622,21 @@ multilib_src_configure() {
 #		$(use_enable !pic asm) \
 
 multilib_src_compile() {
+	default
+	
+	if use vulkan ; then
+		pushd "${BUILD_DIR}"/vulkan-${V_PV}
+			# Vulkan Python build scripts are Python3!
+			python_export python3 PYTHON
+			emake
+		popd
+	fi
+
 	if use glvnd ; then
 		pushd "${BUILD_DIR}"/glvnd_build
 			emake
 		popd
 	fi
-
-	default
 
 	if use opencl && use beignet ; then
 		pushd "${BUILD_DIR}"/beignet-${B_PV}
@@ -564,6 +646,8 @@ multilib_src_compile() {
 }
 
 multilib_src_install() {
+	emake install DESTDIR="${D}"
+
 	if use glvnd ; then
 		pushd "${BUILD_DIR}"/glvnd_build
 			emake install DESTDIR="${D}"
@@ -581,7 +665,18 @@ multilib_src_install() {
 		popd
 	fi
 
-	emake install DESTDIR="${D}"
+	if use vulkan ; then
+		pushd "${BUILD_DIR}"/vulkan-${V_PV}
+			emake install DESTDIR="${D}"
+			ebegin "Installing Vulkan ICD json manifest file(s)"
+			dodir /etc/vulkan/icd.d
+			local vulkan_drivers=( intel )
+			for x in ${vulkan_drivers[@]}; do
+				doins src/vulkan/${x}_icd.json
+			done
+			eend $?
+		popd
+	fi
 
 	if use classic || use gallium; then
 			ebegin "Moving DRI/Gallium drivers for dynamic switching"
