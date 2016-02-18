@@ -430,9 +430,11 @@ vulkan_src_configure() {
 	pushd "${BUILD_DIR}"/vulkan-${B_PV}
 	ECONF_SOURCE="${S}"/vulkan-${V_PV} \
 	econf \
+		--enable-shared-glapi \
 		$(use_enable !bindist texture-float) \
 		$(use_enable debug) \
 		$(use_enable !udev sysfs) \
+		$(use_enable nptl glx-tls) \
 		--with-dri-drivers=${DRI_DRIVERS} \
 		--with-gallium-drivers= \
 		PYTHON2="${PYTHON}" \
@@ -647,8 +649,6 @@ multilib_src_compile() {
 }
 
 multilib_src_install() {
-	emake install DESTDIR="${D}"
-
 	if use glvnd ; then
 		pushd "${BUILD_DIR}"/glvnd_build
 			ebegin "Installing glvnd-mesa libs to glvnd directory"
@@ -672,6 +672,9 @@ multilib_src_install() {
 			eend $?
 		popd
 	fi
+
+	# Install standard Mesa build
+	emake install DESTDIR="${D}"
 
 	if use classic || use gallium; then
 			ebegin "Moving DRI/Gallium drivers for dynamic switching"
