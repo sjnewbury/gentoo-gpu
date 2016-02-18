@@ -399,20 +399,20 @@ glvnd_src_configure() {
 	pushd "${BUILD_DIR}"/glvnd_build
 	# For now only GLX is supported, shared glapi will only work when
 	# glvnd stops using its own internal copy
-	ECONF_SOURCE="${S}" \
+	ECONF_SOURCE="${S}/glvnd_build" \
 	econf \
 		${myconf} \
 		--enable-dri \
 		--enable-glx \
-		--disable-shared-glapi \
+		--enable-shared-glapi \
 		--disable-gles1 \
 		--disable-gles2 \
 		--disable-gbm \
 		--disable-egl \
+		--disable-glx-tls \
 		$(use_enable !bindist texture-float) \
 		$(use_enable debug) \
 		$(use_enable dri3) \
-		$(use_enable nptl glx-tls) \
 		--disable-osmesa \
 		$(use_enable !udev sysfs) \
 		--enable-llvm-shared-libs \
