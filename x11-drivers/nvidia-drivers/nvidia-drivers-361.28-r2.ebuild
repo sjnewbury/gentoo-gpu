@@ -26,10 +26,10 @@ SRC_URI="
 LICENSE="GPL-2 NVIDIA-r2"
 SLOT="0/${PV%.*}"
 KEYWORDS="-* ~amd64 ~x86 ~amd64-fbsd ~x86-fbsd"
-RESTRICT="bindist mirror strip"
+RESTRICT="bindist mirror"
 EMULTILIB_PKG="true"
 
-IUSE="acpi +driver gtk3 kernel_FreeBSD kernel_linux +kms multilib pax_kernel static-libs +tools uvm +X"
+IUSE="acpi compat +driver gtk3 kernel_FreeBSD kernel_linux +kms multilib pax_kernel static-libs +tools uvm +X"
 REQUIRED_USE="
 	tools? ( X )
 	static-libs? ( tools )
@@ -188,8 +188,7 @@ src_compile() {
 		MAKE="$(get_bmake)" CFLAGS="-Wno-sign-compare" emake CC="$(tc-getCC)" \
 			LD="$(tc-getLD)" LDFLAGS="$(raw-ldflags)" || die
 	elif use driver && use kernel_linux; then
-		MAKEOPTS=-j1
-		linux-mod_src_compile
+		MAKEOPTS=-j1 linux-mod_src_compile
 	fi
 
 	if use tools; then
@@ -419,7 +418,7 @@ src_install-libs() {
 		NV_GLX_LIBRARIES=(
 			"libEGL.so.1 ${GL_ROOT}"
 			"libEGL_nvidia.so.${NV_SOVER} ${GL_ROOT}"
-			"libGL.so.1.0.0 ${GL_ROOT}"
+			"libGL.so.$(usex compat ${NV_SOVER} 1.0.0) ${GL_ROOT}"
 			"libGLESv1_CM.so.1 ${GL_ROOT}"
 			"libGLESv1_CM_nvidia.so.${NV_SOVER} ${GL_ROOT}"
 			"libGLESv2.so.2 ${GL_ROOT}"
