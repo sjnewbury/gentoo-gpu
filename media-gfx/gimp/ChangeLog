@@ -1,0 +1,124 @@
+# ChangeLog for media-gfx/gimp
+# Copyright 1999-2016 Gentoo Foundation; Distributed under the GPL v2
+# (auto-generated from git log)
+
+*gimp-9999 (09 Aug 2015)
+*gimp-2.8.14 (09 Aug 2015)
+*gimp-2.8.10-r2 (09 Aug 2015)
+*gimp-2.8.10-r1 (09 Aug 2015)
+
+  09 Aug 2015; Robin H. Johnson <robbat2@gentoo.org>
+  +files/gimp-2.6.11-file-uri.patch, +files/gimp-2.6.12-CVE-2012-2763.patch,
+  +files/gimp-2.6.12-CVE-2012-3236.patch,
+  +files/gimp-2.6.12-CVE-2012-3403.patch,
+  +files/gimp-2.6.12-CVE-2012-3481.patch,
+  +files/gimp-2.6.12-potfiles-skip.patch,
+  +files/gimp-2.7.4-no-deprecation.patch,
+  +files/gimp-2.8.10-CVE-2013-1913.patch,
+  +files/gimp-2.8.10-CVE-2013-1978.patch, +files/gimp-2.8.10-clang.patch,
+  +files/gimp-2.8.10-freetype251.patch, +files/gimp-2.8.6-uclibc.patch,
+  +files/gimp-curl-headers.diff, +gimp-2.8.10-r1.ebuild,
+  +gimp-2.8.10-r2.ebuild, +gimp-2.8.14.ebuild, +gimp-9999.ebuild,
+  +metadata.xml:
+  proj/gentoo: Initial commit
+
+  This commit represents a new era for Gentoo:
+  Storing the gentoo-x86 tree in Git, as converted from CVS.
+
+  This commit is the start of the NEW history.
+  Any historical data is intended to be grafted onto this point.
+
+  Creation process:
+  1. Take final CVS checkout snapshot
+  2. Remove ALL ChangeLog* files
+  3. Transform all Manifests to thin
+  4. Remove empty Manifests
+  5. Convert all stale $Header$/$Id$ CVS keywords to non-expanded Git $Id$
+  5.1. Do not touch files with -kb/-ko keyword flags.
+
+  Signed-off-by: Robin H. Johnson <robbat2@gentoo.org>
+  X-Thanks: Alec Warner <antarus@gentoo.org> - did the GSoC 2006 migration
+  tests
+  X-Thanks: Robin H. Johnson <robbat2@gentoo.org> - infra guy, herding this
+  project
+  X-Thanks: Nguyen Thai Ngoc Duy <pclouds@gentoo.org> - Former Gentoo
+  developer, wrote Git features for the migration
+  X-Thanks: Brian Harring <ferringb@gentoo.org> - wrote much python to improve
+  cvs2svn
+  X-Thanks: Rich Freeman <rich0@gentoo.org> - validation scripts
+  X-Thanks: Patrick Lauer <patrick@gentoo.org> - Gentoo dev, running new 2014
+  work in migration
+  X-Thanks: Michał Górny <mgorny@gentoo.org> - scripts, QA, nagging
+  X-Thanks: All of other Gentoo developers - many ideas and lots of paint on
+  the bikeshed
+
+  24 Aug 2015; Justin Lecher <jlec@gentoo.org> metadata.xml:
+  Use https by default
+
+  Convert all URLs for sites supporting encrypted connections from http to
+  https
+
+  Signed-off-by: Justin Lecher <jlec@gentoo.org>
+
+  24 Aug 2015; Mike Gilbert <floppym@gentoo.org> metadata.xml:
+  Revert DOCTYPE SYSTEM https changes in metadata.xml
+
+  repoman does not yet accept the https version.
+  This partially reverts eaaface92ee81f30a6ac66fe7acbcc42c00dc450.
+
+  Bug: https://bugs.gentoo.org/552720
+
+*gimp-2.8.14-r1 (30 Aug 2015)
+
+  30 Aug 2015; Sebastian Pipping <sping@gentoo.org>
+  +files/gimp-2.8.14-blend-center.patch, +gimp-2.8.14-r1.ebuild:
+  Apply upstream patch on blending (Gentoo bug #558878)
+
+  07 Sep 2015; Sebastian Pipping <sping@gentoo.org> gimp-2.8.14-r1.ebuild:
+  Use virtualx for testing (bug #490480)
+
+*gimp-2.8.16 (05 Dec 2015)
+
+  05 Dec 2015; Sebastian Pipping <sping@gentoo.org> +gimp-2.8.16.ebuild:
+  2.8.16 (bug #567366)
+
+  Package-Manager: portage-2.2.24
+
+*gimp-2.9.2 (05 Dec 2015)
+
+  05 Dec 2015; Sebastian Pipping <sping@gentoo.org>
+  +files/gimp-2.9.2-no-deprecation.patch, +files/gimp-2.9.2-version.patch,
+  +gimp-2.9.2.ebuild:
+  2.9.2 (bug #567366)
+
+  Package-Manager: portage-2.2.24
+
+  05 Dec 2015; Jeroen Roovers <jer@gentoo.org> gimp-2.9.2.ebuild:
+  Mark ~hppa (bug #567558).
+
+  Package-Manager: portage-2.2.26
+  RepoMan-Options: --ignore-arches
+
+  07 Dec 2015; Sebastian Pipping <sping@gentoo.org> gimp-2.9.2.ebuild:
+  Depend on media-libs/gegl[cairo] (bug #567724)
+
+  Package-Manager: portage-2.2.24
+
+  10 Dec 2015; Sebastian Pipping <sping@gentoo.org> gimp-2.9.2.ebuild:
+  Drop ~ia64 ~sparc (bugs #567824, #567802)
+
+  Package-Manager: portage-2.2.26
+
+  24 Dec 2015; Sebastian Pipping <sping@gentoo.org> gimp-9999.ebuild:
+  Merge 2.9.2 into and fix 9999 (bug #569346)
+
+  Package-Manager: portage-2.2.26
+
+  31 Dec 2015; Sebastian Pipping <sping@gentoo.org> gimp-9999.ebuild:
+  Fix compile for NVidia OpenCL (bug #569738)
+
+  Package-Manager: portage-2.2.26
+
+  24 Jan 2016; Michał Górny <mgorny@gentoo.org> metadata.xml:
+  Set appropriate maintainer types in metadata.xml (GLEP 67)
+
