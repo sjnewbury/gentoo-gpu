@@ -645,7 +645,11 @@ multilib_src_install() {
 			done
 
 			# Create libGLX_driver symlinks for each driver
-			for x in ${DRI_DRIVERS//,/ } ${GALLIUM_DRIVERS//,/}; do
+			local ALL_DRIVERS
+			local y
+			local z
+			ALL_DRIVERS="${DRI_DRIVERS//,/ } ${GALLIUM_DRIVERS//,/ }"
+			for x in ${ALL_DRIVERS//i965/intel} indirect; do
 				for y in "${ED}${gl_dir}"/lib/lib*mesa.{la,a,so*}; do
 					if [ -f ${y} -o -L ${y} ]; then
 						z=${y##*/}
