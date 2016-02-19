@@ -351,7 +351,7 @@ src_prepare() {
 	epatch "${FILESDIR}"/0001-Add-an-flag-to-not-export-GL-and-GLX-functions.patch
 	epatch "${FILESDIR}"/0002-GLX-Implement-the-libglvnd-interface.patch
 	epatch "${FILESDIR}"/0003-Update-to-match-libglvnd-commit-e356f84554da42825e14.patch
-	epatch "${FILESDIR}"/fix-GL_LIBS-linking.patch
+	epatch "${FILESDIR}"/glvnd-fix-linking.patch
 
 	base_src_prepare
 
@@ -715,7 +715,7 @@ multilib_src_install() {
 			dodir ${cl_dir}/{lib,include}
 			if [ -f "${ED}/usr/$(get_libdir)/libOpenCL.so" ]; then
 				mv -f "${ED}"/usr/$(get_libdir)/libOpenCL.so* \
-				"${ED}"${cl_dir}
+				"${ED}"${cl_dir}/lib
 			fi
 			if [ -f "${ED}/usr/include/CL/opencl.h" ]; then
 				mv -f "${ED}"/usr/include/CL \
