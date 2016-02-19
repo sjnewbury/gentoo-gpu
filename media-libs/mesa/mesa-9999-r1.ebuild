@@ -208,7 +208,7 @@ DEPEND="${RDEPEND}
 "
 
 S="${WORKDIR}/${MY_P}"
-CMAKE_USE_DIR="${S}"/beignet-${B_PV}
+CMAKE_USE_DIR="${WORKDIR}"/beignet-${B_PV}
 
 QA_WX_LOAD="
 x86? (
@@ -231,7 +231,7 @@ pkg_setup() {
 }
 
 beignet_src_unpack() {
-		export EGIT_MIN_CLONE_TYPE=shallow
+		EGIT_MIN_CLONE_TYPE=shallow
 		if [ -n "${BEIGNET_COMMIT}" ]; then
 			git-r3_fetch "git://anongit.freedesktop.org/beignet" \
 				"${BEIGNET_COMMIT}"
@@ -246,17 +246,11 @@ beignet_src_unpack() {
 				"refs/heads/master"
 		fi		
 		git-r3_checkout "git://anongit.freedesktop.org/beignet" \
-			"${S}"/beignet-${B_PV}
-}
-
-glvnd_src_unpack() {
-		export EGIT_MIN_CLONE_TYPE=mirror
-		# Clone Mesa branch (EGIT_REPO_URI)
-		git-r3_checkout "" "${S}"/glvnd_build "${CATEGORY}/${PN}/${SLOT%/*}-MesaGL"
+			"${WORKDIR}"/beignet-${B_PV}
 }
 
 vulkan_src_unpack() {
-		export EGIT_MIN_CLONE_TYPE=mirror
+		EGIT_MIN_CLONE_TYPE=mirror
 		# Same repo as Mesa (EGIT_REPO_URI)
 		if [ -n "${VULKAN_COMMIT}" ]; then
 			git-r3_fetch "" "${VULKAN_COMMIT}" "${CATEGORY}/${PN}/${SLOT%/*}-MesaVulkan"
@@ -267,20 +261,19 @@ vulkan_src_unpack() {
 		else
 			git-r3_fetch "" "refs/heads/master" "${CATEGORY}/${PN}/${SLOT%/*}-MesaVulkan"
 		fi		
-		git-r3_checkout "" "${S}"/vulkan-${V_PV} "${CATEGORY}/${PN}/${SLOT%/*}-MesaVulkan"
+		git-r3_checkout "" "${WORKDIR}"/vulkan-${V_PV} "${CATEGORY}/${PN}/${SLOT%/*}-MesaVulkan"
 }
 
 src_unpack() {
 	default
 	if [[ $PV = 9999* ]] ; then
-		export EGIT_MIN_CLONE_TYPE=mirror
+		EGIT_MIN_CLONE_TYPE=mirror
 		git-r3_fetch "" "" "${CATEGORY}/${PN}/${SLOT%/*}-MesaGL"
 		git-r3_checkout "" "${S}" "${CATEGORY}/${PN}/${SLOT%/*}-MesaGL"
 		use opencl && use beignet && beignet_src_unpack
 		# Until vulkan is merged with mesa proper, check out vulkan
 		# branch
 		use vulkan && vulkan_src_unpack
-		use glvnd && glvnd_src_unpack
 
 		# We want to make sure the mesa repo HEAD gets stored not beignet
 		# so set the EGIT_VERSION ourselves. 
@@ -289,21 +282,13 @@ src_unpack() {
 			git rev-parse --verify HEAD
 		)
 		export EGIT_VERSION=${new_commit_id}
-	else
-		# keep beignet sources in mesa source tree so they 
-		# get copied with for multilib build
-  		use beignet && mv "${WORKDIR}"/beignet-${B_PV} "${S}"
-		if use glvnd ; then
-			ebegin "Copying Mesa sources for GLVND build"
-			cp -p -R "${S}" "${T}"/glvnd_build
-			mv "${T}"/glvnd_build "${S}"
-			eend $?
-		fi
 	fi
 }
 
 beignet_src_prepare() {
-	pushd "${S}"/beignet-${B_PV}
+	pushd "${WORKDIR}"/beignet-${B_PV}
+	#CMAKE_USE_DIR="${S}"/beignet-${B_PV} \
+	#CMAKE_IN_SOURCE_BUILD=1 \
 	cmake-utils_src_prepare
 
 	# Fix linking
@@ -362,31 +347,21 @@ apply_mesa_patches() {
 src_prepare() {
 	apply_mesa_patches
 
+	# libglvnd patches
+	epatch "${FILESDIR}"/0001-Add-an-flag-to-not-export-GL-and-GLX-functions.patch
+	epatch "${FILESDIR}"/0002-GLX-Implement-the-libglvnd-interface.patch
+	epatch "${FILESDIR}"/0003-Update-to-match-libglvnd-commit-e356f84554da42825e14.patch
+	epatch "${FILESDIR}"/fix-GL_LIBS-linking.patch
+
 	base_src_prepare
 
 	eautoreconf
-
-	if use glvnd ; then
-		pushd "${S}"/glvnd_build
-			apply_mesa_patches
-
-			# libglvnd patches
-			epatch "${FILESDIR}"/0001-Add-an-flag-to-not-export-GL-and-GLX-functions.patch
-			epatch "${FILESDIR}"/0002-GLX-Implement-the-libglvnd-interface.patch
-			epatch "${FILESDIR}"/0003-Update-to-match-libglvnd-commit-e356f84554da42825e14.patch
-			epatch "${FILESDIR}"/fix-GL_LIBS-linking.patch
-
-			base_src_prepare
-
-			eautoreconf
-		popd
-	fi
 
 	# prepare beignet (intel opencl support) using cmake
 	use opencl && use beignet && beignet_src_prepare
 
 	if use vulkan ; then
-		pushd "${S}"/vulkan-${V_PV}
+		pushd "${WORKDIR}"/vulkan-${V_PV}
 			epatch "${FILESDIR}"/0001-Revert-anv-formats-Don-t-use-a-compound-literal-to-i.patch
 			eautoreconf
 		popd
@@ -397,24 +372,23 @@ src_prepare() {
 }
 
 glvnd_src_configure() {
+	mkdir -p "${BUILD_DIR}"/glvnd_build
 	pushd "${BUILD_DIR}"/glvnd_build
-	# For now only GLX is supported, shared glapi will only work when
-	# glvnd stops using its own internal copy
-	ECONF_SOURCE="${S}/glvnd_build" \
+	ECONF_SOURCE="${S}" \
 	econf \
 		${myconf} \
+		${eglconf} \
 		--enable-dri \
 		--enable-glx \
-		--disable-shared-glapi \
-		--disable-gles1 \
-		--disable-gles2 \
-		--disable-gbm \
-		--disable-egl \
-		--disable-glx-tls \
+		--enable-shared-glapi \
+		$(use_enable gles1) \
+		$(use_enable gles2) \
+		$(use_enable gbm) \
+		--disable-osmesa \
+		$(use_enable nptl glx-tls) \
 		$(use_enable !bindist texture-float) \
 		$(use_enable debug) \
 		$(use_enable dri3) \
-		--disable-osmesa \
 		$(use_enable !udev sysfs) \
 		--enable-llvm-shared-libs \
 		--without-dri-drivers \
@@ -424,11 +398,14 @@ glvnd_src_configure() {
 		--disable-opencl \
 		PYTHON2="${PYTHON}"
 	popd
+
+
 }
 
 vulkan_src_configure() {
+	mkdir -p "${BUILD_DIR}"/vulkan-${B_PV}
 	pushd "${BUILD_DIR}"/vulkan-${B_PV}
-	ECONF_SOURCE="${S}"/vulkan-${V_PV} \
+	ECONF_SOURCE="${WORKDIR}"/vulkan-${V_PV} \
 	econf \
 		--enable-shared-glapi \
 		$(use_enable !bindist texture-float) \
@@ -450,6 +427,7 @@ vulkan_src_configure() {
 }
 
 beignet_src_configure() {
+	mkdir -p "${BUILD_DIR}"/beignet-${B_PV}
 	pushd "${BUILD_DIR}"/beignet-${B_PV}
 	local OLD_CFLAGS=${CFLAGS}
 	local OLD_CXXFLAGS=${CFLAGS}
@@ -486,7 +464,10 @@ beignet_src_configure() {
 		append-flags -fpch-deps
 	fi
 
-	BUILD_DIR=${BUILD_DIR}/beignet-${B_PV} cmake-utils_src_configure
+	#CMAKE_USE_DIR="${BUILD_DIR}"/beignet-${B_PV} \
+	#CMAKE_IN_SOURCE_BUILD=1 \
+	BUILD_DIR=${BUILD_DIR}/beignet-${B_PV} \
+	cmake-utils_src_configure
 	CFLAGS=${OLD_CFLAGS}
 	CXXFLAGS=${OLD_CXXFLAGS}
 	popd
@@ -592,7 +573,7 @@ multilib_src_configure() {
 			LLVM_CONFIG="${EPREFIX}/usr/bin/llvm-config.${ABI}"
 	fi
 
-	ECONF_SOURCE="${S}" \
+#	ECONF_SOURCE="${S}" \
 	econf \
 		--enable-dri \
 		--enable-glx \
@@ -651,11 +632,27 @@ multilib_src_compile() {
 multilib_src_install() {
 	if use glvnd ; then
 		pushd "${BUILD_DIR}"/glvnd_build
-			ebegin "Installing glvnd-mesa libs to glvnd directory"
-			local glvnd_dir="/usr/$(get_libdir)/opengl/glvnd/"
-			dodir ${glvnd_dir}/lib
-			insinto ${glvnd_dir}/lib
-			doins lib*/*.so
+			emake install DESTDIR="${D}"
+			ebegin "Moving glvnd-mesa libs to glvnd directory"
+			local x
+			local gl_dir="/usr/$(get_libdir)/opengl/glvnd/"
+			dodir ${gl_dir}/lib
+			for x in "${ED}"/usr/$(get_libdir)/lib*mesa.{la,a,so*}; do
+				if [ -f ${x} -o -L ${x} ]; then
+					mv -f "${x}" "${ED}${gl_dir}"/lib \
+						|| die "Failed to move ${x}"
+				fi
+			done
+
+			# Create libGLX_driver symlinks for each driver
+			for x in ${DRI_DRIVERS//,/ } ${GALLIUM_DRIVERS//,/}; do
+				for y in "${ED}"/usr/$(get_libdir)/lib*mesa.{la,a,so*}; do
+					if [ -f ${y} -o -L ${y} ]; then
+						z=${y##*/}
+						dosym ${z} ${gl_dir}/${z/mesa/${x}}
+					fi
+				done
+			done
 		eend $?
 		popd
 	fi
