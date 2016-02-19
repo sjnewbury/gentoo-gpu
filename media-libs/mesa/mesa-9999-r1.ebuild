@@ -653,7 +653,7 @@ multilib_src_install() {
 				for y in "${ED}${gl_dir}"/lib/lib*mesa.{la,a,so*}; do
 					if [ -f ${y} -o -L ${y} ]; then
 						z=${y##*/}
-						dosym ${z} ${gl_dir}/${z/mesa/${x}}
+						dosym ${z} ${gl_dir}/lib/${z/mesa/${x}}
 					fi
 				done
 			done
