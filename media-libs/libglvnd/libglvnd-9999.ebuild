@@ -29,12 +29,17 @@ src_prepare() {
 	eautoreconf
 }
 
+multilib_src_configure() {
+	ECONF_SOURCE=${S} econf --libdir=/usr/$(get_libdir)/opengl/glvnd/lib
+}
+
 multilib_src_install() {
 	local GL_ROOT="/usr/$(get_libdir)/opengl/glvnd/lib"
 	emake DESTDIR="${D}" install
-	dodir "${GL_ROOT}"
-	mv -f "${ED}"/usr/$(get_libdir)/lib{GL,GLESv1_CM,GLESv2,GLX,OpenGL}* \
-		"${ED}"${GL_ROOT}/
+	mv -f "${ED}"${GL_ROOT}/xorg \
+		"${ED}"/usr/$(get_libdir) || die mv failed
+	mv -f "${ED}"${GL_ROOT}/pkgconfig \
+		"${ED}"/usr/$(get_libdir) || die mv failed
 }
 
 multilib_src_install_all() {
