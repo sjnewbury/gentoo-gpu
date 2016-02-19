@@ -646,7 +646,7 @@ multilib_src_install() {
 
 			# Create libGLX_driver symlinks for each driver
 			for x in ${DRI_DRIVERS//,/ } ${GALLIUM_DRIVERS//,/}; do
-				for y in "${ED}"/usr/$(get_libdir)/lib*mesa.{la,a,so*}; do
+				for y in "${ED}${gl_dir}"/lib/lib*mesa.{la,a,so*}; do
 					if [ -f ${y} -o -L ${y} ]; then
 						z=${y##*/}
 						dosym ${z} ${gl_dir}/${z/mesa/${x}}
@@ -727,9 +727,9 @@ multilib_src_install() {
 			ebegin "Installing Beignet Intel HD Graphics OpenCL implementation"
 			cd "${BUILD_DIR}/beignet-${B_PV}"
 			DESTDIR="${D}" ${CMAKE_MAKEFILE_GENERATOR} install "$@" || \
-											die "Failed to install Beignet"
+						die "Failed to install Beignet"
 			insinto /usr/$(get_libdir)/OpenCL/vendors/beignet/include/CL
-			doins include/CL/*
+			doins ${WORKDIR}/beignet-${B_PV}/include/CL/*
 			eend $?
 		fi
 	fi
