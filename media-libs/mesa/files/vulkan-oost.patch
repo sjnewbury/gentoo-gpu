@@ -1,0 +1,10 @@
+--- src/intel/vulkan/Makefile.am~	2016-02-21 11:22:59.000000000 +0000
++++ src/intel/vulkan/Makefile.am	2016-02-21 11:26:13.149236044 +0000
+@@ -66,6 +66,7 @@
+ 	-I$(top_builddir)/src/compiler \
+ 	-I$(top_builddir)/src/compiler/nir \
+ 	-I$(top_builddir)/src/intel \
++	-I$(top_builddir)/src/intel/genxml \
+ 	-I$(top_builddir)/src/vulkan
+ 
+ libvulkan_intel_la_CFLAGS = $(CFLAGS) -Wno-override-init

@@ -363,6 +363,7 @@ src_prepare() {
 	if use vulkan ; then
 		pushd "${WORKDIR}"/vulkan-${V_PV}
 			epatch "${FILESDIR}"/0001-Revert-anv-formats-Don-t-use-a-compound-literal-to-i.patch
+			epatch "${FILESDIR}"/vulkan-oost.patch
 			eautoreconf
 		popd
 	fi
