@@ -168,7 +168,7 @@ for card in ${RADEON_CARDS}; do
 								${LIBDRM_DEPSTRING}[video_cards_radeon]
 								opencl? (
 											>=sys-devel/llvm-3.3-r1[video_cards_radeon,${MULTILIB_USEDEP}]
-											dev-libs/libclc[${MULTILIB_USEDEP}]
+											dev-libs/libclc
 								)
 		)
 	"
@@ -562,7 +562,7 @@ multilib_src_configure() {
 	fi
 
 	# on abi_x86_32 hardened we need to have asm disable
-	if [[ ${ABI} == x86* ]] && use pic; then
+	if ( [[ ${ABI} == x86* ]] && use pic ) || [[ ${ABI} == x32* ]]; then
 		myconf+=" --disable-asm"
 	fi
 
