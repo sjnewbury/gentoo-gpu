@@ -1,4 +1,4 @@
-gentoo-opencl
+gentoo-gpu
 =============
 
 This repository contains mostly live ebuilds for
