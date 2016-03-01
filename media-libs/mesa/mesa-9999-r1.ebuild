@@ -430,7 +430,9 @@ beignet_src_configure() {
 	mkdir -p "${BUILD_DIR}"/beignet-${B_PV}
 	pushd "${BUILD_DIR}"/beignet-${B_PV}
 	local OLD_CFLAGS=${CFLAGS}
-	local OLD_CXXFLAGS=${CFLAGS}
+	local OLD_CXXFLAGS=${CXXFLAGS}
+	local OLD_CPPFLAGS=${CPPFLAGS}
+	local OLD_LDFLAGS=${LDFLAGS}
 	local mycmakeargs=(
 		-DBEIGNET_INSTALL_DIR="/usr/$(get_libdir)/OpenCL/vendors/beignet"
 	)
@@ -464,12 +466,18 @@ beignet_src_configure() {
 		append-flags -fpch-deps
 	fi
 
+	# Add Mesa include dir to find EGL/egl.h and -L for libs
+	append-cppflags -I"${BUILD_DIR}"/include
+	append-ldflags -L"${BUILD_DIR}"/lib
+
 	#CMAKE_USE_DIR="${BUILD_DIR}"/beignet-${B_PV} \
 	#CMAKE_IN_SOURCE_BUILD=1 \
 	BUILD_DIR=${BUILD_DIR}/beignet-${B_PV} \
 	cmake-utils_src_configure
 	CFLAGS=${OLD_CFLAGS}
 	CXXFLAGS=${OLD_CXXFLAGS}
+	CXXFLAGS=${OLD_CPPFLAGS}
+	LDFLAGS=${OLD_LDFLAGS}
 	popd
 }
 
@@ -566,6 +574,12 @@ multilib_src_configure() {
 		myconf+=" --disable-asm"
 	fi
 
+	# gallium-nine only makes sense on x86 and and amd64
+	# (maybe ARM?)
+	if [[ ${ABI} == x86* ]] || [[ ${ABI} == amd64* ]]; then
+		myconf+=" $(use_enable d3d9 nine)"
+	fi
+
 	# build fails with BSD indent, bug #428112
 	use userland_GNU || export INDENT=cat
 
@@ -579,7 +593,6 @@ multilib_src_configure() {
 		--enable-glx \
 		--enable-shared-glapi \
 		$(use_enable !bindist texture-float) \
-		$(use_enable d3d9 nine) \
 		$(use_enable debug) \
 		$(use_enable dri3) \
 		$(use_enable egl) \
