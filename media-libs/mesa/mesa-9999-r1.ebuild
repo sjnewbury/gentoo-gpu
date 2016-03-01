@@ -526,7 +526,7 @@ multilib_src_configure() {
 		if ( [[ ${ABI} == x86* ]] || [[ ${ABI} == amd64* ]] ); then
 			myconf+=" $(use_enable d3d9 nine)"
 		else
-			myconf+=" --disable-nine)"
+			myconf+=" --disable-nine"
 		fi
 
 		myconf+="
