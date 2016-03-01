@@ -521,8 +521,15 @@ multilib_src_configure() {
 #			$(use_enable openvg gallium-egl)
 
 	if use gallium; then
+		# gallium-nine only makes sense on x86 and and amd64
+		# (maybe ARM?)
+		if ( [[ ${ABI} == x86* ]] || [[ ${ABI} == amd64* ]] ); then
+			myconf+=" $(use_enable d3d9 nine)"
+		else
+			myconf+=" --disable-nine)"
+		fi
+
 		myconf+="
-			$(use_enable d3d9 nine)
 			$(use_enable llvm gallium-llvm)
 			$(use_enable openmax omx)
 			$(use_enable vaapi va)
@@ -572,12 +579,6 @@ multilib_src_configure() {
 	# on abi_x86_32 hardened we need to have asm disable
 	if ( [[ ${ABI} == x86* ]] && use pic ) || [[ ${ABI} == x32* ]]; then
 		myconf+=" --disable-asm"
-	fi
-
-	# gallium-nine only makes sense on x86 and and amd64
-	# (maybe ARM?)
-	if [[ ${ABI} == x86* ]] || [[ ${ABI} == amd64* ]]; then
-		myconf+=" $(use_enable d3d9 nine)"
 	fi
 
 	# build fails with BSD indent, bug #428112
