@@ -11,7 +11,6 @@ if [[ ${PV} = 9999* ]]; then
 	EXPERIMENTAL="true"
 	B_PV="${PV}"
 	V_PV="${PV}"
-	VULKAN_BRANCH=vulkan
 else
 	B_PV="0.9"
 fi
@@ -249,21 +248,6 @@ beignet_src_unpack() {
 			"${WORKDIR}"/beignet-${B_PV}
 }
 
-vulkan_src_unpack() {
-		EGIT_MIN_CLONE_TYPE=mirror
-		# Same repo as Mesa (EGIT_REPO_URI)
-		if [ -n "${VULKAN_COMMIT}" ]; then
-			git-r3_fetch "" "${VULKAN_COMMIT}" "${CATEGORY}/${PN}/${SLOT%/*}-MesaVulkan"
-		elif [ -n "${VULKAN_BRANCH}" ]; then
-			git-r3_fetch "" "refs/heads/${VULKAN_BRANCH}" "${CATEGORY}/${PN}/${SLOT%/*}-MesaVulkan"
-		elif [ -n "${VULKAN_TAG}" ]; then
-			git-r3_fetch "" "refs/tags/${VULKAN_TAG}" "${CATEGORY}/${PN}/${SLOT%/*}-MesaVulkan"
-		else
-			git-r3_fetch "" "refs/heads/master" "${CATEGORY}/${PN}/${SLOT%/*}-MesaVulkan"
-		fi		
-		git-r3_checkout "" "${WORKDIR}"/vulkan-${V_PV} "${CATEGORY}/${PN}/${SLOT%/*}-MesaVulkan"
-}
-
 src_unpack() {
 	default
 	if [[ $PV = 9999* ]] ; then
@@ -271,9 +255,6 @@ src_unpack() {
 		git-r3_fetch "" "" "${CATEGORY}/${PN}/${SLOT%/*}-MesaGL"
 		git-r3_checkout "" "${S}" "${CATEGORY}/${PN}/${SLOT%/*}-MesaGL"
 		use opencl && use beignet && beignet_src_unpack
-		# Until vulkan is merged with mesa proper, check out vulkan
-		# branch
-		use vulkan && vulkan_src_unpack
 
 		# We want to make sure the mesa repo HEAD gets stored not beignet
 		# so set the EGIT_VERSION ourselves. 
@@ -292,29 +273,20 @@ beignet_src_prepare() {
 	cmake-utils_src_prepare
 
 	# Fix linking
-	# no longer needed
-	#epatch "${FILESDIR}"/beignet-"${B_PV}"-respect-flags.patch
 
 	# Build beignet libcl as libOpenCL so that it can be handled
 	# by the Gentoo eselect opencl
 	if [[ -n "${BEIGNET_BRANCH}"  ]]; then
 		epatch "${FILESDIR}"/beignet-${BEIGNET_BRANCH}-"${B_PV}"-libOpenCL.patch
-		epatch "${FILESDIR}"/beignet-${BEIGNET_BRANCH}-"${B_PV}"-inline-to-static-inline.patch
+		epatch "${FILESDIR}"/beignet-${BEIGNET_BRANCH}-"${B_PV}"-llvm-system-libs.patch
 	else
 		epatch "${FILESDIR}"/beignet-"${B_PV}"-libOpenCL.patch
 	fi
-#	epatch "${FILESDIR}"/beignet-"${B_PV}"-fix-FindLLVM.patch
 	epatch "${FILESDIR}"/beignet-"${B_PV}"-llvm-libs-tr.patch
-	#epatch "${FILESDIR}"/beignet-"${B_PV}"-buildfix.patch
 	epatch "${FILESDIR}"/beignet-"${B_PV}"-bitcode-path-fix.patch
 	epatch "${FILESDIR}"/beignet-"${B_PV}"-silence-dri2-failure.patch
-#	epatch "${FILESDIR}"/fix-beignet.patch
 
-	# Beignet hasn't been converted to use the new PassManager yet
-#	sed -i -e 's/\(PassManager\.h\)/IR\/Legacy\1/' $(find -name '*.cpp')
-#	sed -i -e 's/\(::PassManager\)/::legacy\1/' $(find -name '*.cpp')
-
-#	Change ICD name as above
+	# Change ICD name as above
 	sed -i -e 's/libcl/libOpenCL/g' intel-beignet.icd.in
 
 	# optionally enable support for ICD
@@ -352,6 +324,7 @@ src_prepare() {
 	epatch "${FILESDIR}"/0002-GLX-Implement-the-libglvnd-interface.patch
 	epatch "${FILESDIR}"/0003-Update-to-match-libglvnd-commit-e356f84554da42825e14.patch
 	epatch "${FILESDIR}"/glvnd-fix-linking.patch
+	epatch "${FILESDIR}"/0001-Revert-anv-formats-Don-t-use-a-compound-literal-to-i.patch
 
 	base_src_prepare
 
@@ -359,13 +332,6 @@ src_prepare() {
 
 	# prepare beignet (intel opencl support) using cmake
 	use opencl && use beignet && beignet_src_prepare
-
-	if use vulkan ; then
-		pushd "${WORKDIR}"/vulkan-${V_PV}
-			epatch "${FILESDIR}"/0001-Revert-anv-formats-Don-t-use-a-compound-literal-to-i.patch
-			eautoreconf
-		popd
-	fi
 
 	multilib_copy_sources
 
@@ -402,30 +368,6 @@ glvnd_src_configure() {
 
 }
 
-vulkan_src_configure() {
-	mkdir -p "${BUILD_DIR}"/vulkan-${B_PV}
-	pushd "${BUILD_DIR}"/vulkan-${B_PV}
-	ECONF_SOURCE="${WORKDIR}"/vulkan-${V_PV} \
-	econf \
-		--enable-shared-glapi \
-		$(use_enable !bindist texture-float) \
-		$(use_enable debug) \
-		$(use_enable !udev sysfs) \
-		$(use_enable nptl glx-tls) \
-		--with-dri-drivers=${DRI_DRIVERS} \
-		--with-gallium-drivers= \
-		PYTHON2="${PYTHON}" \
-		--disable-nine \
-		--disable-gallium-llvm \
-		--disable-omx \
-		--disable-va \
-		--disable-vdpau \
-		--disable-xa \
-		--disable-xvmc \
-		${eglconf}
-	popd
-}
-
 beignet_src_configure() {
 	mkdir -p "${BUILD_DIR}"/beignet-${B_PV}
 	pushd "${BUILD_DIR}"/beignet-${B_PV}
@@ -459,6 +401,8 @@ beignet_src_configure() {
 	if [[ ${CC} == clang ]]; then
 		filter-flags -f*graphite -f*loop-*
 		filter-flags -mfpmath* -freorder-blocks-and-partition
+		filter-flags -flto* -fuse-linker-plugin
+		filter-flags -ftracer -fvect-cost-model -ftree*
 	fi
 
 	# Pre-compiled headers otherwise result in redefined symbols (gcc only)
@@ -467,7 +411,8 @@ beignet_src_configure() {
 	fi
 
 	# Add Mesa include dir to find EGL/egl.h and -L for libs
-	append-cppflags -I"${BUILD_DIR}"/include
+	# beignet src include must come first for CL headers
+#	append-cppflags -I"${S}"/beignet-${B_PV}/include -I"${BUILD_DIR}"/include
 	append-ldflags -L"${BUILD_DIR}"/lib
 
 	#CMAKE_USE_DIR="${BUILD_DIR}"/beignet-${B_PV} \
@@ -486,6 +431,14 @@ multilib_src_configure() {
 	python_export python2.7 PYTHON
 
 	local myconf eglconf
+
+	if use vulkan; then
+		if use video_cards_i965 || \
+			use video_cards_intel || \
+			use video_cards_ilo; then
+			vulkan_enable intel
+		fi
+	fi
 
 	if use classic; then
 		# Configurable DRI drivers
@@ -606,11 +559,11 @@ multilib_src_configure() {
 		--enable-llvm-shared-libs \
 		--with-dri-drivers=${DRI_DRIVERS} \
 		--with-gallium-drivers=${GALLIUM_DRIVERS} \
+		--with-vulkan-drivers=${VULKAN_DRIVERS} \
 		PYTHON2="${PYTHON}" \
 		${eglconf} \
 		${myconf}
 
-	use vulkan && vulkan_src_configure
 	use glvnd && glvnd_src_configure
 
 	# intel opencl stuff
@@ -622,14 +575,6 @@ multilib_src_configure() {
 multilib_src_compile() {
 	default
 	
-	if use vulkan ; then
-		pushd "${BUILD_DIR}"/vulkan-${V_PV}
-			# Vulkan Python build scripts are Python3!
-			python_export python3 PYTHON
-			emake
-		popd
-	fi
-
 	if use glvnd ; then
 		pushd "${BUILD_DIR}"/glvnd_build
 			emake
@@ -675,19 +620,6 @@ multilib_src_install() {
 		popd
 	fi
 
-	if use vulkan ; then
-		pushd "${BUILD_DIR}"/vulkan-${V_PV}
-			emake install DESTDIR="${D}"
-			ebegin "Installing Vulkan ICD json manifest file(s)"
-			dodir /etc/vulkan/icd.d
-			local vulkan_drivers=( intel )
-			for x in ${vulkan_drivers[@]}; do
-				doins src/${x}/vulkan/${x}_icd.json
-			done
-			eend $?
-		popd
-	fi
-
 	# Install standard Mesa build
 	emake install DESTDIR="${D}"
 
@@ -723,31 +655,33 @@ multilib_src_install() {
 		eend $?
 	fi
 	if use opencl; then
-		if use gallium ; then
-			ebegin "Moving Gallium/Clover OpenCL implementation for dynamic switching"
-			local cl_dir="/usr/$(get_libdir)/OpenCL/vendors/mesa"
+		ebegin "Moving Gallium/Clover OpenCL implementation for dynamic switching"
+		local cl_dir="/usr/$(get_libdir)/OpenCL/vendors/mesa"
+		dodir ${cl_dir}/{lib,include}
+		if [ -f "${ED}/usr/$(get_libdir)/libOpenCL.so" ]; then
+			mv -f "${ED}"/usr/$(get_libdir)/libOpenCL.so* \
+			"${ED}"${cl_dir}/lib
+		fi
+		if [ ! -f "${ED}"${cl_dir}/lib/* ]; then
+			einfo "No Gallium/Clover OpenCL driver, removing ICD config"
+			rm -f "${ED}"/etc/OpenCL/vendors/mesa.icd
+		fi
+		if [ -f "${ED}/usr/include/CL/opencl.h" ]; then
+			mv -f "${ED}"/usr/include/CL \
+			"${ED}"${cl_dir}/include
+		fi
+		eend $?
+		if use beignet ; then
+			ebegin "Installing Beignet Intel HD Graphics OpenCL implementation"
+			local cl_dir="/usr/$(get_libdir)/OpenCL/vendors/beignet"
 			dodir ${cl_dir}/{lib,include}
-			if [ -f "${ED}/usr/$(get_libdir)/libOpenCL.so" ]; then
-				mv -f "${ED}"/usr/$(get_libdir)/libOpenCL.so* \
-				"${ED}"${cl_dir}/lib
-			fi
+			cd "${BUILD_DIR}/beignet-${B_PV}"
+			DESTDIR="${D}" ${CMAKE_MAKEFILE_GENERATOR} install "$@" || \
+						die "Failed to install Beignet"
 			if [ -f "${ED}/usr/include/CL/opencl.h" ]; then
 				mv -f "${ED}"/usr/include/CL \
 				"${ED}"${cl_dir}/include
 			fi
-			if [ ! -f "${ED}"${cl_dir}/lib/* ]; then
-				einfo "No Gallium/Clover OpenCL driver, removing ICD config"
-				rm -f "${ED}"/etc/OpenCL/vendors/mesa.icd
-			fi
-			eend $?
-		fi
-		if use beignet ; then
-			ebegin "Installing Beignet Intel HD Graphics OpenCL implementation"
-			cd "${BUILD_DIR}/beignet-${B_PV}"
-			DESTDIR="${D}" ${CMAKE_MAKEFILE_GENERATOR} install "$@" || \
-						die "Failed to install Beignet"
-			insinto /usr/$(get_libdir)/OpenCL/vendors/beignet/include/CL
-			doins ${WORKDIR}/beignet-${B_PV}/include/CL/*
 			eend $?
 		fi
 	fi
@@ -857,6 +791,23 @@ gallium_enable() {
 				shift
 				for i in $@; do
 					GALLIUM_DRIVERS+=",${i}"
+				done
+			fi
+			;;
+	esac
+}
+
+vulkan_enable() {
+	case $# in
+		# for enabling unconditionally
+		1)
+			VULKAN_DRIVERS+=",$1"
+			;;
+		*)
+			if use $1; then
+				shift
+				for i in $@; do
+					VULKAN_DRIVERS+=",${i}"
 				done
 			fi
 			;;
