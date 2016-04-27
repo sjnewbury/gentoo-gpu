@@ -2,9 +2,9 @@
 # Distributed under the terms of the GNU General Public License v2
 # $Id$
 
-EAPI=5
+EAPI=6
 
-inherit multilib
+inherit multilib-minimal
 
 DESCRIPTION="Alternative to vendor specific OpenCL ICD loaders"
 HOMEPAGE="http://forge.imag.fr/projects/ocl-icd/"
@@ -18,18 +18,18 @@ IUSE=""
 DEPEND="dev-lang/ruby"
 RDEPEND="app-eselect/eselect-opencl"
 
+ECONF_SOURCE="${S}"
+
 src_prepare() {
-	echo "/usr/$(get_libdir)/OpenCL/vendors/ocl-icd/libOpenCL.so" > ocl-icd.icd
+	default
+	multilib_foreach_abi echo "/usr/$(get_libdir)/OpenCL/vendors/ocl-icd/libOpenCL.so" >> ocl-icd.icd
 }
 
-src_install() {
-	insinto /etc/OpenCL/vendors/
-	doins ocl-icd.icd
-
+multilib_src_install() {
 	emake DESTDIR="${D}" install
 
 	OCL_DIR=/usr/"$(get_libdir)"/OpenCL/vendors/ocl-icd/
-	dodir ${OCL_DIR}
+	dodir "${OCL_DIR}"
 
 	mv ${D}/usr/"$(get_libdir)"/libOpenCL* ${D}"${OCL_DIR}"
 
@@ -37,4 +37,10 @@ src_install() {
 	dodir ${OCL_DIR}/include
 	insinto "${OCL_DIR}"/include/CL
 	doins "${FILESDIR}"/2.0/*
+}
+
+multilib_src_install_all() {
+	default
+	insinto /etc/OpenCL/vendors/
+	doins ocl-icd.icd
 }
