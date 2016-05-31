@@ -65,9 +65,7 @@ REQUIRED_USE="
 		video_cards_r600? ( gallium )
 		video_cards_radeon? ( gallium )
 		video_cards_radeonsi? ( gallium )
-		video_cards_i965? ( beignet )
-		video_cards_ilo? ( beignet )
-		video_cards_intel? ( beignet )
+		beignet? ( || ( video_cards_i965 video_cards_ilo video_cards_intel ) )
 	)
 	openmax? ( gallium )
 	gles1?  ( egl )
@@ -114,6 +112,10 @@ RDEPEND="
 	>=x11-libs/libxcb-1.9.3:=[${MULTILIB_USEDEP}]
 	x11-libs/libXfixes:=[${MULTILIB_USEDEP}]
 	llvm? ( !kernel_FreeBSD? (
+		video_cards_nouveau? ( || (
+			>=dev-libs/elfutils-0.155-r1:=[${MULTILIB_USEDEP}]
+			>=dev-libs/libelf-0.8.13-r2:=[${MULTILIB_USEDEP}]
+			) )
 		video_cards_radeonsi? ( || (
 			>=dev-libs/elfutils-0.155-r1:=[${MULTILIB_USEDEP}]
 			>=dev-libs/libelf-0.8.13-r2:=[${MULTILIB_USEDEP}]
@@ -145,6 +147,7 @@ RDEPEND="
 	vdpau? ( >=x11-libs/libvdpau-0.7:=[${MULTILIB_USEDEP}] )
 	wayland? ( >=dev-libs/wayland-1.2.0:=[${MULTILIB_USEDEP}] )
 	xvmc? ( >=x11-libs/libXvMC-1.0.8:=[${MULTILIB_USEDEP}] )
+	glvnd? ( media-libs/libglvnd[${MULTILIB_USEDEP}] )
 	${LIBDRM_DEPSTRING}[video_cards_freedreno?,video_cards_nouveau?,video_cards_vmware?,video_cards_virgl?,${MULTILIB_USEDEP}]
 "
 for card in ${INTEL_CARDS}; do
@@ -283,7 +286,7 @@ beignet_src_prepare() {
 		epatch "${FILESDIR}"/beignet-"${B_PV}"-libOpenCL.patch
 	fi
 	epatch "${FILESDIR}"/beignet-"${B_PV}"-llvm-libs-tr.patch
-	epatch "${FILESDIR}"/beignet-"${B_PV}"-bitcode-path-fix.patch
+	#epatch "${FILESDIR}"/beignet-"${B_PV}"-bitcode-path-fix.patch
 	epatch "${FILESDIR}"/beignet-"${B_PV}"-silence-dri2-failure.patch
 
 	# Change ICD name as above
@@ -319,12 +322,7 @@ apply_mesa_patches() {
 src_prepare() {
 	apply_mesa_patches
 
-	# libglvnd patches
-	epatch "${FILESDIR}"/0001-Add-an-flag-to-not-export-GL-and-GLX-functions.patch
-	epatch "${FILESDIR}"/0002-GLX-Implement-the-libglvnd-interface.patch
-	epatch "${FILESDIR}"/0003-Update-to-match-libglvnd-commit-e356f84554da42825e14.patch
-	epatch "${FILESDIR}"/glvnd-fix-linking.patch
-	epatch "${FILESDIR}"/0001-Revert-anv-formats-Don-t-use-a-compound-literal-to-i.patch
+	# libglvnd patches (landed upstream)
 
 	base_src_prepare
 
