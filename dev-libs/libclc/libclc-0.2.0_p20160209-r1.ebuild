@@ -13,7 +13,7 @@ EGIT_COMMIT="b518692b52a0bbdf9cf0e2167b9629dd9501abcd"
 	EXPERIMENTAL="true"
 #fi
 
-inherit base python-any-r1 $GIT_ECLASS
+inherit python-any-r1 $GIT_ECLASS
 
 DESCRIPTION="OpenCL C library"
 HOMEPAGE="http://libclc.llvm.org/"
@@ -51,6 +51,5 @@ src_configure() {
 }
 
 src_compile() {
-	default
 	emake VERBOSE=1
 }
