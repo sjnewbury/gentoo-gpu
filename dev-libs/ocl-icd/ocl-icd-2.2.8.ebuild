@@ -4,7 +4,9 @@
 
 EAPI=6
 
-inherit multilib-minimal
+USE_RUBY="ruby23 ruby22 ruby21 ruby20"
+
+inherit ruby-single multilib-minimal
 
 DESCRIPTION="Alternative to vendor specific OpenCL ICD loaders"
 HOMEPAGE="http://forge.imag.fr/projects/ocl-icd/"
@@ -15,7 +17,8 @@ KEYWORDS="~amd64 ~x86"
 
 IUSE=""
 
-DEPEND="dev-lang/ruby"
+DEPEND="${RUBY_DEPS}"
+
 RDEPEND="app-eselect/eselect-opencl"
 
 ECONF_SOURCE="${S}"
