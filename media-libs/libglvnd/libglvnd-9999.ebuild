@@ -36,8 +36,8 @@ multilib_src_configure() {
 multilib_src_install() {
 	local GL_ROOT="/usr/$(get_libdir)/opengl/glvnd/lib"
 	emake DESTDIR="${D}" install
-	mv -f "${ED}"${GL_ROOT}/xorg \
-		"${ED}"/usr/$(get_libdir) || die mv failed
+#	mv -f "${ED}"${GL_ROOT}/xorg \
+#		"${ED}"/usr/$(get_libdir) || die mv failed
 	mv -f "${ED}"${GL_ROOT}/pkgconfig \
 		"${ED}"/usr/$(get_libdir) || die mv failed
 }
