@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE repositories SYSTEM "repositories.dtd">
+<repositories xmlns="" version="1.0">
+  <repo quality="experimental" status="unofficial">
+    <name>gentoo-gpu</name>
+    <description>Live ebuilds for bleeding-edge support of GPU APIs: OpenCL, GLVND, Vulkan.</description>
+    <homepage>https://github.com/sjnewbury</homepage>
+    <owner type="project">
+      <email>steve at snewbury.org.uk</email>
+      <name>Steven Newbury</name>
+    </owner>
+    <source type="git">https://github.com/sjnewbury/gentoo-gpu.git</source>
+  </repo>
+</repositories>
