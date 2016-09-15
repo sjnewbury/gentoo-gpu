@@ -4,7 +4,7 @@
 
 EAPI=5
 
-EGIT_REPO_URI="git://anongit.freedesktop.org/mesa/mesa"
+EGIT_REPO_URI="${EGIT_REPO_URI:-git://anongit.freedesktop.org/mesa/mesa}"
 
 if [[ ${PV} = 9999* ]]; then
 	GIT_ECLASS="git-r3"
@@ -254,7 +254,7 @@ beignet_src_unpack() {
 src_unpack() {
 	default
 	if [[ $PV = 9999* ]] ; then
-		EGIT_MIN_CLONE_TYPE=mirror
+		EGIT_MIN_CLONE_TYPE=shallow
 		git-r3_fetch "" "" "${CATEGORY}/${PN}/${SLOT%/*}-MesaGL"
 		git-r3_checkout "" "${S}" "${CATEGORY}/${PN}/${SLOT%/*}-MesaGL"
 		use opencl && use beignet && beignet_src_unpack
@@ -288,6 +288,10 @@ beignet_src_prepare() {
 	epatch "${FILESDIR}"/beignet-"${B_PV}"-llvm-libs-tr.patch
 	#epatch "${FILESDIR}"/beignet-"${B_PV}"-bitcode-path-fix.patch
 	epatch "${FILESDIR}"/beignet-"${B_PV}"-silence-dri2-failure.patch
+	epatch "${FILESDIR}"/beignet-"${B_PV}"-fix-pooled_eu.patch
+
+	# Don't build utests (currently broken with gcc-6)
+	sed -i -e '/utests/d' CMakeLists.txt
 
 	# Change ICD name as above
 	sed -i -e 's/libcl/libOpenCL/g' intel-beignet.icd.in
@@ -317,6 +321,8 @@ apply_mesa_patches() {
 	if [[ ${CHOST} == *-solaris* ]] ; then
 		sed -i -e "s/-DSVR4/-D_POSIX_C_SOURCE=200112L/" configure.ac || die
 	fi
+
+	epatch "${FILESDIR}"/nouveau-G80.patch
 }
 
 src_prepare() {
@@ -394,7 +400,7 @@ beignet_src_configure() {
 	# Use clang (we're depending upon it anyway)
 	# and clang doesn't support graphite
 	# [currently doesn't work as beignet uses g++ variable length array extension]
-	#CC=clang CXX=clang++
+	CC=clang CXX=clang++
 
 	if [[ ${CC} == clang ]]; then
 		filter-flags -f*graphite -f*loop-*
@@ -682,6 +688,11 @@ multilib_src_install() {
 			fi
 			eend $?
 		fi
+	fi
+
+	# Only install the platform vulkan headers
+	if [ -f "${ED}/usr/include/vulkan" ]; then
+		rm -f "${ED}/usr/include/vulkan/{vk_platform.h,vulkan.h}"
 	fi
 
 	if use openmax; then

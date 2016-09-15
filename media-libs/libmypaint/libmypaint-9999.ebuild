@@ -6,7 +6,7 @@ EAPI=5
 
 PYTHON_COMPAT=( python2_7 )
 
-inherit git-r3 toolchain-funcs scons-utils python-single-r1 multilib
+inherit git-r3 toolchain-funcs autotools python-single-r1 multilib
 
 EGIT_REPO_URI="https://github.com/mypaint/libmypaint.git"
 DESCRIPTION="libmypaint, a.k.a. \"brushlib\", is a library for making brushstrokes which is used by MyPaint and other projects."
@@ -26,30 +26,11 @@ DEPEND="${RDEPEND}
 	sys-apps/sed"
 
 src_prepare() {
-	default
-	# Fix multilib dir
-	sed -i \
-		-e "s/prefix\/lib/prefix\/$(get_libdir)/g" \
-		-e "/LIBDIR/s/lib/$(get_libdir)/" \
-		SConscript || die
+	eautoreconf
 }
 
 src_configure() {
-	MYSCONS=(
-		CC="$(tc-getCC)"
-		LD="$(tc-getLD)"
-		CFLAGS="${CFLAGS}"
-		LDFLAGS="${LDFLAGS}"
-		enable_introspection="$(usex introspection)"
-		enable_gegl="true"
-		prefix=/usr
-	)
-}
-
-src_compile() {
-	escons -j1 "${MYSCONS[@]}"
-}
-
-src_install() {
-	escons "${MYSCONS[@]}" --install-sandbox="${ED}" "${ED}"
+		econf \
+			$(use_enable introspection) \
+			--enable-gegl
 }

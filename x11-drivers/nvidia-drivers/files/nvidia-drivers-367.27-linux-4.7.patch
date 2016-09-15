@@ -1,0 +1,56 @@
+--- ./kernel/nvidia-drm/nvidia-drm-gem.c~	2016-06-10 01:38:43.000000000 +0100
++++ ./kernel/nvidia-drm/nvidia-drm-gem.c	2016-06-23 23:01:29.395133776 +0100
+@@ -28,6 +28,8 @@
+ #include "nvidia-drm-ioctl.h"
+ #include "nvidia-drm-gem.h"
+ 
++#include <linux/version.h>
++
+ static struct nvidia_drm_gem_object *nvidia_drm_gem_new
+ (
+     struct drm_file *file_priv,
+@@ -408,7 +410,11 @@
+ 
+     mutex_lock(&dev->struct_mutex);
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 7, 0)
++    gem = drm_gem_object_lookup(file, handle);
++#else
+     gem = drm_gem_object_lookup(dev, file, handle);
++#endif
+ 
+     if (gem == NULL)
+     {
+--- ./kernel/nvidia-drm/nvidia-drm-fb.c~	2016-06-10 01:38:43.000000000 +0100
++++ ./kernel/nvidia-drm/nvidia-drm-fb.c	2016-06-23 23:01:29.981804427 +0100
+@@ -31,6 +31,7 @@
+ #include "nvidia-drm-gem.h"
+ 
+ #include <drm/drm_crtc_helper.h>
++#include <linux/version.h> 
+ 
+ static void nvidia_framebuffer_destroy(struct drm_framebuffer *fb)
+ {
+@@ -114,7 +115,11 @@
+      * We don't support any planar format, pick up first buffer only.
+      */
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 7, 0)
++    gem = drm_gem_object_lookup(file, cmd->handles[0]);
++#else
+     gem = drm_gem_object_lookup(dev, file, cmd->handles[0]);
++#endif
+ 
+     if (gem == NULL)
+     {
+--- ./kernel/nvidia-uvm/uvm_linux.h~	2016-06-10 01:37:08.000000000 +0100
++++ ./kernel/nvidia-uvm/uvm_linux.h	2016-06-23 22:57:57.127025613 +0100
+@@ -563,7 +563,7 @@
+     INIT_RADIX_TREE(tree, GFP_NOWAIT);
+ }
+ 
+-static bool radix_tree_empty(struct radix_tree_root *tree)
++static bool radix_tree_is_empty(struct radix_tree_root *tree)
+ {
+     void *dummy;
+     return radix_tree_gang_lookup(tree, &dummy, 0, 1) == 0;
