@@ -15,7 +15,7 @@ else
 	B_PV="0.9"
 fi
 
-inherit cmake-utils base autotools multilib multilib-minimal flag-o-matic \
+inherit base autotools multilib multilib-minimal flag-o-matic \
 	python-utils-r1 toolchain-funcs pax-utils ${GIT_ECLASS}
 
 OPENGL_DIR="xorg-x11"
@@ -34,8 +34,7 @@ if [[ $PV = 9999* ]]; then
 	SRC_URI="${SRC_PATCHES}"
 else
 	SRC_URI="ftp://ftp.freedesktop.org/pub/mesa/${FOLDER}/${MY_SRC_P}.tar.bz2
-		${SRC_PATCHES}
-		http://cgit.freedesktop.org/beignet/snapshot/Release_v${B_PV}.tar.gz"
+		${SRC_PATCHES}"
 fi
 
 LICENSE="MIT"
@@ -52,7 +51,7 @@ done
 IUSE="${IUSE_VIDEO_CARDS}
 	bindist +classic d3d9 debug +dri3 +egl +gallium +gbm gles1 gles2 +llvm
 	+nptl opencl osmesa pax_kernel openmax pic selinux +udev vaapi vdpau
-	wayland xvmc xa kernel_FreeBSD beignet beignet-egl beignet-generic
+	wayland xvmc xa kernel_FreeBSD
 	opencl-icd glvnd vulkan"
 
 #  Not available at present unfortunately
@@ -65,7 +64,6 @@ REQUIRED_USE="
 		video_cards_r600? ( gallium )
 		video_cards_radeon? ( gallium )
 		video_cards_radeonsi? ( gallium )
-		beignet? ( || ( video_cards_i965 video_cards_ilo video_cards_intel ) )
 	)
 	openmax? ( gallium )
 	gles1?  ( egl )
@@ -130,18 +128,15 @@ RDEPEND="
 	)
 	opencl? (
 				app-eselect/eselect-opencl
-				beignet? ( 	!dev-libs/beignet
-						opencl-icd? ( dev-libs/ocl-icd )
-					 )
 				gallium? (
 					dev-libs/libclc
-					|| (
+					( || (
 						>=dev-libs/elfutils-0.155-r1:=[${MULTILIB_USEDEP}]
 						>=dev-libs/libelf-0.8.13-r2:=[${MULTILIB_USEDEP}]
-						opencl-icd? ( dev-libs/ocl-icd )
-					)
+					) )
+					opencl-icd? ( dev-libs/ocl-icd )
 				)
-			)
+	)
 	openmax? ( >=media-libs/libomxil-bellagio-0.9.3:=[${MULTILIB_USEDEP}] )
 	vaapi? ( >=x11-libs/libva-0.35.0:=[${MULTILIB_USEDEP}] )
 	vdpau? ( >=x11-libs/libvdpau-0.7:=[${MULTILIB_USEDEP}] )
@@ -150,16 +145,11 @@ RDEPEND="
 	glvnd? ( media-libs/libglvnd[${MULTILIB_USEDEP}] )
 	${LIBDRM_DEPSTRING}[video_cards_freedreno?,video_cards_nouveau?,video_cards_vmware?,video_cards_virgl?,${MULTILIB_USEDEP}]
 "
+
 for card in ${INTEL_CARDS}; do
 	RDEPEND="${RDEPEND}
 		video_cards_${card}? (
 								${LIBDRM_DEPSTRING}[video_cards_intel]
-								opencl? ( beignet? ( || (
-									>=sys-devel/llvm-3.3[${MULTILIB_USEDEP}]
-									>=sys-devel/llvm-3.4[-ncurses,${MULTILIB_USEDEP}]
-										)
-										!beignet-generic? ( sys-apps/pciutils ) )
-								)
 		)
 	"
 done
@@ -190,7 +180,6 @@ DEPEND="${RDEPEND}
 	)
 	sys-devel/gettext
 	virtual/pkgconfig
-	beignet? ( sys-apps/sed )
 	>=x11-proto/dri2proto-2.8-r1:=[${MULTILIB_USEDEP}]
 	dri3? (
 		>=x11-proto/dri3proto-1.0:=[${MULTILIB_USEDEP}]
@@ -210,7 +199,6 @@ DEPEND="${RDEPEND}
 "
 
 S="${WORKDIR}/${MY_P}"
-CMAKE_USE_DIR="${WORKDIR}"/beignet-${B_PV}
 
 QA_WX_LOAD="
 x86? (
@@ -232,34 +220,14 @@ pkg_setup() {
 	use vulkan && [[ ${PV} != 9999 ]] && die "Vulkan is currently git only"
 }
 
-beignet_src_unpack() {
-		EGIT_MIN_CLONE_TYPE=shallow
-		if [ -n "${BEIGNET_COMMIT}" ]; then
-			git-r3_fetch "git://anongit.freedesktop.org/beignet" \
-				"${BEIGNET_COMMIT}"
-		elif [ -n "${BEIGNET_BRANCH}" ]; then
-			git-r3_fetch "git://anongit.freedesktop.org/beignet" \
-				"refs/heads/${BEIGNET_BRANCH}"
-		elif [ -n "${BEIGNET_TAG}" ]; then
-			git-r3_fetch "git://anongit.freedesktop.org/beignet" \
-				"refs/tags/${BEIGNET_TAG}"
-		else
-			git-r3_fetch "git://anongit.freedesktop.org/beignet" \
-				"refs/heads/master"
-		fi		
-		git-r3_checkout "git://anongit.freedesktop.org/beignet" \
-			"${WORKDIR}"/beignet-${B_PV}
-}
-
 src_unpack() {
 	default
 	if [[ $PV = 9999* ]] ; then
 		EGIT_MIN_CLONE_TYPE=shallow
 		git-r3_fetch "" "" "${CATEGORY}/${PN}/${SLOT%/*}-MesaGL"
 		git-r3_checkout "" "${S}" "${CATEGORY}/${PN}/${SLOT%/*}-MesaGL"
-		use opencl && use beignet && beignet_src_unpack
 
-		# We want to make sure the mesa repo HEAD gets stored not beignet
+		# We want to make sure the mesa repo HEAD gets stored
 		# so set the EGIT_VERSION ourselves. 
 		cd "${S}"
 		local new_commit_id=$(
@@ -267,39 +235,6 @@ src_unpack() {
 		)
 		export EGIT_VERSION=${new_commit_id}
 	fi
-}
-
-beignet_src_prepare() {
-	pushd "${WORKDIR}"/beignet-${B_PV}
-	#CMAKE_USE_DIR="${S}"/beignet-${B_PV} \
-	#CMAKE_IN_SOURCE_BUILD=1 \
-	cmake-utils_src_prepare
-
-	# Fix linking
-
-	# Build beignet libcl as libOpenCL so that it can be handled
-	# by the Gentoo eselect opencl
-	if [[ -n "${BEIGNET_BRANCH}"  ]]; then
-		epatch "${FILESDIR}"/beignet-${BEIGNET_BRANCH}-"${B_PV}"-libOpenCL.patch
-		epatch "${FILESDIR}"/beignet-${BEIGNET_BRANCH}-"${B_PV}"-llvm-system-libs.patch
-	else
-		epatch "${FILESDIR}"/beignet-"${B_PV}"-libOpenCL.patch
-	fi
-	epatch "${FILESDIR}"/beignet-"${B_PV}"-llvm-libs-tr.patch
-	#epatch "${FILESDIR}"/beignet-"${B_PV}"-bitcode-path-fix.patch
-	epatch "${FILESDIR}"/beignet-"${B_PV}"-silence-dri2-failure.patch
-	epatch "${FILESDIR}"/beignet-"${B_PV}"-fix-pooled_eu.patch
-
-	# Don't build utests (currently broken with gcc-6)
-	sed -i -e '/utests/d' CMakeLists.txt
-
-	# Change ICD name as above
-	sed -i -e 's/libcl/libOpenCL/g' intel-beignet.icd.in
-
-	# optionally enable support for ICD
-	use opencl-icd || sed -i -e '/Find_Package(OCLIcd)/s/^/#/' \
-		CMakeLists.txt || die
-	popd
 }
 
 apply_mesa_patches() {
@@ -334,9 +269,6 @@ src_prepare() {
 
 	eautoreconf
 
-	# prepare beignet (intel opencl support) using cmake
-	use opencl && use beignet && beignet_src_prepare
-
 	multilib_copy_sources
 
 }
@@ -370,64 +302,6 @@ glvnd_src_configure() {
 	popd
 
 
-}
-
-beignet_src_configure() {
-	mkdir -p "${BUILD_DIR}"/beignet-${B_PV}
-	pushd "${BUILD_DIR}"/beignet-${B_PV}
-	local OLD_CFLAGS=${CFLAGS}
-	local OLD_CXXFLAGS=${CXXFLAGS}
-	local OLD_CPPFLAGS=${CPPFLAGS}
-	local OLD_LDFLAGS=${LDFLAGS}
-	local mycmakeargs=(
-		-DBEIGNET_INSTALL_DIR="/usr/$(get_libdir)/OpenCL/vendors/beignet"
-	)
-
-	if ! use beignet-generic; then
-		mycmakeargs+=(
-			-DGEN_PCI_ID=$(. "${FILESDIR}"/GetGenID.sh)
-		)
-	fi
-	if use beignet-egl; then
-		mycmakeargs+=(
-			-DMESA_SOURCE_PREFIX="${BUILD_DIR}"
-		)
-	fi
-
-	multilib_is_native_abi || mycmakeargs+=(
-		-DLLVM_CONFIG_EXECUTABLE="${EPREFIX}/usr/bin/$(get_abi_CHOST ${ABI})-llvm-config"
-	)
-	# Use clang (we're depending upon it anyway)
-	# and clang doesn't support graphite
-	# [currently doesn't work as beignet uses g++ variable length array extension]
-	CC=clang CXX=clang++
-
-	if [[ ${CC} == clang ]]; then
-		filter-flags -f*graphite -f*loop-*
-		filter-flags -mfpmath* -freorder-blocks-and-partition
-		filter-flags -flto* -fuse-linker-plugin
-		filter-flags -ftracer -fvect-cost-model -ftree*
-	fi
-
-	# Pre-compiled headers otherwise result in redefined symbols (gcc only)
-	if [[ ${CC} == gcc* ]]; then
-		append-flags -fpch-deps
-	fi
-
-	# Add Mesa include dir to find EGL/egl.h and -L for libs
-	# beignet src include must come first for CL headers
-#	append-cppflags -I"${S}"/beignet-${B_PV}/include -I"${BUILD_DIR}"/include
-	append-ldflags -L"${BUILD_DIR}"/lib
-
-	#CMAKE_USE_DIR="${BUILD_DIR}"/beignet-${B_PV} \
-	#CMAKE_IN_SOURCE_BUILD=1 \
-	BUILD_DIR=${BUILD_DIR}/beignet-${B_PV} \
-	cmake-utils_src_configure
-	CFLAGS=${OLD_CFLAGS}
-	CXXFLAGS=${OLD_CXXFLAGS}
-	CXXFLAGS=${OLD_CPPFLAGS}
-	LDFLAGS=${OLD_LDFLAGS}
-	popd
 }
 
 multilib_src_configure() {
@@ -569,9 +443,6 @@ multilib_src_configure() {
 		${myconf}
 
 	use glvnd && glvnd_src_configure
-
-	# intel opencl stuff
-	use opencl && use beignet && beignet_src_configure
 }
 
 #		$(use_enable !pic asm) \
@@ -584,12 +455,6 @@ multilib_src_compile() {
 			emake
 		popd
 	fi
-
-	if use opencl && use beignet ; then
-		pushd "${BUILD_DIR}"/beignet-${B_PV}
-		emake
-		popd
-	fi	
 }
 
 multilib_src_install() {
@@ -675,19 +540,6 @@ multilib_src_install() {
 			"${ED}"${cl_dir}/include
 		fi
 		eend $?
-		if use beignet ; then
-			ebegin "Installing Beignet Intel HD Graphics OpenCL implementation"
-			local cl_dir="/usr/$(get_libdir)/OpenCL/vendors/beignet"
-			dodir ${cl_dir}/{lib,include}
-			cd "${BUILD_DIR}/beignet-${B_PV}"
-			DESTDIR="${D}" ${CMAKE_MAKEFILE_GENERATOR} install "$@" || \
-						die "Failed to install Beignet"
-			if [ -f "${ED}/usr/include/CL/opencl.h" ]; then
-				mv -f "${ED}"/usr/include/CL \
-				"${ED}"${cl_dir}/include
-			fi
-			eend $?
-		fi
 	fi
 
 	# Only install the platform vulkan headers

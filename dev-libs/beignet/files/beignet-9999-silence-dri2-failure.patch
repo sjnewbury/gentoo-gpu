@@ -1,5 +1,5 @@
---- src/intel/intel_driver.c~	2014-10-19 17:32:47.000000000 +0100
-+++ src/intel/intel_driver.c	2014-10-19 17:42:49.119321666 +0100
+--- ./src/intel/intel_driver.c~	2014-10-19 17:32:47.000000000 +0100
++++ ./src/intel/intel_driver.c	2014-10-19 17:42:49.119321666 +0100
 @@ -223,8 +223,6 @@
        intel_driver_init_shared(intel, intel->dri_ctx);
        Xfree(driver_name);
