@@ -526,6 +526,7 @@ multilib_src_install() {
 			mv -f "${ED}"/usr/$(get_libdir)/libOpenCL.so* \
 			"${ED}"${cl_dir}/lib
 			einfo "Gallium/Clover OpenCL driver installed, creating ICD config"
+			dodir /etc/OpenCL/vendors/
 			echo "${cl_dir}/lib/libOpenCL.so" > "${ED}"/etc/OpenCL/vendors/mesa.icd
 		fi
 		if [ -f "${ED}/usr/include/CL/opencl.h" ]; then
