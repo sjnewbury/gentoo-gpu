@@ -12,7 +12,8 @@ inherit python-any-r1 cmake-multilib flag-o-matic toolchain-funcs
 DESCRIPTION="OpenCL implementation for Intel GPUs"
 HOMEPAGE="https://01.org/beignet"
 
-IUSE="beignet-egl beignet-generic"
+IUSE="beignet-generic"
+# beignet-egl build requires mesa sources
 
 LICENSE="LGPL-2.1+"
 SLOT="0"

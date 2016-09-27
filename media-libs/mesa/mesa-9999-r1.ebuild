@@ -52,7 +52,7 @@ IUSE="${IUSE_VIDEO_CARDS}
 	bindist +classic d3d9 debug +dri3 +egl +gallium +gbm gles1 gles2 +llvm
 	+nptl opencl osmesa pax_kernel openmax pic selinux +udev vaapi vdpau
 	wayland xvmc xa kernel_FreeBSD
-	opencl-icd glvnd vulkan"
+	glvnd vulkan"
 
 #  Not available at present unfortunately
 #	openvg? ( egl gallium )
@@ -134,7 +134,6 @@ RDEPEND="
 						>=dev-libs/elfutils-0.155-r1:=[${MULTILIB_USEDEP}]
 						>=dev-libs/libelf-0.8.13-r2:=[${MULTILIB_USEDEP}]
 					) )
-					opencl-icd? ( dev-libs/ocl-icd )
 				)
 	)
 	openmax? ( >=media-libs/libomxil-bellagio-0.9.3:=[${MULTILIB_USEDEP}] )
@@ -395,8 +394,6 @@ multilib_src_configure() {
 		if use opencl; then
 			myconf+="
 				$(use_enable opencl)
-				$(use_enable opencl-icd)
-				--with-opencl-libdir="${EPREFIX}/usr/$(get_libdir)/OpenCL/vendors/mesa"
 				--with-clang-libdir="${EPREFIX}/usr/${LIBDIR_default}"
 				"
 		fi
