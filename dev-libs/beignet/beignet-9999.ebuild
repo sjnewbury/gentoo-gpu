@@ -121,7 +121,10 @@ multilib_src_install() {
 	cmake-utils_src_install
 
 	# Remove upstream icd
-	rm -f ${ED}/etc/OpenCL/vendors/intel-beignet.icd
+	rm -f "${ED}"/etc/OpenCL/vendors/intel-beignet.icd
+
+	# Headers should only be in VENDOR_DIR
+	rm -rf "${ED}"/usr/include
 
 	insinto /etc/OpenCL/vendors/
 	echo "${VENDOR_DIR}/libOpenCL.so" > "${PN}-${ABI}.icd" || die "Failed to generate ICD file"
