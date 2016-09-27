@@ -255,8 +255,6 @@ apply_mesa_patches() {
 	if [[ ${CHOST} == *-solaris* ]] ; then
 		sed -i -e "s/-DSVR4/-D_POSIX_C_SOURCE=200112L/" configure.ac || die
 	fi
-
-	epatch "${FILESDIR}"/nouveau-G80.patch
 }
 
 src_prepare() {
@@ -527,10 +525,8 @@ multilib_src_install() {
 		if [ -f "${ED}/usr/$(get_libdir)/libOpenCL.so" ]; then
 			mv -f "${ED}"/usr/$(get_libdir)/libOpenCL.so* \
 			"${ED}"${cl_dir}/lib
-		fi
-		if [ ! -f "${ED}"${cl_dir}/lib/* ]; then
-			einfo "No Gallium/Clover OpenCL driver, removing ICD config"
-			rm -f "${ED}"/etc/OpenCL/vendors/mesa.icd
+			einfo "Gallium/Clover OpenCL driver installed, creating ICD config"
+			echo "${cl_dir}/lib/libOpenCL.so" > "${ED}"/etc/OpenCL/vendors/mesa.icd
 		fi
 		if [ -f "${ED}/usr/include/CL/opencl.h" ]; then
 			mv -f "${ED}"/usr/include/CL \
