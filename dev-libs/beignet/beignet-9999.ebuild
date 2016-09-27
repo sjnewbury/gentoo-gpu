@@ -99,7 +99,7 @@ multilib_src_configure() {
 	fi
 
 	local mycmakeargs=(
-		-DCMAKE_INSTALL_PREFIX="${VENDOR_DIR}"
+		-DBEIGNET_INSTALL_DIR="${VENDOR_DIR}"
 	)
 
 	if ! use beignet-generic; then
@@ -120,7 +120,10 @@ multilib_src_install() {
 
 	cmake-utils_src_install
 
+	# Remove upstream icd
+	rm -f ${ED}/etc/OpenCL/vendors/intel-beignet.icd
+
 	insinto /etc/OpenCL/vendors/
-	echo "${VENDOR_DIR}/lib/${PN}/libOpenCL.so" > "${PN}-${ABI}.icd" || die "Failed to generate ICD file"
+	echo "${VENDOR_DIR}/libOpenCL.so" > "${PN}-${ABI}.icd" || die "Failed to generate ICD file"
 	doins "${PN}-${ABI}.icd"
 }
