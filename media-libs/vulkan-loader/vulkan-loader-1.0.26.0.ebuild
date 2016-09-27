@@ -2,7 +2,7 @@
 # Distributed under the terms of the GNU General Public License v2
 # $Id$
 
-EAPI=5
+EAPI=6
 
 inherit cmake-multilib eutils
 
@@ -13,40 +13,39 @@ SRC_URI="https://github.com/KhronosGroup/Vulkan-LoaderAndValidationLayers/archiv
 LICENSE="BSD"
 SLOT="0"
 KEYWORDS="amd64"
-IUSE="+layers xcb Xlib vulkaninfo"
+IUSE="+layers xcb Xlib wayland vulkaninfo"
 
 # Other demos use XLib
-REQUIRED_USE="vulkaninfo? ( Xlib xcb )"
+REQUIRED_USE="vulkaninfo? ( Xlib xcb wayland )"
 
 
 DEPEND=">=dev-lang/python-3
-        dev-util/cmake
-		dev-util/glslang
-		dev-util/SPIRV-Tools[${MULTILIB_USEDEP}]
-		${RDEPEND}"
-RDEPEND="xcb? ( x11-libs/libxcb )
-	     Xlib? ( x11-libs/libX11 )"
+        dev-util/cmake:*
+	dev-util/glslang:=
+	dev-util/SPIRV-Tools:=[${MULTILIB_USEDEP}]
+	${RDEPEND}"
+RDEPEND="xcb? ( x11-libs/libxcb:= )
+	Xlib? ( x11-libs/libX11:= )
+	wayland? ( dev-libs/wayland:* )"
 
 S="${WORKDIR}/Vulkan-LoaderAndValidationLayers-sdk-${PV}"
-
-src_unpack() {
-	unpack $A
-}
 
 src_prepare() {
 	# Change the search path to match dev-util/glslang
 	epatch "${FILESDIR}"/glslang-spirv-hpp.patch
 	sed -i -e 's@\("library_path": "\).@\1/usr/lib@' layers/linux/*.json
+	default
 }
 
 src_configure() {
 	local mycmakeargs=(
-		$(cmake-utils_use_build xcb WSI_XCB_SUPPORT)
-		$(cmake-utils_use_build Xlib WSI_XLIB_SUPPORT)
-		$(cmake-utils_use_build layers LAYERS)
+		-DBUILD_WSI_WAYLAND_SUPPORT=$(usex wayland ON OFF)
+		-DBUILD_WSI_XCB_SUPPORT=$(usex xcb ON OFF)
+		-DBUILD_WSI_XLIB_SUPPORT=$(usex Xlib ON OFF)
+		-DBUILD_LAYERS=$(usex layers ON OFF)
 		# Build all demos to get vulkaninfo
-		$(cmake-utils_use_build vulkaninfo DEMOS)
-		"-DBUILD_TESTS=OFF"
+		-DBUILD_DEMOS=$(vulkaninfo ON OFF)
+		-DBUILD_TESTS=OFF
 	)
 
 	cmake-multilib_src_configure
