@@ -1,12 +1,10 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 7dac0f5..05d0b33 100755
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -20,6 +20,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
+--- ./CMakeLists.txt.orig	2016-09-27 11:53:10.785960405 +0100
++++ CMakeLists.txt	2016-09-27 11:54:20.554740579 +0100
+@@ -18,6 +18,7 @@
      add_definitions(-DVK_USE_PLATFORM_ANDROID_KHR)
      set(DisplayServer Android)
  elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 +    include_directories(SYSTEM /usr/include/SPIRV)
-     #   TODO: Basic support is present for Xlib but is untested.
-     #         Mir support is stubbed in but unimplemented and untested.
+     #   Note: Supported configurations are XCB, XCB + Xlib, Wayland.  
+     #         MIR is stubbed and untested 
      option(BUILD_WSI_XCB_SUPPORT "Build XCB WSI support" ON)
