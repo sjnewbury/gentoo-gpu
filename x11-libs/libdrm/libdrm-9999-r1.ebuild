@@ -21,7 +21,7 @@ if [[ ${PV} = 9999* ]]; then
 else
 	KEYWORDS="~alpha ~amd64 ~arm ~hppa ~ia64 ~mips ~ppc ~ppc64 ~s390 ~sh ~sparc ~x86 ~amd64-fbsd ~x86-fbsd ~x64-freebsd ~x86-freebsd ~amd64-linux ~arm-linux ~x86-linux ~sparc-solaris ~x64-solaris ~x86-solaris"
 fi
-VIDEO_CARDS="exynos freedreno intel nouveau omap radeon vmware virgl"
+VIDEO_CARDS="exynos freedreno intel nouveau omap radeon vmware vc4 virgl"
 for card in ${VIDEO_CARDS}; do
 	IUSE_VIDEO_CARDS+=" video_cards_${card}"
 done
@@ -55,7 +55,8 @@ src_configure() {
 		$(use_enable video_cards_omap omap-experimental-api)
 		$(use_enable video_cards_radeon radeon)
 		$(use_enable video_cards_vmware vmwgfx)
-		$(use_enable video_cards_vmware virgl)
+		$(use_enable video_cards_vc4)
+		$(use_enable video_cards_virgl virgl)
 		$(use_enable libkms)
 	)
 	xorg-2_src_configure
