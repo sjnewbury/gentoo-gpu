@@ -43,15 +43,15 @@ RESTRICT="!bindist? ( bindist )"
 
 INTEL_CARDS="i915 i965 ilo intel"
 RADEON_CARDS="r100 r200 r300 r600 radeon radeonsi"
-VIDEO_CARDS="${INTEL_CARDS} ${RADEON_CARDS} freedreno nouveau vmware virgl"
+VIDEO_CARDS="${INTEL_CARDS} ${RADEON_CARDS} freedreno nouveau vmware vc4 virgl"
 for card in ${VIDEO_CARDS}; do
 	IUSE_VIDEO_CARDS+=" video_cards_${card}"
 done
 
 IUSE="${IUSE_VIDEO_CARDS}
 	bindist +classic d3d9 debug +dri3 +egl +gallium +gbm gles1 gles2 +llvm
-	+nptl opencl osmesa pax_kernel openmax pic selinux +udev vaapi vdpau
-	wayland xvmc xa kernel_FreeBSD
+	+nptl opencl osmesa pax_kernel openmax pic selinux +udev vaapi valgrind
+	vdpau wayland xvmc xa kernel_FreeBSD
 	glvnd vulkan"
 
 #  Not available at present unfortunately
@@ -70,6 +70,7 @@ REQUIRED_USE="
 	gles2?  ( egl )
 	vaapi? ( gallium )
 	vdpau? ( gallium )
+	vulkan? ( || ( video_cards_radeon? ( llvm ) video_cards_intel? ( classic ) ) )
 	wayland? ( egl gbm )
 	xa?  ( gallium )
 	video_cards_freedreno?  ( gallium )
@@ -88,7 +89,7 @@ REQUIRED_USE="
 	video_cards_virgl? ( gallium )
 "
 
-LIBDRM_DEPSTRING=">=x11-libs/libdrm-2.4.64"
+LIBDRM_DEPSTRING=">=x11-libs/libdrm-2.4.67"
 # keep correct libdrm and dri2proto dep
 # keep blocks in rdepend for binpkg
 RDEPEND="
@@ -137,19 +138,20 @@ RDEPEND="
 				)
 	)
 	openmax? ( >=media-libs/libomxil-bellagio-0.9.3:=[${MULTILIB_USEDEP}] )
-	vaapi? ( >=x11-libs/libva-0.35.0:=[${MULTILIB_USEDEP}] )
-	vdpau? ( >=x11-libs/libvdpau-0.7:=[${MULTILIB_USEDEP}] )
+	vaapi? (
+		>=x11-libs/libva-1.6.0:=[${MULTILIB_USEDEP}]
+		video_cards_nouveau? ( !<=x11-libs/libva-vdpau-driver-0.7.4-r3 )
+	)
+	vdpau? ( >=x11-libs/libvdpau-1.1:=[${MULTILIB_USEDEP}] )
 	wayland? ( >=dev-libs/wayland-1.2.0:=[${MULTILIB_USEDEP}] )
 	xvmc? ( >=x11-libs/libXvMC-1.0.8:=[${MULTILIB_USEDEP}] )
 	glvnd? ( media-libs/libglvnd[${MULTILIB_USEDEP}] )
-	${LIBDRM_DEPSTRING}[video_cards_freedreno?,video_cards_nouveau?,video_cards_vmware?,video_cards_virgl?,${MULTILIB_USEDEP}]
+	${LIBDRM_DEPSTRING}[video_cards_freedreno?,video_cards_nouveau?,video_cards_vc4?,video_cards_vmware?,video_cards_virgl?,${MULTILIB_USEDEP}]
 "
 
 for card in ${INTEL_CARDS}; do
 	RDEPEND="${RDEPEND}
-		video_cards_${card}? (
-								${LIBDRM_DEPSTRING}[video_cards_intel]
-		)
+		video_cards_${card}? ( ${LIBDRM_DEPSTRING}[video_cards_intel] )
 	"
 done
 
@@ -160,6 +162,9 @@ for card in ${RADEON_CARDS}; do
 								opencl? (
 											>=sys-devel/llvm-3.3-r1[video_cards_radeon,${MULTILIB_USEDEP}]
 											dev-libs/libclc
+								)
+								vulkan? (
+											>=sys-devel/llvm-3.9[video_cards_radeon,${MULTILIB_USEDEP}]
 								)
 		)
 	"
@@ -179,6 +184,7 @@ DEPEND="${RDEPEND}
 	)
 	sys-devel/gettext
 	virtual/pkgconfig
+	valgrind? ( dev-util/valgrind )
 	>=x11-proto/dri2proto-2.8-r1:=[${MULTILIB_USEDEP}]
 	dri3? (
 		>=x11-proto/dri3proto-1.0:=[${MULTILIB_USEDEP}]
@@ -283,7 +289,6 @@ glvnd_src_configure() {
 		$(use_enable gles1) \
 		$(use_enable gles2) \
 		$(use_enable gbm) \
-		--disable-osmesa \
 		$(use_enable nptl glx-tls) \
 		$(use_enable !bindist texture-float) \
 		$(use_enable debug) \
@@ -312,6 +317,10 @@ multilib_src_configure() {
 			use video_cards_intel || \
 			use video_cards_ilo; then
 			vulkan_enable intel
+		fi
+		if use video_cards_radeon || \
+			use video_cards_radeonsi; then
+			vulkan_enable radeon
 		fi
 	fi
 
@@ -369,6 +378,7 @@ multilib_src_configure() {
 		use vaapi && myconf+=" --with-va-libdir=/usr/$(get_libdir)/va/drivers"
 
 		gallium_enable swrast
+		gallium_enable video_cards_vc4 vc4
 		gallium_enable video_cards_vmware svga
 		gallium_enable video_cards_virgl virgl
 		gallium_enable video_cards_nouveau nouveau
@@ -407,6 +417,12 @@ multilib_src_configure() {
 		myconf+=" --disable-asm"
 	fi
 
+	if use gallium; then
+		myconf+=" $(use_enable osmesa gallium-osmesa)"
+	else
+		myconf+=" $(use_enable osmesa)"
+	fi
+
 	# build fails with BSD indent, bug #428112
 	use userland_GNU || export INDENT=cat
 
@@ -419,6 +435,7 @@ multilib_src_configure() {
 		--enable-dri \
 		--enable-glx \
 		--enable-shared-glapi \
+		--enable-shader-cache \
 		$(use_enable !bindist texture-float) \
 		$(use_enable debug) \
 		$(use_enable dri3) \
@@ -427,8 +444,8 @@ multilib_src_configure() {
 		$(use_enable gles1) \
 		$(use_enable gles2) \
 		$(use_enable nptl glx-tls) \
-		$(use_enable osmesa) \
 		$(use_enable !udev sysfs) \
+		--enable-valgrind=$(usex valgrind auto no) \
 		--enable-llvm-shared-libs \
 		--with-dri-drivers=${DRI_DRIVERS} \
 		--with-gallium-drivers=${GALLIUM_DRIVERS} \
