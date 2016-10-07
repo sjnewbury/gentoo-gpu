@@ -300,6 +300,8 @@ glvnd_src_configure() {
 		--enable-llvm-shared-libs \
 		--without-dri-drivers \
 		--without-gallium-drivers \
+		--disable-osmesa \
+		--disable-gallium-osmesa \
 		--enable-libglvnd \
 		--disable-nine \
 		--disable-opencl \
