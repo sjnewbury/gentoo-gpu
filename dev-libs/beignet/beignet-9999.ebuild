@@ -51,7 +51,6 @@ PATCHES=(
 	"${FILESDIR}"/beignet-9999-libOpenCL.patch
 	"${FILESDIR}"/beignet-9999-llvm-libs-tr.patch
 	"${FILESDIR}"/beignet-9999-silence-dri2-failure.patch
-	"${FILESDIR}"/beignet-9999-fix-pooled_eu.patch
 )
 
 DOCS=(

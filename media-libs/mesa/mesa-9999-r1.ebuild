@@ -286,6 +286,7 @@ glvnd_src_configure() {
 	econf \
 		${myconf} \
 		${eglconf} \
+		--enable-libglvnd \
 		--enable-dri \
 		--enable-glx \
 		--enable-shared-glapi \
@@ -298,14 +299,15 @@ glvnd_src_configure() {
 		$(use_enable dri3) \
 		$(use_enable !udev sysfs) \
 		--enable-llvm-shared-libs \
-		--without-dri-drivers \
-		--without-gallium-drivers \
-		--disable-osmesa \
-		--disable-gallium-osmesa \
-		--enable-libglvnd \
+		--with-dri-drivers=${DRI_DRIVERS} \
+		--with-gallium-drivers=${GALLIUM_DRIVERS} \
 		--disable-nine \
 		--disable-opencl \
 		PYTHON2="${PYTHON}"
+#		--without-dri-drivers \
+#		--without-gallium-drivers \
+#		--disable-osmesa \
+#		--disable-gallium-osmesa \
 	popd
 
 
