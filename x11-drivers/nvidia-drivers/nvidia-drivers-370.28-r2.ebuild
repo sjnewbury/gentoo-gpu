@@ -391,10 +391,10 @@ src_install() {
 
 		exeinto /etc/X11/xinit/xinitrc.d
 		newexe "${FILESDIR}"/95-nvidia-settings-r1 95-nvidia-settings
-
-		insinto /etc/vulkan/icd.d
-		doins nvidia_icd.json
 	fi
+
+	insinto /etc/vulkan/icd.d
+	doins nvidia_icd.json
 
 	dobin ${NV_OBJ}/nvidia-bug-report.sh
 
@@ -490,6 +490,10 @@ src_install-libs() {
 		for x in "${GL_ROOT}"/lib*_nvidia.so* ; do
 			dosym "${x}" "${glvnd_ROOT}"/lib/"${x##*/}"
 		done
+
+		# Put in the full path to the GLX/Vulkan client library
+		sed -e "s|\(libGLX_nvidia\.so\.0\)|${glvnd_ROOT}/lib\1|g" \
+			-i ${ED}/etc/vulkan/icd.d/nvidia_icd.json || die
 	fi
 }
 
