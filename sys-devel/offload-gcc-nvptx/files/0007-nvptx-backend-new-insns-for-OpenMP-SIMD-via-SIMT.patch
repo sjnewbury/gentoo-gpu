@@ -1,0 +1,239 @@
+From d4126d9248c47631394412d03401b2c9bb31f0ec Mon Sep 17 00:00:00 2001
+From: Alexander Monakov <amonakov at ispras dot ru>
+Date: Fri, 14 Oct 2016 19:39:48 +0300
+Subject: [PATCH 7/8] nvptx backend: new insns for OpenMP SIMD-via-SIMT
+
+This patch implements in nvptx.md a few new instruction patterns that are used
+for OpenMP SIMD code.
+
+	* config/nvptx/nvptx-protos.h (nvptx_shuffle_kind): Move enum
+	declaration from nvptx.c.
+	(nvptx_gen_shuffle): Declare.
+	* config/nvptx/nvptx.c (nvptx_shuffle_kind): Move to nvptx-protos.h.
+	(nvptx_gen_shuffle): Export.
+	* config/nvptx/nvptx.md (UNSPEC_VOTE_BALLOT): New unspec.
+	(UNSPEC_LANEID): Ditto.
+	(UNSPECV_NOUNROLL): Ditto.
+	(nvptx_vote_ballot): New pattern.
+	(omp_simt_lane): Ditto.
+	(omp_simt_last_lane): Ditto.
+	(omp_simt_ordered): Ditto.
+	(omp_simt_vote_any): Ditto.
+	(omp_simt_xchg_bfly): Ditto.
+	(omp_simt_xchg_idx): Ditto.
+	(nvptx_nounroll): Ditto.
+	* target-insns.def (omp_simt_lane): New.
+	(omp_simt_last_lane): New.
+	(omp_simt_ordered): New.
+	(omp_simt_vote_any): New.
+	(omp_simt_xchg_bfly): New.
+	(omp_simt_xchg_idx): New.
+---
+ gcc/config/nvptx/nvptx-protos.h | 11 +++++
+ gcc/config/nvptx/nvptx.c        | 12 +-----
+ gcc/config/nvptx/nvptx.md       | 94 +++++++++++++++++++++++++++++++++++++++++
+ gcc/target-insns.def            |  6 +++
+ 4 files changed, 112 insertions(+), 11 deletions(-)
+
+diff --git a/gcc/config/nvptx/nvptx-protos.h b/gcc/config/nvptx/nvptx-protos.h
+index 647607d..331ec0a 100644
+--- a/gcc/config/nvptx/nvptx-protos.h
++++ b/gcc/config/nvptx/nvptx-protos.h
+@@ -21,6 +21,16 @@
+ #ifndef GCC_NVPTX_PROTOS_H
+ #define GCC_NVPTX_PROTOS_H
+ 
++/* The kind of shuffe instruction.  */
++enum nvptx_shuffle_kind
++{
++  SHUFFLE_UP,
++  SHUFFLE_DOWN,
++  SHUFFLE_BFLY,
++  SHUFFLE_IDX,
++  SHUFFLE_MAX
++};
++
+ extern void nvptx_declare_function_name (FILE *, const char *, const_tree decl);
+ extern void nvptx_declare_object_name (FILE *file, const char *name,
+ 				       const_tree decl);
+@@ -36,6 +46,7 @@ extern void nvptx_register_pragmas (void);
+ extern void nvptx_expand_oacc_fork (unsigned);
+ extern void nvptx_expand_oacc_join (unsigned);
+ extern void nvptx_expand_call (rtx, rtx);
++extern rtx nvptx_gen_shuffle (rtx, rtx, rtx, nvptx_shuffle_kind);
+ extern rtx nvptx_expand_compare (rtx);
+ extern const char *nvptx_ptx_type_from_mode (machine_mode, bool);
+ extern const char *nvptx_output_mov_insn (rtx, rtx);
+diff --git a/gcc/config/nvptx/nvptx.c b/gcc/config/nvptx/nvptx.c
+index 414e134..c5642a3 100644
+--- a/gcc/config/nvptx/nvptx.c
++++ b/gcc/config/nvptx/nvptx.c
+@@ -72,16 +72,6 @@
+ /* This file should be included last.  */
+ #include "target-def.h"
+ 
+-/* The kind of shuffe instruction.  */
+-enum nvptx_shuffle_kind
+-{
+-  SHUFFLE_UP,
+-  SHUFFLE_DOWN,
+-  SHUFFLE_BFLY,
+-  SHUFFLE_IDX,
+-  SHUFFLE_MAX
+-};
+-
+ /* The various PTX memory areas an object might reside in.  */
+ enum nvptx_data_area
+ {
+@@ -1447,7 +1437,7 @@ nvptx_gen_pack (rtx dst, rtx src0, rtx src1)
+ /* Generate an instruction or sequence to broadcast register REG
+    across the vectors of a single warp.  */
+ 
+-static rtx
++rtx
+ nvptx_gen_shuffle (rtx dst, rtx src, rtx idx, nvptx_shuffle_kind kind)
+ {
+   rtx res;
+diff --git a/gcc/config/nvptx/nvptx.md b/gcc/config/nvptx/nvptx.md
+index 35ae71e..91d1129 100644
+--- a/gcc/config/nvptx/nvptx.md
++++ b/gcc/config/nvptx/nvptx.md
+@@ -42,6 +42,10 @@
+ 
+    UNSPEC_BIT_CONV
+ 
++   UNSPEC_VOTE_BALLOT
++
++   UNSPEC_LANEID
++
+    UNSPEC_SHUFFLE
+    UNSPEC_BR_UNIFIED
+ ])
+@@ -57,6 +61,8 @@
+    UNSPECV_FORKED
+    UNSPECV_JOINING
+    UNSPECV_JOIN
++
++   UNSPECV_NOUNROLL
+ ])
+ 
+ (define_attr "subregs_ok" "false,true"
+@@ -1169,6 +1175,88 @@
+   ""
+   "%.\\tshfl%S3.b32\\t%0, %1, %2, 31;")
+ 
++(define_insn "nvptx_vote_ballot"
++  [(set (match_operand:SI 0 "nvptx_register_operand" "=R")
++	(unspec:SI [(match_operand:BI 1 "nvptx_register_operand" "R")]
++		   UNSPEC_VOTE_BALLOT))]
++  ""
++  "%.\\tvote.ballot.b32\\t%0, %1;")
++
++;; Patterns for OpenMP SIMD-via-SIMT lowering
++
++;; Implement IFN_GOMP_SIMT_LANE: set operand 0 to lane index
++(define_insn "omp_simt_lane"
++  [(set (match_operand:SI 0 "nvptx_register_operand" "")
++	(unspec:SI [(const_int 0)] UNSPEC_LANEID))]
++  ""
++  "%.\\tmov.u32\\t%0, %%laneid;")
++
++;; Implement IFN_GOMP_SIMT_ORDERED: copy operand 1 to operand 0 and
++;; place a compiler barrier to disallow unrolling/peeling the containing loop
++(define_expand "omp_simt_ordered"
++  [(match_operand:SI 0 "nvptx_register_operand" "=R")
++   (match_operand:SI 1 "nvptx_register_operand" "R")]
++  ""
++{
++  emit_move_insn (operands[0], operands[1]);
++  emit_insn (gen_nvptx_nounroll ());
++  DONE;
++})
++
++;; Implement IFN_GOMP_SIMT_XCHG_BFLY: perform a "butterfly" exchange
++;; across lanes
++(define_expand "omp_simt_xchg_bfly"
++  [(match_operand 0 "nvptx_register_operand" "=R")
++   (match_operand 1 "nvptx_register_operand" "R")
++   (match_operand:SI 2 "nvptx_nonmemory_operand" "Ri")]
++  ""
++{
++  emit_insn (nvptx_gen_shuffle (operands[0], operands[1], operands[2],
++				SHUFFLE_BFLY));
++  DONE;
++})
++
++;; Implement IFN_GOMP_SIMT_XCHG_IDX: broadcast value in operand 1
++;; from lane given by index in operand 2 to operand 0 in all lanes
++(define_expand "omp_simt_xchg_idx"
++  [(match_operand 0 "nvptx_register_operand" "=R")
++   (match_operand 1 "nvptx_register_operand" "R")
++   (match_operand:SI 2 "nvptx_nonmemory_operand" "Ri")]
++  ""
++{
++  emit_insn (nvptx_gen_shuffle (operands[0], operands[1], operands[2],
++				SHUFFLE_IDX));
++  DONE;
++})
++
++;; Implement IFN_GOMP_SIMT_VOTE_ANY:
++;; set operand 0 to zero iff all lanes supply zero in operand 1
++(define_expand "omp_simt_vote_any"
++  [(match_operand:SI 0 "nvptx_register_operand" "=R")
++   (match_operand:SI 1 "nvptx_register_operand" "R")]
++  ""
++{
++  rtx pred = gen_reg_rtx (BImode);
++  emit_move_insn (pred, gen_rtx_NE (BImode, operands[1], const0_rtx));
++  emit_insn (gen_nvptx_vote_ballot (operands[0], pred));
++  DONE;
++})
++
++;; Implement IFN_GOMP_SIMT_LAST_LANE:
++;; set operand 0 to the lowest lane index that passed non-zero in operand 1
++(define_expand "omp_simt_last_lane"
++  [(match_operand:SI 0 "nvptx_register_operand" "=R")
++   (match_operand:SI 1 "nvptx_register_operand" "R")]
++  ""
++{
++  rtx pred = gen_reg_rtx (BImode);
++  rtx tmp = gen_reg_rtx (SImode);
++  emit_move_insn (pred, gen_rtx_NE (BImode, operands[1], const0_rtx));
++  emit_insn (gen_nvptx_vote_ballot (tmp, pred));
++  emit_insn (gen_ctzsi2 (operands[0], tmp));
++  DONE;
++})
++
+ ;; extract parts of a 64 bit object into 2 32-bit ints
+ (define_insn "unpack<mode>si2"
+   [(set (match_operand:SI 0 "nvptx_register_operand" "=R")
+@@ -1285,3 +1373,9 @@
+   ""
+   "\\tbar.sync\\t%0;"
+   [(set_attr "predicable" "false")])
++
++(define_insn "nvptx_nounroll"
++  [(unspec_volatile [(const_int 0)] UNSPECV_NOUNROLL)]
++  ""
++  "\\t.pragma \\\"nounroll\\\";"
++  [(set_attr "predicable" "false")])
+diff --git a/gcc/target-insns.def b/gcc/target-insns.def
+index a6a040e..e011a5a 100644
+--- a/gcc/target-insns.def
++++ b/gcc/target-insns.def
+@@ -68,6 +68,12 @@ DEF_TARGET_INSN (oacc_dim_pos, (rtx x0, rtx x1))
+ DEF_TARGET_INSN (oacc_dim_size, (rtx x0, rtx x1))
+ DEF_TARGET_INSN (oacc_fork, (rtx x0, rtx x1, rtx x2))
+ DEF_TARGET_INSN (oacc_join, (rtx x0, rtx x1, rtx x2))
++DEF_TARGET_INSN (omp_simt_lane, (rtx x0))
++DEF_TARGET_INSN (omp_simt_last_lane, (rtx x0, rtx x1))
++DEF_TARGET_INSN (omp_simt_ordered, (rtx x0, rtx x1))
++DEF_TARGET_INSN (omp_simt_vote_any, (rtx x0, rtx x1))
++DEF_TARGET_INSN (omp_simt_xchg_bfly, (rtx x0, rtx x1, rtx x2))
++DEF_TARGET_INSN (omp_simt_xchg_idx, (rtx x0, rtx x1, rtx x2))
+ DEF_TARGET_INSN (prefetch, (rtx x0, rtx x1, rtx x2))
+ DEF_TARGET_INSN (probe_stack, (rtx x0))
+ DEF_TARGET_INSN (probe_stack_address, (rtx x0))
+-- 
+2.10.1
+

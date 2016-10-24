@@ -1,0 +1,181 @@
+Index: symtab.c
+===================================================================
+--- gcc/symtab.c	(revision 221757)
++++ gcc/symtab.c	(working copy)
+@@ -1682,6 +1682,11 @@ symtab_node::get_partitioning_class (voi
+ 
+   if (varpool_node *vnode = dyn_cast <varpool_node *> (this))
+     {
++      /* Static variables referring named label are always handled the same way
++	 as the function they belong to.  */
++      if (vnode->contains_named_label)
++	return cgraph_node::get (decl_function_context (decl))
++		->get_partitioning_class ();
+       if (alias && definition && !ultimate_alias_target ()->definition)
+ 	return SYMBOL_EXTERNAL;
+       /* Constant pool references use local symbol names that can not
+Index: lto-cgraph.c
+===================================================================
+--- gcc/lto-cgraph.c	(revision 221757)
++++ gcc/lto-cgraph.c	(working copy)
+@@ -662,6 +663,7 @@ lto_output_varpool_node (struct lto_simp
+   bp_pack_value (&bp, node->tls_model, 3);
+   bp_pack_value (&bp, node->used_by_single_function, 1);
+   bp_pack_value (&bp, node->need_bounds_init, 1);
++  bp_pack_value (&bp, node->contains_named_label, 1);
+   streamer_write_bitpack (&bp);
+ 
+   group = node->get_comdat_group ();
+@@ -1413,6 +1416,7 @@ input_varpool_node (struct lto_file_decl
+   node->tls_model = (enum tls_model)bp_unpack_value (&bp, 3);
+   node->used_by_single_function = (enum tls_model)bp_unpack_value (&bp, 1);
+   node->need_bounds_init = bp_unpack_value (&bp, 1);
++  node->contains_named_label = bp_unpack_value (&bp, 1);
+   group = read_identifier (ib);
+   if (group)
+     {
+Index: tree.c
+===================================================================
+--- gcc/tree.c	(revision 221757)
++++ gcc/tree.c	(working copy)
+@@ -3149,7 +3149,12 @@ decl_address_ip_invariant_p (const_tree
+ 
+   switch (TREE_CODE (op))
+     {
++    /* Theoretically label decls can be considered IP invariants, but until
++       we are able to handle them as regular symbols (i.e. output with
++       non-local visibility), we really want them to be contained in a function
++       they belong to.  */
+     case LABEL_DECL:
++      return false;
+     case FUNCTION_DECL:
+     case STRING_CST:
+       return true;
+Index: cgraph.h
+===================================================================
+--- gcc/cgraph.h	(revision 221757)
++++ gcc/cgraph.h	(working copy)
+@@ -1778,6 +1780,9 @@ public:
+      if we did not do any inter-procedural code movement.  */
+   unsigned used_by_single_function : 1;
+ 
++  /* Set if te variable is contains a named label.  */
++  unsigned contains_named_label : 1;
++
+ private:
+   /* Assemble thunks and aliases associated to varpool node.  */
+   void assemble_aliases (void);
+Index: cgraphbuild.c
+===================================================================
+--- gcc/cgraphbuild.c	(revision 221757)
++++ gcc/cgraphbuild.c	(working copy)
+@@ -112,6 +112,8 @@ record_reference (tree *tp, int *walk_su
+ 	  varpool_node *vnode = varpool_node::get_create (decl);
+ 	  ctx->varpool_node->create_reference (vnode, IPA_REF_ADDR);
+ 	}
++      if (TREE_CODE (decl) == LABEL_DECL)
++	ctx->varpool_node->contains_named_label = true;
+       *walk_subtrees = 0;
+       break;
+ 
+Index: lto/lto-partition.c
+===================================================================
+--- gcc/lto/lto-partition.c	(revision 221757)
++++ gcc/lto/lto-partition.c	(working copy)
+@@ -113,6 +113,14 @@ add_references_to_partition (ltrans_part
+   for (i = 0; node->iterate_reference (i, ref); i++)
+     if (ref->referred->get_partitioning_class () == SYMBOL_DUPLICATE)
+       add_symbol_to_partition (part, ref->referred);
++    /* A static variable referring to named labels must go to the same
++       partition as a function it belongs to.  */
++    else if (is_a <varpool_node *> (ref->referred)
++	     && (dyn_cast <varpool_node *> (ref->referred)
++		 ->contains_named_label)
++	     && node->decl == decl_function_context (ref->referred->decl)
++	     && !lto_symtab_encoder_in_partition_p (part->encoder, ref->referred))
++      add_symbol_to_partition (part, ref->referred);
+     /* References to a readonly variable may be constant foled into its value.
+        Recursively look into the initializers of the constant variable and add
+        references, too.  */
+@@ -193,6 +201,14 @@ add_symbol_to_partition_1 (ltrans_partit
+ 	add_symbol_to_partition_1 (part, cnode->instrumented_version);
+     }
+ 
++  /* Variables referring named labels must always go to the same section
++     as the function they belong to.  */
++  if (is_a <varpool_node *> (node)
++      && dyn_cast <varpool_node *> (node)->contains_named_label)
++    add_symbol_to_partition_1 (part,
++			         cgraph_node::get
++				    (decl_function_context (node->decl)));
++
+   add_references_to_partition (part, node);
+ 
+   /* Add all aliases associated with the symbol.  */
+@@ -409,7 +425,12 @@ add_sorted_nodes (vec<symtab_node *> &ne
+ 
+   next_nodes.qsort (varpool_node_cmp);
+   FOR_EACH_VEC_ELT (next_nodes, i, node)
+-    if (!symbol_partitioned_p (node))
++    if (!symbol_partitioned_p (node)
++	/* Local statics containing named labels always go after their
++	   functions.  Do not partition on them and wait for them to be
++	   dragged in, so we do not force reordering of the functions.  */
++	&& (!is_a <varpool_node *> (node)
++	    || !dyn_cast <varpool_node *> (node)->contains_named_label))
+       add_symbol_to_partition (partition, node);
+ }
+ 
+@@ -636,6 +657,7 @@ lto_balanced_map (int n_lto_partitions)
+ 		  continue;
+ 		if (!symbol_partitioned_p (vnode) && flag_toplevel_reorder
+ 		    && !vnode->no_reorder
++		    && !vnode->contains_named_label
+ 		    && vnode->get_partitioning_class () == SYMBOL_PARTITION)
+ 		  add_symbol_to_partition (partition, vnode);
+ 		index = lto_symtab_encoder_lookup (partition->encoder,
+@@ -674,6 +696,7 @@ lto_balanced_map (int n_lto_partitions)
+ 		if (!symbol_partitioned_p (vnode) && flag_toplevel_reorder
+ 		    && !vnode->no_reorder
+ 		    && !vnode->can_remove_if_no_refs_p ()
++		    && !vnode->contains_named_label
+ 		    && vnode->get_partitioning_class () == SYMBOL_PARTITION)
+ 		  add_symbol_to_partition (partition, vnode);
+ 		index = lto_symtab_encoder_lookup (partition->encoder,
+Index: varpool.c
+===================================================================
+--- gcc/varpool.c	(revision 221757)
++++ gcc/varpool.c	(working copy)
+@@ -256,6 +256,8 @@ varpool_node::dump (FILE *f)
+     fprintf (f, " const-value-known");
+   if (writeonly)
+     fprintf (f, " write-only");
++  if (contains_named_label)
++    fprintf (f, " contains-named-label");
+   if (tls_model)
+     fprintf (f, " tls-%s", tls_model_names [tls_model]);
+   fprintf (f, "\n");
+Index: ipa.c
+===================================================================
+--- gcc/ipa.c	(revision 221757)
++++ gcc/ipa.c	(working copy)
+@@ -406,6 +406,18 @@ symbol_table::remove_unreachable_nodes (
+ 		      n->used_as_abstract_origin = true;
+ 		}
+ 	    }
++
++	  /* Static variables referring local label needs the containing
++	     function to be output.  */
++	  if (is_a <varpool_node *> (node)
++	      && dyn_cast <varpool_node *> (node)->contains_named_label)
++	    {
++	      cgraph_node *cn
++		 = cgraph_node::get (decl_function_context (node->decl));
++	      if (!reachable.add (cn))
++		enqueue_node (cn, &first, &reachable);
++	    }
++	      
+ 	  /* If any symbol in a comdat group is reachable, force
+ 	     all externally visible symbols in the same comdat
+ 	     group to be reachable as well.  Comdat-local symbols
+

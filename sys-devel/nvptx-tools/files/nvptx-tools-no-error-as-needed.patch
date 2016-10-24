@@ -1,0 +1,13 @@
+--- nvptx-tools-9999/nvptx-ld.c	2016-10-23 12:28:22.725857400 +0100
++++ nvptx-tools-9999-abi_x86_64.amd64/nvptx-ld.c	2016-10-23 12:29:28.989318183 +0100
+@@ -340,7 +340,9 @@
+ static const struct option long_options[] = {
+   {"help", no_argument, 0, 'h' },
+   {"version", no_argument, 0, 'V' },
+-  {0, 0, 0, 0 }
++  {"as-needed", no_argument, 0, no_argument },
++  {"no-as-needed", no_argument, 0, no_argument },
++{0, 0, 0, 2 }
+ };
+ 
+ int

@@ -1,0 +1,142 @@
+From 79df97e582745f78513b7c2478ab13541495949d Mon Sep 17 00:00:00 2001
+From: Alexander Monakov <amonakov at ispras dot ru>
+Date: Fri, 14 Oct 2016 19:39:49 +0300
+Subject: [PATCH 8/8] nvptx: handle OpenMP "omp target entrypoint"
+
+This patch implements emission of OpenMP target region entrypoints: the
+compiler emits the target function with '$impl' appended to the name, and
+under the original name it emits a short entry sequence that sets up shared
+memory arrays and calls the target function via 'gomp_nvptx_main' (which is
+implemented in libgomp).
+
+	* config/nvptx/nvptx.c (write_as_kernel): Restrict to OpenACC target
+	regions.
+	(write_omp_entry): New.  Use it...
+	(nvptx_declare_function_name): ...here to emit OpenMP target region
+	entrypoints.
+	(nvptx_record_offload_symbol): Handle NULL attributes.
+---
+ gcc/config/nvptx/nvptx.c | 82 +++++++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 78 insertions(+), 4 deletions(-)
+
+diff --git a/gcc/config/nvptx/nvptx.c b/gcc/config/nvptx/nvptx.c
+index c5642a3..2f109a6 100644
+--- a/gcc/config/nvptx/nvptx.c
++++ b/gcc/config/nvptx/nvptx.c
+@@ -731,7 +731,10 @@ static bool
+ write_as_kernel (tree attrs)
+ {
+   return (lookup_attribute ("kernel", attrs) != NULL_TREE
+-	  || lookup_attribute ("omp target entrypoint", attrs) != NULL_TREE);
++	  || (lookup_attribute ("omp target entrypoint", attrs) != NULL_TREE
++	      && lookup_attribute ("oacc function", attrs) != NULL_TREE));
++  /* For OpenMP target regions, the corresponding kernel entry is emitted from
++     write_omp_entry as a separate function.  */
+ }
+ 
+ /* Emit a linker marker for a function decl or defn.  */
+@@ -1088,6 +1091,69 @@ nvptx_init_unisimt_predicate (FILE *file)
+   need_unisimt_decl = true;
+ }
+ 
++/* Emit kernel NAME for function ORIG outlined for an OpenMP 'target' region:
++
++   extern void gomp_nvptx_main (void (*fn)(void*), void *fnarg);
++   void __attribute__((kernel)) NAME (void *arg, char *stack, size_t stacksize)
++   {
++     __nvptx_stacks[tid.y] = stack + stacksize * (ctaid.x * ntid.y + tid.y + 1);
++     __nvptx_uni[tid.y] = 0;
++     gomp_nvptx_main (ORIG, arg);
++   }
++   ORIG itself should not be emitted as a PTX .entry function.  */
++
++static void
++write_omp_entry (FILE *file, const char *name, const char *orig)
++{
++  static bool gomp_nvptx_main_declared;
++  if (!gomp_nvptx_main_declared)
++    {
++      gomp_nvptx_main_declared = true;
++      write_fn_marker (func_decls, false, true, "gomp_nvptx_main");
++      func_decls << ".extern .func gomp_nvptx_main (.param.u" << POINTER_SIZE
++        << " %in_ar1, .param.u" << POINTER_SIZE << " %in_ar2);\n";
++    }
++#define ENTRY_TEMPLATE(PS, PS_BYTES, MAD_PS_32) "\
++ (.param.u" PS " %arg, .param.u" PS " %stack, .param.u" PS " %sz)\n\
++{\n\
++	.reg.u32 %r<3>;\n\
++	.reg.u" PS " %R<4>;\n\
++	mov.u32 %r0, %tid.y;\n\
++	mov.u32 %r1, %ntid.y;\n\
++	mov.u32 %r2, %ctaid.x;\n\
++	cvt.u" PS ".u32 %R1, %r0;\n\
++	" MAD_PS_32 " %R1, %r1, %r2, %R1;\n\
++	mov.u" PS " %R0, __nvptx_stacks;\n\
++	" MAD_PS_32 " %R0, %r0, " PS_BYTES ", %R0;\n\
++	ld.param.u" PS " %R2, [%stack];\n\
++	ld.param.u" PS " %R3, [%sz];\n\
++	add.u" PS " %R2, %R2, %R3;\n\
++	mad.lo.u" PS " %R2, %R1, %R3, %R2;\n\
++	st.shared.u" PS " [%R0], %R2;\n\
++	mov.u" PS " %R0, __nvptx_uni;\n\
++	" MAD_PS_32 " %R0, %r0, 4, %R0;\n\
++	mov.u32 %r0, 0;\n\
++	st.shared.u32 [%R0], %r0;\n\
++	mov.u" PS " %R0, \0;\n\
++	ld.param.u" PS " %R1, [%arg];\n\
++	{\n\
++		.param.u" PS " %P<2>;\n\
++		st.param.u" PS " [%P0], %R0;\n\
++		st.param.u" PS " [%P1], %R1;\n\
++		call.uni gomp_nvptx_main, (%P0, %P1);\n\
++	}\n\
++	ret.uni;\n\
++}\n"
++  static const char entry64[] = ENTRY_TEMPLATE ("64", "8", "mad.wide.u32");
++  static const char entry32[] = ENTRY_TEMPLATE ("32", "4", "mad.lo.u32  ");
++#undef ENTRY_TEMPLATE
++  const char *entry_1 = TARGET_ABI64 ? entry64 : entry32;
++  /* Position ENTRY_2 after the embedded nul using strlen of the prefix.  */
++  const char *entry_2 = entry_1 + strlen (entry64) + 1;
++  fprintf (file, ".visible .entry %s%s%s%s", name, entry_1, orig, entry_2);
++  need_softstack_decl = need_unisimt_decl = true;
++}
++
+ /* Implement ASM_DECLARE_FUNCTION_NAME.  Writes the start of a ptx
+    function, including local var decls and copies from the arguments to
+    local regs.  */
+@@ -1099,6 +1165,14 @@ nvptx_declare_function_name (FILE *file, const char *name, const_tree decl)
+   tree result_type = TREE_TYPE (fntype);
+   int argno = 0;
+ 
++  if (lookup_attribute ("omp target entrypoint", DECL_ATTRIBUTES (decl))
++      && !lookup_attribute ("oacc function", DECL_ATTRIBUTES (decl)))
++    {
++      char *buf = (char *) alloca (strlen (name) + sizeof ("$impl"));
++      sprintf (buf, "%s$impl", name);
++      write_omp_entry (file, name, buf);
++      name = buf;
++    }
+   /* We construct the initial part of the function into a string
+      stream, in order to share the prototype writing code.  */
+   std::stringstream s;
+@@ -4138,13 +4212,13 @@ nvptx_record_offload_symbol (tree decl)
+     case FUNCTION_DECL:
+       {
+ 	tree attr = get_oacc_fn_attrib (decl);
+-	tree dims = TREE_VALUE (attr);
+-	unsigned ix;
++	/* OpenMP offloading does not set this attribute.  */
++	tree dims = attr ? TREE_VALUE (attr) : NULL_TREE;
+ 
+ 	fprintf (asm_out_file, "//:FUNC_MAP \"%s\"",
+ 		 IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl)));
+ 
+-	for (ix = 0; ix != GOMP_DIM_MAX; ix++, dims = TREE_CHAIN (dims))
++	for (; dims; dims = TREE_CHAIN (dims))
+ 	  {
+ 	    int size = TREE_INT_CST_LOW (TREE_VALUE (dims));
+ 
+-- 
+2.10.1
+

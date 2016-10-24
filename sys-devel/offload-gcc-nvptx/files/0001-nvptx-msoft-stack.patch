@@ -1,0 +1,486 @@
+From 30c19b4d0c4bb41a168622b1fb0fb3d2574776d9 Mon Sep 17 00:00:00 2001
+From: Alexander Monakov <amonakov at ispras dot ru>
+Date: Fri, 14 Oct 2016 19:39:42 +0300
+Subject: [PATCH 1/8] nvptx -msoft-stack
+
+This patch implements '-msoft-stack' code generation variant for NVPTX.  The
+goal is to avoid relying on '.local' memory space for placement of automatic
+data, and instead have an explicitely-maintained stack pointer (which can be
+set up to point to preallocated global memory space).  This allows to have
+stack data accessible from all threads and modifiable with atomic
+instructions.  This also allows to implement variable-length stack allocation
+(for 'alloca' and C99 VLAs).
+
+Each warp has its own 'soft stack' pointer.  It lives in shared memory array
+called __nvptx_stacks at index %tid.y (like in OpenACC, OpenMP offloading is
+going to use launch geometry such that %tid.y gives the warp index).  It is
+retrieved in function prologue (if the function needs a stack frame) and may
+also be written there (if the function is non-leaf, so that its callees see
+the updated stack pointer), and restored prior to returning.
+
+Startup code is responsible for setting up the initial soft-stack pointer. For
+-mmainkernel testing it is libgcc's __main, for OpenMP offloading it's the
+kernel region entry code.
+
+gcc/:
+	* config/nvptx/nvptx-protos.h (nvptx_output_set_softstack): Declare.
+	* config/nvptx/nvptx.c: (need_softstack_decl): New variable.
+	(init_softstack_frame): New.
+	(nvptx_declare_function_name): Handle TARGET_SOFT_STACK.
+	(nvptx_output_set_softstack): New.
+	(nvptx_get_drap_rtx): Return %argp as the DRAP if needed.
+	(nvptx_file_end): Handle need_softstack_decl.
+	* config/nvptx/nvptx.h: (TARGET_CPU_CPP_BUILTINS): Define
+	__nvptx_softstack__ when -msoft-stack is active.
+	(STACK_SIZE_MODE): Define.
+	(FIXED_REGISTERS): Adjust.
+	(SOFTSTACK_SLOT_REGNUM): New.
+	(SOFTSTACK_PREV_REGNUM): New.
+	(REGISTER_NAMES): Adjust.
+	(struct machine_function): New bool field has_softstack.
+	* config/nvptx/nvptx.md (UNSPEC_SET_SOFTSTACK): New.
+	(epilogue): Emit stack restore if TARGET_SOFT_STACK.
+	(allocate_stack): Implement for TARGET_SOFT_STACK.  Remove unused code.
+	(allocate_stack_<mode>): Remove unused pattern.
+	(set_softstack_insn): New pattern.
+	(restore_stack_block): Handle for TARGET_SOFT_STACK.
+	* config/nvptx/nvptx.opt: (msoft-stack): New option.
+	* doc/invoke.texi (msoft-stack): Document.
+
+gcc/testsuite/:
+	* gcc.target/nvptx/softstack.c: New test.
+	* lib/target-supports.exp (check_effective_target_alloca): Use a
+	compile test.
+
+libgcc/:
+	* config/nvptx/crt0.c (__main): Setup __nvptx_stacks.
+---
+ gcc/config/nvptx/nvptx-protos.h            |   1 +
+ gcc/config/nvptx/nvptx.c                   | 120 ++++++++++++++++++++++++++---
+ gcc/config/nvptx/nvptx.h                   |  15 +++-
+ gcc/config/nvptx/nvptx.md                  |  36 ++++++---
+ gcc/config/nvptx/nvptx.opt                 |   4 +
+ gcc/doc/invoke.texi                        |  12 +++
+ gcc/testsuite/gcc.target/nvptx/softstack.c |  23 ++++++
+ gcc/testsuite/lib/target-supports.exp      |   5 +-
+ libgcc/config/nvptx/crt0.c                 |   8 ++
+ 9 files changed, 198 insertions(+), 26 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/nvptx/softstack.c
+
+diff --git a/gcc/config/nvptx/nvptx-protos.h b/gcc/config/nvptx/nvptx-protos.h
+index ec4588e..647607d 100644
+--- a/gcc/config/nvptx/nvptx-protos.h
++++ b/gcc/config/nvptx/nvptx-protos.h
+@@ -41,5 +41,6 @@ extern const char *nvptx_ptx_type_from_mode (machine_mode, bool);
+ extern const char *nvptx_output_mov_insn (rtx, rtx);
+ extern const char *nvptx_output_call_insn (rtx_insn *, rtx, rtx);
+ extern const char *nvptx_output_return (void);
++extern const char *nvptx_output_set_softstack (unsigned);
+ #endif
+ #endif
+diff --git a/gcc/config/nvptx/nvptx.c b/gcc/config/nvptx/nvptx.c
+index 80fa9ae..e576e73 100644
+--- a/gcc/config/nvptx/nvptx.c
++++ b/gcc/config/nvptx/nvptx.c
+@@ -141,6 +141,9 @@ static GTY(()) rtx worker_red_sym;
+ /* Global lock variable, needed for 128bit worker & gang reductions.  */
+ static GTY(()) tree global_lock_var;
+ 
++/* True if any function references __nvptx_stacks.  */
++static bool need_softstack_decl;
++
+ /* Allocate a new, cleared machine_function structure.  */
+ 
+ static struct machine_function *
+@@ -973,6 +976,67 @@ init_frame (FILE  *file, int regno, unsigned align, unsigned size)
+ 	   POINTER_SIZE, reg_names[regno], reg_names[regno]);
+ }
+ 
++/* Emit soft stack frame setup sequence.  */
++
++static void
++init_softstack_frame (FILE *file, unsigned alignment, HOST_WIDE_INT size)
++{
++  /* Maintain 64-bit stack alignment.  */
++  unsigned keep_align = BIGGEST_ALIGNMENT / BITS_PER_UNIT;
++  size = ROUND_UP (size, keep_align);
++  int bits = POINTER_SIZE;
++  const char *reg_stack = reg_names[STACK_POINTER_REGNUM];
++  const char *reg_frame = reg_names[FRAME_POINTER_REGNUM];
++  const char *reg_sspslot = reg_names[SOFTSTACK_SLOT_REGNUM];
++  const char *reg_sspprev = reg_names[SOFTSTACK_PREV_REGNUM];
++  fprintf (file, "\t.reg.u%d %s;\n", bits, reg_stack);
++  fprintf (file, "\t.reg.u%d %s;\n", bits, reg_frame);
++  fprintf (file, "\t.reg.u%d %s;\n", bits, reg_sspslot);
++  fprintf (file, "\t.reg.u%d %s;\n", bits, reg_sspprev);
++  fprintf (file, "\t{\n");
++  fprintf (file, "\t\t.reg.u32 %%fstmp0;\n");
++  fprintf (file, "\t\t.reg.u%d %%fstmp1;\n", bits);
++  fprintf (file, "\t\t.reg.u%d %%fstmp2;\n", bits);
++  fprintf (file, "\t\tmov.u32 %%fstmp0, %%tid.y;\n");
++  fprintf (file, "\t\tmul%s.u32 %%fstmp1, %%fstmp0, %d;\n",
++	   bits == 64 ? ".wide" : ".lo", bits / 8);
++  fprintf (file, "\t\tmov.u%d %%fstmp2, __nvptx_stacks;\n", bits);
++
++  /* Initialize %sspslot = &__nvptx_stacks[tid.y].  */
++  fprintf (file, "\t\tadd.u%d %s, %%fstmp2, %%fstmp1;\n", bits, reg_sspslot);
++
++  /* Initialize %sspprev = __nvptx_stacks[tid.y].  */
++  fprintf (file, "\t\tld.shared.u%d %s, [%s];\n",
++	   bits, reg_sspprev, reg_sspslot);
++
++  /* Initialize %frame = %sspprev - size.  */
++  fprintf (file, "\t\tsub.u%d %s, %s, " HOST_WIDE_INT_PRINT_DEC ";\n",
++	   bits, reg_frame, reg_sspprev, size);
++
++  /* Apply alignment, if larger than 64.  */
++  if (alignment > keep_align)
++    fprintf (file, "\t\tand.b%d %s, %s, %d;\n",
++	     bits, reg_frame, reg_frame, -alignment);
++
++  size = crtl->outgoing_args_size;
++  gcc_assert (size % keep_align == 0);
++
++  /* Initialize %stack.  */
++  fprintf (file, "\t\tsub.u%d %s, %s, " HOST_WIDE_INT_PRINT_DEC ";\n",
++	   bits, reg_stack, reg_frame, size);
++
++  /* Usually 'crtl->is_leaf' is computed during register allocator
++     initialization, which is not done on NVPTX.  Compute it now.  */
++  gcc_assert (!crtl->is_leaf);
++  crtl->is_leaf = leaf_function_p ();
++  if (!crtl->is_leaf)
++    fprintf (file, "\t\tst.shared.u%d [%s], %s;\n",
++	     bits, reg_sspslot, reg_stack);
++  fprintf (file, "\t}\n");
++  cfun->machine->has_softstack = true;
++  need_softstack_decl = true;
++}
++
+ /* Emit code to initialize the REGNO predicate register to indicate
+    whether we are not lane zero on the NAME axis.  */
+ 
+@@ -1034,19 +1098,24 @@ nvptx_declare_function_name (FILE *file, const char *name, const_tree decl)
+ 
+   fprintf (file, "%s", s.str().c_str());
+ 
+-  /* Declare a local var for outgoing varargs.  */
+-  if (cfun->machine->has_varadic)
+-    init_frame (file, STACK_POINTER_REGNUM,
+-		UNITS_PER_WORD, crtl->outgoing_args_size);
+-
+-  /* Declare a local variable for the frame.  Force its size to be
+-     DImode-compatible.  */
+   HOST_WIDE_INT sz = get_frame_size ();
+-  if (sz || cfun->machine->has_chain)
+-    init_frame (file, FRAME_POINTER_REGNUM,
+-		crtl->stack_alignment_needed / BITS_PER_UNIT,
+-		(sz + GET_MODE_SIZE (DImode) - 1)
+-		& ~(HOST_WIDE_INT)(GET_MODE_SIZE (DImode) - 1));
++  bool need_frameptr = sz || cfun->machine->has_chain;
++  int alignment = crtl->stack_alignment_needed / BITS_PER_UNIT;
++  if (!TARGET_SOFT_STACK)
++    {
++      /* Declare a local var for outgoing varargs.  */
++      if (cfun->machine->has_varadic)
++	init_frame (file, STACK_POINTER_REGNUM,
++		    UNITS_PER_WORD, crtl->outgoing_args_size);
++
++      /* Declare a local variable for the frame.  Force its size to be
++	 DImode-compatible.  */
++      if (need_frameptr)
++	init_frame (file, FRAME_POINTER_REGNUM, alignment,
++		    ROUND_UP (sz, GET_MODE_SIZE (DImode)));
++    }
++  else if (need_frameptr || cfun->machine->has_varadic || cfun->calls_alloca)
++    init_softstack_frame (file, alignment, sz);
+ 
+   /* Declare the pseudos we have as ptx registers.  */
+   int maxregs = max_reg_num ();
+@@ -1074,6 +1143,21 @@ nvptx_declare_function_name (FILE *file, const char *name, const_tree decl)
+ 			       REGNO (cfun->machine->axis_predicate[1]), "x");
+ }
+ 
++/* Output instruction that sets soft stack pointer in shared memory to the
++   value in register given by SRC_REGNO.  */
++
++const char *
++nvptx_output_set_softstack (unsigned src_regno)
++{
++  if (cfun->machine->has_softstack && !crtl->is_leaf)
++    {
++      fprintf (asm_out_file, "\tst.shared.u%d\t[%s], ",
++	       POINTER_SIZE, reg_names[SOFTSTACK_SLOT_REGNUM]);
++      output_reg (asm_out_file, src_regno, VOIDmode);
++      fprintf (asm_out_file, ";\n");
++    }
++  return "";
++}
+ /* Output a return instruction.  Also copy the return value to its outgoing
+    location.  */
+ 
+@@ -1113,6 +1197,8 @@ nvptx_function_ok_for_sibcall (tree, tree)
+ static rtx
+ nvptx_get_drap_rtx (void)
+ {
++  if (TARGET_SOFT_STACK && stack_realign_drap)
++    return arg_pointer_rtx;
+   return NULL_RTX;
+ }
+ 
+@@ -3991,6 +4077,16 @@ nvptx_file_end (void)
+   if (worker_red_size)
+     write_worker_buffer (asm_out_file, worker_red_sym,
+ 			 worker_red_align, worker_red_size);
++
++  if (need_softstack_decl)
++    {
++      write_var_marker (asm_out_file, false, true, "__nvptx_stacks");
++      /* 32 is the maximum number of warps in a block.  Even though it's an
++         external declaration, emit the array size explicitly; otherwise, it
++         may fail at PTX JIT time if the definition is later in link order.  */
++      fprintf (asm_out_file, ".extern .shared .u%d __nvptx_stacks[32];\n",
++	       POINTER_SIZE);
++    }
+ }
+ 
+ /* Expander for the shuffle builtins.  */
+diff --git a/gcc/config/nvptx/nvptx.h b/gcc/config/nvptx/nvptx.h
+index 381269e..2c4962a 100644
+--- a/gcc/config/nvptx/nvptx.h
++++ b/gcc/config/nvptx/nvptx.h
+@@ -31,6 +31,8 @@
+       builtin_assert ("machine=nvptx");		\
+       builtin_assert ("cpu=nvptx");		\
+       builtin_define ("__nvptx__");		\
++      if (TARGET_SOFT_STACK)			\
++        builtin_define ("__nvptx_softstack__");	\
+     } while (0)
+ 
+ /* Avoid the default in ../../gcc.c, which adds "-pthread", which is not
+@@ -79,13 +81,14 @@
+ 
+ #define POINTER_SIZE (TARGET_ABI64 ? 64 : 32)
+ #define Pmode (TARGET_ABI64 ? DImode : SImode)
++#define STACK_SIZE_MODE Pmode
+ 
+ /* Registers.  Since ptx is a virtual target, we just define a few
+    hard registers for special purposes and leave pseudos unallocated.
+    We have to have some available hard registers, to keep gcc setup
+    happy.  */
+ #define FIRST_PSEUDO_REGISTER 16
+-#define FIXED_REGISTERS	    { 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
++#define FIXED_REGISTERS	    { 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+ #define CALL_USED_REGISTERS { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 }
+ 
+ #define HARD_REGNO_NREGS(REG, MODE)		\
+@@ -133,10 +136,17 @@ enum reg_class             {  NO_REGS,    ALL_REGS,	LIM_REG_CLASSES };
+ #define FRAME_POINTER_REGNUM 2
+ #define ARG_POINTER_REGNUM 3
+ #define STATIC_CHAIN_REGNUM 4
++/* This register points to the shared memory location with the current warp's
++   soft stack pointer (__nvptx_stacks[tid.y]).  */
++#define SOFTSTACK_SLOT_REGNUM 5
++/* This register is used to save the previous value of the soft stack pointer
++   in the prologue and restore it when returning.  */
++#define SOFTSTACK_PREV_REGNUM 6
+ 
+ #define REGISTER_NAMES							\
+   {									\
+-    "%value", "%stack", "%frame", "%args", "%chain", "%hr5", "%hr6", "%hr7", \
++    "%value", "%stack", "%frame", "%args",                              \
++    "%chain", "%sspslot", "%sspprev", "%hr7",                           \
+     "%hr8", "%hr9", "%hr10", "%hr11", "%hr12", "%hr13", "%hr14", "%hr15" \
+   }
+ 
+@@ -200,6 +210,7 @@ struct GTY(()) machine_function
+   bool is_varadic;  /* This call is varadic  */
+   bool has_varadic;  /* Current function has a varadic call.  */
+   bool has_chain; /* Current function has outgoing static chain.  */
++  bool has_softstack; /* Current function has a soft stack frame.  */
+   int num_args;	/* Number of args of current call.  */
+   int return_mode; /* Return mode of current fn.
+ 		      (machine_mode not defined yet.) */
+diff --git a/gcc/config/nvptx/nvptx.md b/gcc/config/nvptx/nvptx.md
+index d117343..e91e8ac 100644
+--- a/gcc/config/nvptx/nvptx.md
++++ b/gcc/config/nvptx/nvptx.md
+@@ -36,6 +36,8 @@
+ 
+    UNSPEC_ALLOCA
+ 
++   UNSPEC_SET_SOFTSTACK
++
+    UNSPEC_DIM_SIZE
+ 
+    UNSPEC_BIT_CONV
+@@ -944,6 +946,9 @@
+   [(clobber (const_int 0))]
+   ""
+ {
++  if (TARGET_SOFT_STACK)
++    emit_insn (gen_set_softstack_insn (gen_rtx_REG (Pmode,
++						    SOFTSTACK_PREV_REGNUM)));
+   emit_jump_insn (gen_return ());
+   DONE;
+ })
+@@ -972,31 +977,40 @@
+    (match_operand 1 "nvptx_register_operand")]
+   ""
+ {
++  if (TARGET_SOFT_STACK)
++    {
++      emit_move_insn (stack_pointer_rtx,
++		      gen_rtx_MINUS (Pmode, stack_pointer_rtx, operands[1]));
++      emit_insn (gen_set_softstack_insn (stack_pointer_rtx));
++      emit_move_insn (operands[0], virtual_stack_dynamic_rtx);
++      DONE;
++    }
+   /* The ptx documentation specifies an alloca intrinsic (for 32 bit
+      only)  but notes it is not implemented.  The assembler emits a
+      confused error message.  Issue a blunt one now instead.  */
+   sorry ("target cannot support alloca.");
+   emit_insn (gen_nop ());
+   DONE;
+-  if (TARGET_ABI64)
+-    emit_insn (gen_allocate_stack_di (operands[0], operands[1]));
+-  else
+-    emit_insn (gen_allocate_stack_si (operands[0], operands[1]));
+-  DONE;
+ })
+ 
+-(define_insn "allocate_stack_<mode>"
+-  [(set (match_operand:P 0 "nvptx_register_operand" "=R")
+-        (unspec:P [(match_operand:P 1 "nvptx_register_operand" "R")]
+-                   UNSPEC_ALLOCA))]
+-  ""
+-  "%.\\tcall (%0), %%alloca, (%1);")
++(define_insn "set_softstack_insn"
++  [(unspec [(match_operand 0 "nvptx_register_operand" "R")]
++	   UNSPEC_SET_SOFTSTACK)]
++  "TARGET_SOFT_STACK"
++{
++  return nvptx_output_set_softstack (REGNO (operands[0]));
++})
+ 
+ (define_expand "restore_stack_block"
+   [(match_operand 0 "register_operand" "")
+    (match_operand 1 "register_operand" "")]
+   ""
+ {
++  if (TARGET_SOFT_STACK)
++    {
++      emit_move_insn (operands[0], operands[1]);
++      emit_insn (gen_set_softstack_insn (operands[0]));
++    }
+   DONE;
+ })
+ 
+diff --git a/gcc/config/nvptx/nvptx.opt b/gcc/config/nvptx/nvptx.opt
+index 601cf12..71ddadb 100644
+--- a/gcc/config/nvptx/nvptx.opt
++++ b/gcc/config/nvptx/nvptx.opt
+@@ -32,3 +32,7 @@ Link in code for a __main kernel.
+ moptimize
+ Target Report Var(nvptx_optimize) Init(-1)
+ Optimize partition neutering.
++
++msoft-stack
++Target Report Mask(SOFT_STACK)
++Use custom stacks instead of local memory for automatic storage.
+diff --git a/gcc/doc/invoke.texi b/gcc/doc/invoke.texi
+index 9f57d52..8a2c9c8 100644
+--- a/gcc/doc/invoke.texi
++++ b/gcc/doc/invoke.texi
+@@ -20369,6 +20369,18 @@ offloading execution.
+ Apply partitioned execution optimizations.  This is the default when any
+ level of optimization is selected.
+ 
++@item -msoft-stack
++@opindex msoft-stack
++Generate code that does not use @code{.local} memory
++directly for stack storage. Instead, a per-warp stack pointer is
++maintained explicitly. This enables variable-length stack allocation (with
++variable-length arrays or @code{alloca}), and when global memory is used for
++underlying storage, makes it possible to access automatic variables from other
++threads, or with atomic instructions. This code generation variant is used
++for OpenMP offloading, but the option is exposed on its own for the purpose
++of testing the compiler; to generate code suitable for linking into programs
++using OpenMP offloading, use option @option{-mgomp}.
++
+ @end table
+ 
+ @node PDP-11 Options
+diff --git a/gcc/testsuite/gcc.target/nvptx/softstack.c b/gcc/testsuite/gcc.target/nvptx/softstack.c
+new file mode 100644
+index 0000000..73e60f2
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/nvptx/softstack.c
+@@ -0,0 +1,23 @@
++/* { dg-options "-O2 -msoft-stack" } */
++/* { dg-do run } */
++
++static __attribute__((noinline,noclone)) int f(int *p)
++{
++  return __sync_lock_test_and_set(p, 1);
++}
++
++static __attribute__((noinline,noclone)) int g(int n)
++{
++  /* Check that variable-length stack allocation works.  */
++  int v[n];
++  v[0] = 0;
++  /* Check that atomic operations can be applied to auto data.  */
++  return f(v) == 0 && v[0] == 1;
++}
++
++int main()
++{
++  if (!g(1))
++    __builtin_abort();
++  return 0;
++}
+diff --git a/gcc/testsuite/lib/target-supports.exp b/gcc/testsuite/lib/target-supports.exp
+index 2394ac4..00f4de0 100644
+--- a/gcc/testsuite/lib/target-supports.exp
++++ b/gcc/testsuite/lib/target-supports.exp
+@@ -765,7 +765,10 @@ proc check_effective_target_untyped_assembly {} {
+ 
+ proc check_effective_target_alloca {} {
+     if { [istarget nvptx-*-*] } {
+-	return 0
++	return [check_no_compiler_messages alloca assembly {
++	    void f (void*);
++	    void g (int n) { f (__builtin_alloca (n)); }
++	}]
+     }
+     return 1
+ }
+diff --git a/libgcc/config/nvptx/crt0.c b/libgcc/config/nvptx/crt0.c
+index 3b7382d..290dc6c 100644
+--- a/libgcc/config/nvptx/crt0.c
++++ b/libgcc/config/nvptx/crt0.c
+@@ -24,6 +24,11 @@ int *__exitval_ptr;
+ extern void __attribute__((noreturn)) exit (int status);
+ extern int main (int, void **);
+ 
++/* Always setup soft stacks to allow testing with -msoft-stack but without
++   -mgomp.  32 is the maximum number of warps in a CTA: the definition here
++   must match the external declaration emitted by the compiler.  */
++void *__nvptx_stacks[32] __attribute__((shared,nocommon));
++
+ void __attribute__((kernel))
+ __main (int *rval_ptr, int argc, void **argv)
+ {
+@@ -33,5 +38,8 @@ __main (int *rval_ptr, int argc, void **argv)
+   if (rval_ptr)
+     *rval_ptr = 255;
+ 
++  static char stack[131072] __attribute__((aligned(8)));
++  __nvptx_stacks[0] = stack + sizeof stack;
++
+   exit (main (argc, argv));
+ }
+-- 
+2.10.1
+

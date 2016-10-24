@@ -1,0 +1,24 @@
+--- ./configure.ac~	2016-10-23 00:22:56.000000000 +0100
++++ ./configure.ac	2016-10-23 09:25:33.398947208 +0100
+@@ -786,6 +786,9 @@
+   *-*-lynxos*)
+     noconfigdirs="$noconfigdirs target-libffi"
+     ;;
++  nvptx-*-*)
++    noconfigdirs="$noconfigdirs target-libffi"
++    ;;
+ esac
+ 
+ # Disable the go frontend on systems where it is known to not work. Please keep
+--- ./configure~	2016-10-23 00:22:56.000000000 +0100
++++ ./configure	2016-10-23 09:25:33.725616553 +0100
+@@ -3444,6 +3444,9 @@
+   *-*-lynxos*)
+     noconfigdirs="$noconfigdirs target-libffi"
+     ;;
++  nvptx-*-*)
++    noconfigdirs="$noconfigdirs target-libffi"
++    ;;
+ esac
+ 
+ # Disable the go frontend on systems where it is known to not work. Please keep

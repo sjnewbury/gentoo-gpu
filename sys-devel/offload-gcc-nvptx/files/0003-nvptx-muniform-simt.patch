@@ -1,0 +1,429 @@
+From 1a9ee069884dec3429043ee9dd9d411a19c9f6e6 Mon Sep 17 00:00:00 2001
+From: Alexander Monakov <amonakov at ispras dot ru>
+Date: Fri, 14 Oct 2016 19:39:44 +0300
+Subject: [PATCH 3/8] nvptx -muniform-simt
+
+This patch implements -muniform-simt code generation option, which is used to
+emit code for OpenMP offloading.  The goal is to emit code that can either
+execute "normally", or can execute in a way that keeps all lanes in a given
+warp active, their local state synchronized, and observable effects from
+execution happening as if only one lane was active.  The latter mode is how
+OpenMP offloaded code runs outside of SIMD regions.
+
+To achieve that, the compiler instruments atomic instructions and calls to
+functions provided by the CUDA runtime (malloc, free, vprintf), i.e. those
+that GCC itself doesn't compile.
+
+Instrumentation converts an atomic instruction to a predicated atomic
+instruction followed by a warp shuffle.  To illustrate,
+
+   atom.op dest, <args>
+
+becomes
+
+  @PRED	atom.op	dest, <args>
+   shfl.idx dest, dest, MASTER
+
+where, outside of SIMD regions:
+
+- PRED is true in lane 0, false in lanes 1-31, so the side effect happens once
+- MASTER is 0 in all lanes, so the shuffle synchronizes 'dest' among all lanes
+
+and inside of SIMD regions:
+
+- PRED is true in all lanes, so the atomic is done in all lanes independently
+- MASTER equals to current lane number, so the shuffle is a no-op.
+
+To keep track of current state and compute PRED and MASTER, the compiler uses
+shared memory array 'unsigned __nvptx_uni[]' with per-warp all-zeros or
+all-ones masks.  The mask word is zero outside of SIMD regions, all-ones
+inside.  Function prologue uses mask to compute MASTER and PRED via:
+
+    MASTER = LANE_ID & MASK;
+    PRED   = LANE_ID == MASTER;
+
+Calls are handled like atomics.
+
+gcc/
+	* config/nvptx/nvptx.c (need_unisimt_decl): New variable.  Set it...
+	(nvptx_init_unisimt_predicate): ...here (new function) and use it...
+	(nvptx_file_end): ...here to emit declaration of __nvptx_uni array.
+	(nvptx_declare_function_name): Call nvptx_init_unisimt_predicate.
+	(nvptx_get_unisimt_master): New helper function.
+	(nvptx_get_unisimt_predicate): Ditto.
+	(nvptx_call_insn_is_syscall_p): Ditto.
+	(nvptx_unisimt_handle_set): Ditto.
+	(nvptx_reorg_uniform_simt): New.  Transform code for -muniform-simt.
+	(nvptx_reorg): Call nvptx_reorg_uniform_simt.
+	* config/nvptx/nvptx.h (TARGET_CPU_CPP_BUILTINS): Define
+	__nvptx_unisimt__ when -muniform-simt option is active.
+	(struct machine_function): Add unisimt_master, unisimt_predicate
+	rtx fields.
+	* config/nvptx/nvptx.md (atomic): New attribute.
+	(atomic_compare_and_swap<mode>_1): Mark with atomic attribute.
+	(atomic_exchange<mode>): Ditto.
+	(atomic_fetch_add<mode>): Ditto.
+	(atomic_fetch_addsf): Ditto.
+	(atomic_fetch_<logic><mode>): Ditto.
+	* config/nvptx/nvptx.opt (muniform-simt): New option.
+	* doc/invoke.texi (-muniform-simt): Document.
+
+gcc/testsuite/
+	* gcc.target/nvptx/unisimt.c: New test.
+
+libgcc/
+	* config/nvptx/crt0.c (__main): Setup __nvptx_uni.
+---
+ gcc/config/nvptx/nvptx.c                 | 124 +++++++++++++++++++++++++++++++
+ gcc/config/nvptx/nvptx.h                 |   4 +
+ gcc/config/nvptx/nvptx.md                |  18 +++--
+ gcc/config/nvptx/nvptx.opt               |   4 +
+ gcc/doc/invoke.texi                      |  11 +++
+ gcc/testsuite/gcc.target/nvptx/unisimt.c |  22 ++++++
+ libgcc/config/nvptx/crt0.c               |   4 +
+ 7 files changed, 182 insertions(+), 5 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/nvptx/unisimt.c
+
+diff --git a/gcc/config/nvptx/nvptx.c b/gcc/config/nvptx/nvptx.c
+index 3523f1b..f046b3f 100644
+--- a/gcc/config/nvptx/nvptx.c
++++ b/gcc/config/nvptx/nvptx.c
+@@ -144,6 +144,9 @@ static GTY(()) tree global_lock_var;
+ /* True if any function references __nvptx_stacks.  */
+ static bool need_softstack_decl;
+ 
++/* True if any function references __nvptx_uni.  */
++static bool need_unisimt_decl;
++
+ /* Allocate a new, cleared machine_function structure.  */
+ 
+ static struct machine_function *
+@@ -1050,6 +1053,34 @@ nvptx_init_axis_predicate (FILE *file, int regno, const char *name)
+   fprintf (file, "\t}\n");
+ }
+ 
++/* Emit code to initialize predicate and master lane index registers for
++   -muniform-simt code generation variant.  */
++
++static void
++nvptx_init_unisimt_predicate (FILE *file)
++{
++  int bits = POINTER_SIZE;
++  int master = REGNO (cfun->machine->unisimt_master);
++  int pred = REGNO (cfun->machine->unisimt_predicate);
++  fprintf (file, "\t{\n");
++  fprintf (file, "\t\t.reg.u32 %%ustmp0;\n");
++  fprintf (file, "\t\t.reg.u%d %%ustmp1;\n", bits);
++  fprintf (file, "\t\t.reg.u%d %%ustmp2;\n", bits);
++  fprintf (file, "\t\tmov.u32 %%ustmp0, %%tid.y;\n");
++  fprintf (file, "\t\tmul%s.u32 %%ustmp1, %%ustmp0, 4;\n",
++	   bits == 64 ? ".wide" : ".lo");
++  fprintf (file, "\t\tmov.u%d %%ustmp2, __nvptx_uni;\n", bits);
++  fprintf (file, "\t\tadd.u%d %%ustmp2, %%ustmp2, %%ustmp1;\n", bits);
++  fprintf (file, "\t\tld.shared.u32 %%r%d, [%%ustmp2];\n", master);
++  fprintf (file, "\t\tmov.u32 %%ustmp0, %%tid.x;\n");
++  /* Compute 'master lane index' as 'tid.x & __nvptx_uni[tid.y]'.  */
++  fprintf (file, "\t\tand.b32 %%r%d, %%r%d, %%ustmp0;\n", master, master);
++  /* Compute predicate as 'tid.x == master'.  */
++  fprintf (file, "\t\tsetp.eq.u32 %%r%d, %%r%d, %%ustmp0;\n", pred, master);
++  fprintf (file, "\t}\n");
++  need_unisimt_decl = true;
++}
++
+ /* Implement ASM_DECLARE_FUNCTION_NAME.  Writes the start of a ptx
+    function, including local var decls and copies from the arguments to
+    local regs.  */
+@@ -1141,6 +1172,8 @@ nvptx_declare_function_name (FILE *file, const char *name, const_tree decl)
+   if (cfun->machine->axis_predicate[1])
+     nvptx_init_axis_predicate (file,
+ 			       REGNO (cfun->machine->axis_predicate[1]), "x");
++  if (cfun->machine->unisimt_predicate)
++    nvptx_init_unisimt_predicate (file);
+ }
+ 
+ /* Output instruction that sets soft stack pointer in shared memory to the
+@@ -2401,6 +2434,89 @@ nvptx_reorg_subreg (void)
+     }
+ }
+ 
++/* Return a SImode "master lane index" register for uniform-simt, allocating on
++   first use.  */
++
++static rtx
++nvptx_get_unisimt_master ()
++{
++  rtx &master = cfun->machine->unisimt_master;
++  return master ? master : master = gen_reg_rtx (SImode);
++}
++
++/* Return a BImode "predicate" register for uniform-simt, similar to above.  */
++
++static rtx
++nvptx_get_unisimt_predicate ()
++{
++  rtx &pred = cfun->machine->unisimt_predicate;
++  return pred ? pred : pred = gen_reg_rtx (BImode);
++}
++
++/* Return true if given call insn references one of the functions provided by
++   the CUDA runtime: malloc, free, vprintf.  */
++
++static bool
++nvptx_call_insn_is_syscall_p (rtx_insn *insn)
++{
++  rtx pat = PATTERN (insn);
++  gcc_checking_assert (GET_CODE (pat) == PARALLEL);
++  pat = XVECEXP (pat, 0, 0);
++  if (GET_CODE (pat) == SET)
++    pat = SET_SRC (pat);
++  gcc_checking_assert (GET_CODE (pat) == CALL
++		       && GET_CODE (XEXP (pat, 0)) == MEM);
++  rtx addr = XEXP (XEXP (pat, 0), 0);
++  if (GET_CODE (addr) != SYMBOL_REF)
++    return false;
++  const char *name = XSTR (addr, 0);
++  /* Ordinary malloc/free are redirected to __nvptx_{malloc,free), so only the
++     references with forced assembler name refer to PTX syscalls.  For vprintf,
++     accept both normal and forced-assembler-name references.  */
++  return (!strcmp (name, "vprintf") || !strcmp (name, "*vprintf")
++	  || !strcmp (name, "*malloc")
++	  || !strcmp (name, "*free"));
++}
++
++/* If SET subexpression of INSN sets a register, emit a shuffle instruction to
++   propagate its value from lane MASTER to current lane.  */
++
++static void
++nvptx_unisimt_handle_set (rtx set, rtx_insn *insn, rtx master)
++{
++  rtx reg;
++  if (GET_CODE (set) == SET && REG_P (reg = SET_DEST (set)))
++    emit_insn_after (nvptx_gen_shuffle (reg, reg, master, SHUFFLE_IDX), insn);
++}
++
++/* Adjust code for uniform-simt code generation variant by making atomics and
++   "syscalls" conditionally executed, and inserting shuffle-based propagation
++   for registers being set.  */
++
++static void
++nvptx_reorg_uniform_simt ()
++{
++  rtx_insn *insn, *next;
++
++  for (insn = get_insns (); insn; insn = next)
++    {
++      next = NEXT_INSN (insn);
++      if (!(CALL_P (insn) && nvptx_call_insn_is_syscall_p (insn))
++	  && !(NONJUMP_INSN_P (insn)
++	       && GET_CODE (PATTERN (insn)) == PARALLEL
++	       && get_attr_atomic (insn)))
++	continue;
++      rtx pat = PATTERN (insn);
++      rtx master = nvptx_get_unisimt_master ();
++      for (int i = 0; i < XVECLEN (pat, 0); i++)
++	nvptx_unisimt_handle_set (XVECEXP (pat, 0, i), insn, master);
++      rtx pred = nvptx_get_unisimt_predicate ();
++      pred = gen_rtx_NE (BImode, pred, const0_rtx);
++      pat = gen_rtx_COND_EXEC (VOIDmode, pred, pat);
++      validate_change (insn, &PATTERN (insn), pat, false);
++    }
++}
++
+ /* Loop structure of the function.  The entire function is described as
+    a NULL loop.  */
+ 
+@@ -3917,6 +4033,9 @@ nvptx_reorg (void)
+   /* Replace subregs.  */
+   nvptx_reorg_subreg ();
+ 
++  if (TARGET_UNIFORM_SIMT)
++    nvptx_reorg_uniform_simt ();
++
+   regstat_free_n_sets_and_refs ();
+ 
+   df_finish_pass (true);
+@@ -4089,6 +4208,11 @@ nvptx_file_end (void)
+       fprintf (asm_out_file, ".extern .shared .u%d __nvptx_stacks[32];\n",
+ 	       POINTER_SIZE);
+     }
++  if (need_unisimt_decl)
++    {
++      write_var_marker (asm_out_file, false, true, "__nvptx_uni");
++      fprintf (asm_out_file, ".extern .shared .u32 __nvptx_uni[32];\n");
++    }
+ }
+ 
+ /* Expander for the shuffle builtins.  */
+diff --git a/gcc/config/nvptx/nvptx.h b/gcc/config/nvptx/nvptx.h
+index 2c4962a..1702178 100644
+--- a/gcc/config/nvptx/nvptx.h
++++ b/gcc/config/nvptx/nvptx.h
+@@ -33,6 +33,8 @@
+       builtin_define ("__nvptx__");		\
+       if (TARGET_SOFT_STACK)			\
+         builtin_define ("__nvptx_softstack__");	\
++      if (TARGET_UNIFORM_SIMT)			\
++        builtin_define ("__nvptx_unisimt__");	\
+     } while (0)
+ 
+ /* Avoid the default in ../../gcc.c, which adds "-pthread", which is not
+@@ -215,6 +217,8 @@ struct GTY(()) machine_function
+   int return_mode; /* Return mode of current fn.
+ 		      (machine_mode not defined yet.) */
+   rtx axis_predicate[2]; /* Neutering predicates.  */
++  rtx unisimt_master; /* 'Master lane index' for -muniform-simt.  */
++  rtx unisimt_predicate; /* Predicate for -muniform-simt.  */
+ };
+ #endif
+ 
+diff --git a/gcc/config/nvptx/nvptx.md b/gcc/config/nvptx/nvptx.md
+index 5c5c991..35ae71e 100644
+--- a/gcc/config/nvptx/nvptx.md
++++ b/gcc/config/nvptx/nvptx.md
+@@ -62,6 +62,9 @@
+ (define_attr "subregs_ok" "false,true"
+   (const_string "false"))
+ 
++(define_attr "atomic" "false,true"
++  (const_string "false"))
++
+ ;; The nvptx operand predicates, in general, don't permit subregs and
+ ;; only literal constants, which differ from the generic ones, which
+ ;; permit subregs and symbolc constants (as appropriate)
+@@ -1218,7 +1221,8 @@
+    (set (match_dup 1)
+ 	(unspec_volatile:SDIM [(const_int 0)] UNSPECV_CAS))]
+   ""
+-  "%.\\tatom%A1.cas.b%T0\\t%0, %1, %2, %3;")
++  "%.\\tatom%A1.cas.b%T0\\t%0, %1, %2, %3;"
++  [(set_attr "atomic" "true")])
+ 
+ (define_insn "atomic_exchange<mode>"
+   [(set (match_operand:SDIM 0 "nvptx_register_operand" "=R")	;; output
+@@ -1229,7 +1233,8 @@
+    (set (match_dup 1)
+ 	(match_operand:SDIM 2 "nvptx_nonmemory_operand" "Ri"))]	;; input
+   ""
+-  "%.\\tatom%A1.exch.b%T0\\t%0, %1, %2;")
++  "%.\\tatom%A1.exch.b%T0\\t%0, %1, %2;"
++  [(set_attr "atomic" "true")])
+ 
+ (define_insn "atomic_fetch_add<mode>"
+   [(set (match_operand:SDIM 1 "memory_operand" "+m")
+@@ -1241,7 +1246,8 @@
+    (set (match_operand:SDIM 0 "nvptx_register_operand" "=R")
+ 	(match_dup 1))]
+   ""
+-  "%.\\tatom%A1.add%t0\\t%0, %1, %2;")
++  "%.\\tatom%A1.add%t0\\t%0, %1, %2;"
++  [(set_attr "atomic" "true")])
+ 
+ (define_insn "atomic_fetch_addsf"
+   [(set (match_operand:SF 1 "memory_operand" "+m")
+@@ -1253,7 +1259,8 @@
+    (set (match_operand:SF 0 "nvptx_register_operand" "=R")
+ 	(match_dup 1))]
+   ""
+-  "%.\\tatom%A1.add%t0\\t%0, %1, %2;")
++  "%.\\tatom%A1.add%t0\\t%0, %1, %2;"
++  [(set_attr "atomic" "true")])
+ 
+ (define_code_iterator any_logic [and ior xor])
+ (define_code_attr logic [(and "and") (ior "or") (xor "xor")])
+@@ -1269,7 +1276,8 @@
+    (set (match_operand:SDIM 0 "nvptx_register_operand" "=R")
+ 	(match_dup 1))]
+   "0"
+-  "%.\\tatom%A1.b%T0.<logic>\\t%0, %1, %2;")
++  "%.\\tatom%A1.b%T0.<logic>\\t%0, %1, %2;"
++  [(set_attr "atomic" "true")])
+ 
+ (define_insn "nvptx_barsync"
+   [(unspec_volatile [(match_operand:SI 0 "const_int_operand" "")]
+diff --git a/gcc/config/nvptx/nvptx.opt b/gcc/config/nvptx/nvptx.opt
+index 71ddadb..0d46e1d 100644
+--- a/gcc/config/nvptx/nvptx.opt
++++ b/gcc/config/nvptx/nvptx.opt
+@@ -36,3 +36,7 @@ Optimize partition neutering.
+ msoft-stack
+ Target Report Mask(SOFT_STACK)
+ Use custom stacks instead of local memory for automatic storage.
++
++muniform-simt
++Target Report Mask(UNIFORM_SIMT)
++Generate code that can keep local state uniform across all lanes.
+diff --git a/gcc/doc/invoke.texi b/gcc/doc/invoke.texi
+index 8a2c9c8..aa4d7b9 100644
+--- a/gcc/doc/invoke.texi
++++ b/gcc/doc/invoke.texi
+@@ -20381,6 +20381,17 @@ for OpenMP offloading, but the option is exposed on its own for the purpose
+ of testing the compiler; to generate code suitable for linking into programs
+ using OpenMP offloading, use option @option{-mgomp}.
+ 
++@item -muniform-simt
++@opindex muniform-simt
++Generate code that may keep all lanes in each warp active, even when
++observable effects from execution must appear as if only one lane is active.
++This is achieved by instrumenting syscalls and atomic instructions in a
++lightweight way, allowing the compiler to emit code that can switch at run
++time between this and conventional execution modes. This code generation
++variant is used for OpenMP offloading, but the option is exposed on its own
++for the purpose of testing the compiler; to generate code suitable for linking
++into programs using OpenMP offloading, use option @option{-mgomp}.
++
+ @end table
+ 
+ @node PDP-11 Options
+diff --git a/gcc/testsuite/gcc.target/nvptx/unisimt.c b/gcc/testsuite/gcc.target/nvptx/unisimt.c
+new file mode 100644
+index 0000000..d268721
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/nvptx/unisimt.c
+@@ -0,0 +1,22 @@
++/* { dg-options "-O2 -muniform-simt" } */
++/* { dg-do run } */
++
++#include <stdarg.h>
++
++static __attribute__((noinline,noclone)) int print (const char *fmt, ...)
++{
++  va_list va;
++  va_start (va, fmt);
++  int r = __builtin_vprintf (fmt, va);
++  va_end (va);
++  return r;
++}
++
++int main()
++{
++  static int v;
++  __sync_fetch_and_add (&v, 1);
++  if (print ("%d", v) != 1) /* { dg-output "^1$" } */
++    __builtin_abort ();
++  return 0;
++}
+diff --git a/libgcc/config/nvptx/crt0.c b/libgcc/config/nvptx/crt0.c
+index 290dc6c..5a7dbf6 100644
+--- a/libgcc/config/nvptx/crt0.c
++++ b/libgcc/config/nvptx/crt0.c
+@@ -29,6 +29,9 @@ extern int main (int, void **);
+    must match the external declaration emitted by the compiler.  */
+ void *__nvptx_stacks[32] __attribute__((shared,nocommon));
+ 
++/* Likewise for -muniform-simt.  */
++unsigned __nvptx_uni[32] __attribute__((shared,nocommon));
++
+ void __attribute__((kernel))
+ __main (int *rval_ptr, int argc, void **argv)
+ {
+@@ -40,6 +43,7 @@ __main (int *rval_ptr, int argc, void **argv)
+ 
+   static char stack[131072] __attribute__((aligned(8)));
+   __nvptx_stacks[0] = stack + sizeof stack;
++  __nvptx_uni[0] = 0;
+ 
+   exit (main (argc, argv));
+ }
+-- 
+2.10.1
+

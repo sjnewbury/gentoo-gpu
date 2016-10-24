@@ -1,0 +1,154 @@
+From 4c6e6f55c9aaf05a4d6c8301d96bd7ea9215a351 Mon Sep 17 00:00:00 2001
+From: Alexander Monakov <amonakov at ispras dot ru>
+Date: Fri, 14 Oct 2016 19:39:45 +0300
+Subject: [PATCH 4/8] nvptx -mgomp
+
+This patch adds option -mgomp which enables -msoft-stack plus -muniform-simt,
+and wires up the corresponding multilib variant.  This codegen convention is
+used for OpenMP offloading.
+
+	* config/nvptx/nvptx.c (diagnose_openacc_conflict): New.  Use it...
+        (nvptx_option_override): ...here.  Handle TARGET_GOMP.
+	* config/nvptx/nvptx.opt (mgomp): New option.
+	* config/nvptx/t-nvptx (MULTILIB_OPTIONS): New.
+	* doc/invoke.texi (mgomp): Document.
+
+libgcc:
+	config/nvptx/mgomp.c: New file.
+        config/nvptx/t-nvptx: Add mgomp.c
+---
+ gcc/config/nvptx/nvptx.c    | 17 +++++++++++++++++
+ gcc/config/nvptx/nvptx.opt  |  4 ++++
+ gcc/config/nvptx/t-nvptx    |  2 ++
+ gcc/doc/invoke.texi         |  6 ++++++
+ libgcc/config/nvptx/mgomp.c | 32 ++++++++++++++++++++++++++++++++
+ libgcc/config/nvptx/t-nvptx |  3 ++-
+ 6 files changed, 63 insertions(+), 1 deletion(-)
+ create mode 100644 libgcc/config/nvptx/mgomp.c
+
+diff --git a/gcc/config/nvptx/nvptx.c b/gcc/config/nvptx/nvptx.c
+index f046b3f..a49b55b 100644
+--- a/gcc/config/nvptx/nvptx.c
++++ b/gcc/config/nvptx/nvptx.c
+@@ -157,6 +157,16 @@ nvptx_init_machine_status (void)
+   return p;
+ }
+ 
++/* Issue a diagnostic when option OPTNAME is enabled (as indicated by OPTVAL)
++   and -fopenacc is also enabled.  */
++
++static void
++diagnose_openacc_conflict (bool optval, const char *optname)
++{
++  if (flag_openacc && optval)
++    error ("option %s is not supported together with -fopenacc", optname);
++}
++
+ /* Implement TARGET_OPTION_OVERRIDE.  */
+ 
+ static void
+@@ -194,6 +204,13 @@ nvptx_option_override (void)
+   worker_red_sym = gen_rtx_SYMBOL_REF (Pmode, "__worker_red");
+   SET_SYMBOL_DATA_AREA (worker_red_sym, DATA_AREA_SHARED);
+   worker_red_align = GET_MODE_ALIGNMENT (SImode) / BITS_PER_UNIT;
++
++  diagnose_openacc_conflict (TARGET_GOMP, "-mgomp");
++  diagnose_openacc_conflict (TARGET_SOFT_STACK, "-msoft-stack");
++  diagnose_openacc_conflict (TARGET_UNIFORM_SIMT, "-muniform-simt");
++
++  if (TARGET_GOMP)
++    target_flags |= MASK_SOFT_STACK | MASK_UNIFORM_SIMT;
+ }
+ 
+ /* Return a ptx type for MODE.  If PROMOTE, then use .u32 for QImode to
+diff --git a/gcc/config/nvptx/nvptx.opt b/gcc/config/nvptx/nvptx.opt
+index 0d46e1d..cb6194d 100644
+--- a/gcc/config/nvptx/nvptx.opt
++++ b/gcc/config/nvptx/nvptx.opt
+@@ -40,3 +40,7 @@ Use custom stacks instead of local memory for automatic storage.
+ muniform-simt
+ Target Report Mask(UNIFORM_SIMT)
+ Generate code that can keep local state uniform across all lanes.
++
++mgomp
++Target Report Mask(GOMP)
++Generate code for OpenMP offloading: enables -msoft-stack and -muniform-simt.
+diff --git a/gcc/config/nvptx/t-nvptx b/gcc/config/nvptx/t-nvptx
+index e2580c9..6c1010d 100644
+--- a/gcc/config/nvptx/t-nvptx
++++ b/gcc/config/nvptx/t-nvptx
+@@ -8,3 +8,5 @@ ALL_HOST_OBJS += mkoffload.o
+ mkoffload$(exeext): mkoffload.o collect-utils.o libcommon-target.a $(LIBIBERTY) $(LIBDEPS)
+ 	+$(LINKER) $(ALL_LINKERFLAGS) $(LDFLAGS) -o $@ \
+ 	  mkoffload.o collect-utils.o libcommon-target.a $(LIBIBERTY) $(LIBS)
++
++MULTILIB_OPTIONS = mgomp
+diff --git a/gcc/doc/invoke.texi b/gcc/doc/invoke.texi
+index aa4d7b9..d9bdd50 100644
+--- a/gcc/doc/invoke.texi
++++ b/gcc/doc/invoke.texi
+@@ -20392,6 +20392,12 @@ variant is used for OpenMP offloading, but the option is exposed on its own
+ for the purpose of testing the compiler; to generate code suitable for linking
+ into programs using OpenMP offloading, use option @option{-mgomp}.
+ 
++@item -mgomp
++@opindex mgomp
++Generate code for use in OpenMP offloading: enables the @option{-msoft-stack}
++and @option{-muniform-simt} options, and selects the corresponding multilib
++variant.
++
+ @end table
+ 
+ @node PDP-11 Options
+diff --git a/libgcc/config/nvptx/mgomp.c b/libgcc/config/nvptx/mgomp.c
+new file mode 100644
+index 0000000..d8ca581
+--- /dev/null
++++ b/libgcc/config/nvptx/mgomp.c
+@@ -0,0 +1,32 @@
++/* Define shared memory arrays for -msoft-stack and -muniform-simt.
++
++   Copyright (C) 2015-2016 Free Software Foundation, Inc.
++
++   This file is free software; you can redistribute it and/or modify it
++   under the terms of the GNU General Public License as published by the
++   Free Software Foundation; either version 3, or (at your option) any
++   later version.
++
++   This file is distributed in the hope that it will be useful, but
++   WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   General Public License for more details.
++
++   Under Section 7 of GPL version 3, you are granted additional
++   permissions described in the GCC Runtime Library Exception, version
++   3.1, as published by the Free Software Foundation.
++
++   You should have received a copy of the GNU General Public License and
++   a copy of the GCC Runtime Library Exception along with this program;
++   see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++/* OpenACC offloading does not use these symbols; thus, they are exposed
++   only for the -mgomp multilib.  The same definitions are also provided
++   in crt0.c for the case of non-offloading compilation.  32 is the maximum
++   number of warps in a CTA.  */
++
++#if defined(__nvptx_softstack__) && defined(__nvptx_unisimt__)
++void *__nvptx_stacks[32] __attribute__((shared,nocommon));
++unsigned __nvptx_uni[32] __attribute__((shared,nocommon));
++#endif
+diff --git a/libgcc/config/nvptx/t-nvptx b/libgcc/config/nvptx/t-nvptx
+index daf252f..c4d20c9 100644
+--- a/libgcc/config/nvptx/t-nvptx
++++ b/libgcc/config/nvptx/t-nvptx
+@@ -1,4 +1,5 @@
+-LIB2ADD=$(srcdir)/config/nvptx/reduction.c
++LIB2ADD=$(srcdir)/config/nvptx/reduction.c \
++	$(srcdir)/config/nvptx/mgomp.c
+ 
+ LIB2ADDEH=
+ LIB2FUNCS_EXCLUDE=__main
+-- 
+2.10.1
+
