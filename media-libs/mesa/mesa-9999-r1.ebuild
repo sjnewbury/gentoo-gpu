@@ -160,11 +160,14 @@ for card in ${RADEON_CARDS}; do
 		video_cards_${card}? (
 								${LIBDRM_DEPSTRING}[video_cards_radeon]
 								opencl? (
-											>=sys-devel/llvm-3.3-r1[video_cards_radeon,${MULTILIB_USEDEP}]
+											|| (	>=sys-devel/llvm-3.3-r1[video_cards_radeon,${MULTILIB_USEDEP}]
+												>=sys-devel/llvm-3.9[llvm_targets_AMDGPU,${MULTILIB_USEDEP}]
+											)
 											dev-libs/libclc
 								)
-								vulkan? (
-											>=sys-devel/llvm-3.9[video_cards_radeon,${MULTILIB_USEDEP}]
+								vulkan? (	|| (	>=sys-devel/llvm-3.9[video_cards_radeon,${MULTILIB_USEDEP}]
+											>=sys-devel/llvm-3.9[llvm_targets_AMDGPU,${MULTILIB_USEDEP}]
+										)
 								)
 		)
 	"
@@ -264,6 +267,8 @@ apply_mesa_patches() {
 	if [[ ${CHOST} == *-solaris* ]] ; then
 		sed -i -e "s/-DSVR4/-D_POSIX_C_SOURCE=200112L/" configure.ac || die
 	fi
+
+	epatch "${FILESDIR}/${P}-fix-missing-openmp-include.patch"
 }
 
 src_prepare() {
@@ -542,6 +547,7 @@ multilib_src_install() {
 			popd
 		eend $?
 	fi
+
 	if use opencl; then
 		ebegin "Moving Gallium/Clover OpenCL implementation for dynamic switching"
 		local cl_dir="/usr/$(get_libdir)/OpenCL/vendors/mesa"
@@ -561,8 +567,10 @@ multilib_src_install() {
 	fi
 
 	# Only install the platform vulkan headers
-	if [ -f "${ED}/usr/include/vulkan" ]; then
+	if [ -d "${ED}"/usr/include/vulkan ]; then
+		ebegin "Remove generic Vulkan headers"
 		rm -f "${ED}/usr/include/vulkan/{vk_platform.h,vulkan.h}"
+		eend $?
 	fi
 
 	if use openmax; then

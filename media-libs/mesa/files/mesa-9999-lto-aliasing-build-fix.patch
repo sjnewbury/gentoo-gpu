@@ -1,0 +1,28 @@
+--- ./src/gallium/drivers/llvmpipe/Makefile.am~	2016-10-25 18:21:37.000000000 +0100
++++ ./src/gallium/drivers/llvmpipe/Makefile.am	2016-10-25 18:26:18.779505004 +0100
+@@ -24,10 +24,12 @@
+ include $(top_srcdir)/src/gallium/Automake.inc
+ 
+ AM_CFLAGS = \
++	-fno-strict-aliasing \
+ 	$(GALLIUM_DRIVER_CFLAGS) \
+ 	$(LLVM_CFLAGS) \
+ 	$(MSVC2013_COMPAT_CFLAGS)
+ AM_CXXFLAGS= \
++	-fno-strict-aliasing \
+ 	$(GALLIUM_DRIVER_CXXFLAGS) \
+ 	$(LLVM_CXXFLAGS) \
+ 	$(MSVC2013_COMPAT_CXXFLAGS)
+--- ./src/mesa/drivers/dri/Makefile.am~	2016-10-25 18:28:24.000000000 +0100
++++ ./src/mesa/drivers/dri/Makefile.am	2016-10-25 18:39:40.544598760 +0100
+@@ -58,6 +58,10 @@
+ 
+ nodist_EXTRA_mesa_dri_drivers_la_SOURCES = dummy.cpp
+ mesa_dri_drivers_la_SOURCES =
++mesa_dri_drivers_la_CFLAGS = \
++	-fno-strict-aliasing
++mesa_dri_drivers_la_CXXFLAGS = \
++	-fno-strict-aliasing
+ mesa_dri_drivers_la_LDFLAGS = \
+         -module -avoid-version -shared -shrext .so \
+         $(BSYMBOLIC) \
