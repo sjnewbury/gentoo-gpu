@@ -566,13 +566,6 @@ multilib_src_install() {
 		eend $?
 	fi
 
-	# Only install the platform vulkan headers
-	if [ -d "${ED}"/usr/include/vulkan ]; then
-		ebegin "Remove generic Vulkan headers"
-		rm -f "${ED}/usr/include/vulkan/{vk_platform.h,vulkan.h}"
-		eend $?
-	fi
-
 	if use openmax; then
 		echo "XDG_DATA_DIRS=\"${EPREFIX}/usr/share/mesa/xdg\"" > "${T}/99mesaxdgomx"
 		doenvd "${T}"/99mesaxdgomx
@@ -583,6 +576,13 @@ multilib_src_install() {
 multilib_src_install_all() {
 	prune_libtool_files --all
 	einstalldocs
+
+	# Only install the platform vulkan headers
+	if [ -d "${ED}"/usr/include/vulkan ]; then
+		ebegin "Remove generic Vulkan headers"
+		rm -rf "${ED}"/usr/include/vulkan || die Remove generic Vulkan headers failed!?!
+		eend $?
+	fi
 
 	if use !bindist; then
 		dodoc docs/patents.txt
