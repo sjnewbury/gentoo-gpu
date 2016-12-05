@@ -103,7 +103,7 @@ multilib_src_configure() {
 
 	if ! use beignet-generic; then
 		mycmakeargs+=(
-			-DGEN_PCI_ID=$(. "${FILESDIR}"/GetGenID.sh)
+			-DGEN_PCI_ID=$(. "${S}"/GetGenID.sh)
 		)
 	fi
 
