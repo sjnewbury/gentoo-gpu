@@ -80,7 +80,7 @@ FFMPEG_FLAG_MAP=(
 		schroedinger:libschroedinger speex:libspeex vorbis:libvorbis vpx:libvpx
 		zvbi:libzvbi
 		# libavfilter options
-		bs2b:libbs2b chromaprint ebur128:libebur128 flite:libflite frei0r
+		bs2b:libbs2b chromaprint flite:libflite frei0r
 		fribidi:libfribidi fontconfig ladspa libass truetype:libfreetype
 		rubberband:librubberband zimg:libzimg
 		# libswresample options
@@ -163,7 +163,6 @@ RDEPEND="
 	cdio? ( >=dev-libs/libcdio-paranoia-0.90_p1-r1[${MULTILIB_USEDEP}] )
 	celt? ( >=media-libs/celt-0.11.1-r1[${MULTILIB_USEDEP}] )
 	chromaprint? ( >=media-libs/chromaprint-1.2-r1[${MULTILIB_USEDEP}] )
-	ebur128? ( >=media-libs/libebur128-1.1.0[${MULTILIB_USEDEP}] )
 	encode? (
 		amrenc? ( >=media-libs/vo-amrwbenc-0.1.2-r1[${MULTILIB_USEDEP}] )
 		kvazaar? ( media-libs/kvazaar[${MULTILIB_USEDEP}] )
@@ -224,7 +223,7 @@ RDEPEND="
 	schroedinger? ( >=media-libs/schroedinger-1.0.11-r1[${MULTILIB_USEDEP}] )
 	sdl? ( >=media-libs/libsdl-1.2.15-r4[sound,video,${MULTILIB_USEDEP}] )
 	speex? ( >=media-libs/speex-1.2_rc1-r1[${MULTILIB_USEDEP}] )
-	ssh? ( >=net-libs/libssh-0.5.5[${MULTILIB_USEDEP}] )
+	ssh? ( >=net-libs/libssh-0.5.5[sftp,${MULTILIB_USEDEP}] )
 	truetype? ( >=media-libs/freetype-2.5.0.1:2[${MULTILIB_USEDEP}] )
 	vaapi? ( >=x11-libs/libva-1.2.1-r1[${MULTILIB_USEDEP}] )
 	vdpau? ( >=x11-libs/libvdpau-0.7[${MULTILIB_USEDEP}] )
