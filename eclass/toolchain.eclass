@@ -103,7 +103,12 @@ fi
 INCLUDEPATH=${TOOLCHAIN_INCLUDEPATH:-${LIBPATH}/include}
 
 if is_crosscompile ; then
-	BINPATH=${TOOLCHAIN_BINPATH:-${PREFIX}/${CHOST}/${CTARGET}/gcc-bin/${GCC_CONFIG_VER}}
+	if [[ ${PN} != offload-* ]] ; then
+		BINPATH=${TOOLCHAIN_BINPATH:-${PREFIX}/${CHOST}/${CTARGET}/gcc-bin/${GCC_CONFIG_VER}}
+	else
+		# offload accelerator compiler binary is internal to CHOST toolchain
+		BINPATH=${TOOLCHAIN_BINPATH:-${PREFIX}/${CHOST}/gcc-bin/${GCC_CONFIG_VER}}
+	fi
 	HOSTLIBPATH=${PREFIX}/${CHOST}/${CTARGET}/lib/${GCC_CONFIG_VER}
 else
 	BINPATH=${TOOLCHAIN_BINPATH:-${PREFIX}/${CTARGET}/gcc-bin/${GCC_CONFIG_VER}}
@@ -134,7 +139,7 @@ fi
 IUSE="regression-test vanilla"
 IUSE_DEF=( nls nptl )
 
-if [[ ${PN} != "kgcc64" && ${PN} != gcc-* && ${PN} ]] ; then
+if [[ ${PN} != "kgcc64" && ${PN} != gcc-* ]] ; then
 	IUSE+=" altivec debug"
 	IUSE_DEF+=( cxx fortran )
 	[[ -n ${PIE_VER} ]] && IUSE+=" nopie"
@@ -590,17 +595,15 @@ toolchain_src_prepare() {
 	done
 	sed -i 's|A-Za-z0-9|[:alnum:]|g' "${S}"/gcc/*.awk #215828
 
-	if tc_version_is_between 3.0 7.0 ; then
-		# Prevent new texinfo from breaking old versions (see #198182, #464008)
-		tc_version_is_at_least 4.1 && epatch "${GCC_FILESDIR}"/gcc-configure-texinfo.patch
+	# Prevent new texinfo from breaking old versions (see #198182, #464008)
+	tc_version_is_at_least 4.1 && epatch "${GCC_FILESDIR}"/gcc-configure-texinfo.patch
 
-		if [[ -x contrib/gcc_update ]] ; then
-			einfo "Touching generated files"
-			./contrib/gcc_update --touch | \
-				while read f ; do
-					einfo "  ${f%%...}"
-				done
-		fi
+	if [[ -x contrib/gcc_update ]] ; then
+		einfo "Touching generated files"
+		./contrib/gcc_update --touch | \
+			while read f ; do
+				einfo "  ${f%%...}"
+			done
 	fi
 }
 
@@ -848,9 +851,10 @@ toolchain_src_configure() {
 		--mandir="${DATAPATH}/man"
 		--infodir="${DATAPATH}/info"
 		--with-gxx-include-dir="${STDCXX_INCDIR}"
-		--with-boot-libs="${LIBS}"
-		--with-boot-ldflags="${LDFLAGS}"
 	)
+#		--with-boot-libs="${LIBS}"
+#		--with-boot-ldflags="${LDFLAGS}"
+
 
 	# Stick the python scripts in their own slotted directory (bug #279252)
 	#
@@ -946,7 +950,7 @@ toolchain_src_configure() {
 
 	# # Turn on the -Wl,--build-id flag by default for ELF targets. #525942
 	# # This helps with locating debug files.
-	# case ${CTARGET} in	
+	# case ${CTARGET} in
 	# *-linux-*|*-elf|*-eabi)
 	# 	tc_version_is_at_least 4.5 && confgcc+=(
 	# 		--enable-linker-build-id
@@ -1069,7 +1073,7 @@ toolchain_src_configure() {
 		local offload_targets
 		if in_iuse offload-nvptx; then
 			if use offload-nvptx ; then
-				offload_targets="nvptx-none"
+				offload_targets='nvptx-none'
 				confgcc+=( --with-cuda-driver=/opt/cuda )
 			fi
 		fi
@@ -1078,7 +1082,9 @@ toolchain_src_configure() {
 				offload_targets="${offload_targets},x86_64-intelmicemul-linux-gnu"
 			fi
 		fi
-		confgcc+=( --enable-offload-targets="${offload_targets}" )
+		if [[ -n ${offload_targets} ]] ; then
+			confgcc+=( --enable-offload-targets="${offload_targets}" )
+		fi
 		;;
 	*-freebsd*)
 		confgcc+=( --enable-__cxa_atexit )
@@ -1094,6 +1100,11 @@ toolchain_src_configure() {
 		)
 		;;
 	esac
+#$(
+#						for a in ${MULTILIB_ABIS} ; do
+#						get_abi_CHOST ${a} ; printf ','
+#						done
+#				)
 
 	### arch options
 
@@ -1749,11 +1760,8 @@ toolchain_src_install() {
 		[[ -r ${D}${BINPATH}/gcc${EXEEXT} ]] || die "gcc not found in ${D}"
 	fi
 
-	# Offload accelerators are not used directly
-	if [[ ${PN} != offload-* ]] ; then
-		dodir /etc/env.d/gcc
-		create_gcc_env_entry
-	fi
+	dodir /etc/env.d/gcc
+	create_gcc_env_entry
 
 	# Setup the gcc_env_entry for hardened gcc 4 with minispecs
 	want_minispecs && copy_minispecs_gcc_specs
@@ -1938,7 +1946,7 @@ gcc_movelibs() {
 		mv "${D}"/usr/$(get_libdir)/libcc1* "${D}${HOSTLIBPATH}" || die
 	fi
 
-	# Offload accelerators do not have expected functionality
+	# Offload accelerators treat multilib differently
 	[[ ${PN} == offload-* ]] && return 0
 
 	# For all the libs that are built for CTARGET, move them into the
