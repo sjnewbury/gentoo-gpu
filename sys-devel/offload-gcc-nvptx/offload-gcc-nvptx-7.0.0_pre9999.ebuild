@@ -48,15 +48,7 @@ src_unpack() {
 }
 
 src_prepare() {
-	epatch 	"${FILESDIR}/0001-nvptx-msoft-stack.patch" \
-		"${FILESDIR}/0002-nvptx-implement-predicated-instructions.patch" \
-		"${FILESDIR}/0003-nvptx-muniform-simt.patch" \
-		"${FILESDIR}/0004-nvptx-mgomp.patch" \
-		"${FILESDIR}/0005-nvptx-mkoffload-pass-mgomp-for-OpenMP-offloading.patch" \
-		"${FILESDIR}/0006-new-target-hook-TARGET_SIMT_VF.patch" \
-		"${FILESDIR}/0007-nvptx-backend-new-insns-for-OpenMP-SIMD-via-SIMT.patch" \
-		"${FILESDIR}/0008-nvptx-handle-OpenMP-omp-target-entrypoint.patch" \
-		"${FILESDIR}/nvptx-no-libffi.patch" \
+	epatch	"${FILESDIR}/nvptx-no-libffi.patch" \
 		"${FILESDIR}/nvptx-no-boehm-gc.patch"
 
 	is_crosscompile && EPATCH_EXCLUDE+=" 05_all_gcc-spec-env.patch"
