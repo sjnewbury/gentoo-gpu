@@ -41,8 +41,6 @@ if [[ "${PV}" != 9999* ]]; then
 fi
 
 src_prepare() {
-	# Change the search path to match dev-util/glslang
-	epatch "${FILESDIR}"/glslang-spirv-hpp.patch
 	sed -i -e 's@\("library_path": "\).@\1/usr/lib@' layers/linux/*.json
 	default
 }
@@ -52,9 +50,10 @@ src_configure() {
 		-DBUILD_WSI_WAYLAND_SUPPORT=$(usex wayland ON OFF)
 		-DBUILD_WSI_XCB_SUPPORT=$(usex xcb ON OFF)
 		-DBUILD_WSI_XLIB_SUPPORT=$(usex Xlib ON OFF)
+		-DBUILD_WSI_MIR_SUPPORT=OFF
 		-DBUILD_LAYERS=$(usex layers ON OFF)
 		# Build all demos to get vulkaninfo
-		-DBUILD_DEMOS=$(vulkaninfo ON OFF)
+		-DBUILD_DEMOS=$(usex vulkaninfo ON OFF)
 		-DBUILD_TESTS=OFF
 	)
 
