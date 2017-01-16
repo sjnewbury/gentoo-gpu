@@ -1,0 +1,47 @@
+diff --git a/src/module.c b/src/module.c
+index f7b99fa..38e2daa 100644
+--- a/src/module.c
++++ b/src/module.c
+@@ -92,12 +92,24 @@ int module_load(char *module_name, char *driver) {
+  * @return 1 if the driver is succesfully unloaded, 0 otherwise
+  */
+ int module_unload(char *driver) {
+-  if (module_is_loaded(driver) == 1) {
++
++	char uvm[] = "nvidia_uvm";
++	char drm[] = "nvidia_drm";
++	char modeset[] = "nvidia_modeset";
++	int uvm_is_loaded = module_is_loaded(uvm);
++	int drm_is_loaded = module_is_loaded(drm);
++	int modeset_is_loaded = module_is_loaded(modeset);
++
++  if (uvm_is_loaded || drm_is_loaded || modeset_is_loaded || *driver == 1) {
+     int retries = 30;
+-    bb_log(LOG_INFO, "Unloading %s driver\n", driver);
++    bb_log(LOG_INFO, "Unloading UVM/DRM/MODESET driver\n");
+     char *mod_argv[] = {
+-      "rmmod",
+-      driver,
++      "modprobe",
++      "-r",
++      "nvidia_uvm",
++      "nvidia_drm",
++      "nvidia_modeset",
++			driver,
+       NULL
+     };
+     bb_run_fork_wait(mod_argv, 10);
+@@ -109,7 +121,7 @@ int module_unload(char *driver) {
+       return 0;
+     }
+   }
+-  return 1;
++ 	return 1;
+ }
+ 
+ /**
+@@ -134,3 +146,4 @@ int module_is_available(char *module_name) {
+   };
+   return bb_run_fork(mod_argv, 1) == EXIT_SUCCESS;
+ }
++
