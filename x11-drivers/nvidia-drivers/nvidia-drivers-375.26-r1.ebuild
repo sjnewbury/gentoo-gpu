@@ -472,6 +472,11 @@ src_install-libs() {
 			"libvdpau_nvidia.so.${NV_SOVER}"
 		)
 
+		cat > "${T}"/09nvidia-primus << EOF
+PRIMUS_libGLa='/usr/\$LIB/opengl/nvidia/lib/libGL.so.${NV_SOVER}'
+EOF
+		doenvd "${T}"/09nvidia-primus
+
 		if use wayland && has_multilib_profile && [[ ${ABI} == "amd64" ]];
 		then
 			NV_GLX_LIBRARIES+=(
