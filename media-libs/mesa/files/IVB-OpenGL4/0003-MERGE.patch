@@ -1,7 +1,7 @@
-From 281ca9b3c9e06f5486a8d60c82e936ae5214d165 Mon Sep 17 00:00:00 2001
+From 42656692b5001a6ddd6800205d07335e6a03a102 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
 Date: Tue, 10 Jan 2017 08:03:06 +0100
-Subject: [PATCH 03/32] MERGE:
+Subject: [PATCH 03/34] MERGE:
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
@@ -17,7 +17,7 @@ Signed-off-by: Samuel Iglesias Gonsálvez <siglesias@igalia.com>
  2 files changed, 14 insertions(+), 14 deletions(-)
 
 diff --git a/src/mesa/drivers/dri/i965/brw_fs.cpp b/src/mesa/drivers/dri/i965/brw_fs.cpp
-index 6aecdb77ee..62f5cd6827 100644
+index e3170a51804..95714c16f15 100644
 --- a/src/mesa/drivers/dri/i965/brw_fs.cpp
 +++ b/src/mesa/drivers/dri/i965/brw_fs.cpp
 @@ -340,19 +340,6 @@ fs_inst::has_source_and_destination_hazard() const
@@ -50,7 +50,7 @@ index 6aecdb77ee..62f5cd6827 100644
  
        /* The hardware shifts exactly 8 channels per compressed half of the
 diff --git a/src/mesa/drivers/dri/i965/brw_fs.h b/src/mesa/drivers/dri/i965/brw_fs.h
-index d0e272bb9e..263db0b795 100644
+index d0e272bb9ee..263db0b7952 100644
 --- a/src/mesa/drivers/dri/i965/brw_fs.h
 +++ b/src/mesa/drivers/dri/i965/brw_fs.h
 @@ -501,3 +501,16 @@ fs_reg setup_imm_df(const brw::fs_builder &bld,

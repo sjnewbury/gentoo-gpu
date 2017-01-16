@@ -1,7 +1,7 @@
-From 65c81d2f019aafc56307be012e51cd21866dde8b Mon Sep 17 00:00:00 2001
+From b7fbcb6a5586422446cc357443b04216fae1bcda Mon Sep 17 00:00:00 2001
 From: Iago Toral Quiroga <itoral@igalia.com>
 Date: Fri, 22 Jul 2016 13:36:25 +0200
-Subject: [PATCH 01/32] i965/disasm: also print nibctrl in IVB for execsize=8
+Subject: [PATCH 01/34] i965/disasm: also print nibctrl in IVB for execsize=8
 
 4-wide DF operations where NibCtrl applies require and execsize of 8
 in IvyBridge/BayTrail.
@@ -15,7 +15,7 @@ Reviewed-by: Matt Turner <mattst88@gmail.com>
  1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/src/mesa/drivers/dri/i965/brw_disasm.c b/src/mesa/drivers/dri/i965/brw_disasm.c
-index 167067a4b7..b04325564a 100644
+index 167067a4b7d..b04325564a6 100644
 --- a/src/mesa/drivers/dri/i965/brw_disasm.c
 +++ b/src/mesa/drivers/dri/i965/brw_disasm.c
 @@ -1189,10 +1189,10 @@ qtr_ctrl(FILE *file, const struct gen_device_info *devinfo, brw_inst *inst)

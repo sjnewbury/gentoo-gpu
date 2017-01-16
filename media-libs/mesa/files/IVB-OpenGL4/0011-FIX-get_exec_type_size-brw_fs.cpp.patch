@@ -1,14 +1,14 @@
-From c8118612c815db76ad9372ee2e4ae11449e6b0f5 Mon Sep 17 00:00:00 2001
+From ec224d1983d4929887d6ac732e69cc6df942fe5c Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
 Date: Tue, 10 Jan 2017 08:34:56 +0100
-Subject: [PATCH 11/32] FIX: get_exec_type_size() brw_fs.cpp
+Subject: [PATCH 11/34] FIX: get_exec_type_size() brw_fs.cpp
 
 ---
  src/mesa/drivers/dri/i965/brw_fs.cpp | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/src/mesa/drivers/dri/i965/brw_fs.cpp b/src/mesa/drivers/dri/i965/brw_fs.cpp
-index 0d2a9a6317..3a63db828b 100644
+index 6b3534b2d1b..4c6aed2944a 100644
 --- a/src/mesa/drivers/dri/i965/brw_fs.cpp
 +++ b/src/mesa/drivers/dri/i965/brw_fs.cpp
 @@ -4939,7 +4939,7 @@ get_lowered_simd_width(const struct gen_device_info *devinfo,

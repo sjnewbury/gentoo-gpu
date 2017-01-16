@@ -1,14 +1,14 @@
-From ab21d9f65def6f722c733b48e98f86cfedcf79b2 Mon Sep 17 00:00:00 2001
+From 229fd4a565cf103b84e7fd2b1cd904c1c4cff3e2 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
 Date: Mon, 17 Oct 2016 14:40:06 +0000
-Subject: [PATCH 30/32] i965: enable ARB_shader_precision in gen7+
+Subject: [PATCH 31/34] i965: enable ARB_shader_precision in gen7+
 
 ---
- src/mesa/drivers/dri/i965/intel_extensions.c | 1 +
- 1 file changed, 1 insertion(+)
+ src/mesa/drivers/dri/i965/intel_extensions.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/src/mesa/drivers/dri/i965/intel_extensions.c b/src/mesa/drivers/dri/i965/intel_extensions.c
-index 67730a3c7b..9284ebdd3f 100644
+index 36a6c9f9e3c..d66d616f0c6 100644
 --- a/src/mesa/drivers/dri/i965/intel_extensions.c
 +++ b/src/mesa/drivers/dri/i965/intel_extensions.c
 @@ -212,6 +212,7 @@ intelInitExtensions(struct gl_context *ctx)
@@ -19,6 +19,14 @@ index 67730a3c7b..9284ebdd3f 100644
        ctx->Extensions.ARB_shader_texture_image_samples = true;
        ctx->Extensions.ARB_tessellation_shader = true;
        ctx->Extensions.ARB_texture_compression_bptc = true;
+@@ -241,7 +242,6 @@ intelInitExtensions(struct gl_context *ctx)
+    }
+ 
+    if (brw->gen >= 8 || brw->is_haswell) {
+-      ctx->Extensions.ARB_shader_precision = true;
+       ctx->Extensions.ARB_stencil_texturing = true;
+       ctx->Extensions.ARB_texture_stencil8 = true;
+       ctx->Extensions.OES_geometry_shader = true;
 -- 
 2.11.0
 

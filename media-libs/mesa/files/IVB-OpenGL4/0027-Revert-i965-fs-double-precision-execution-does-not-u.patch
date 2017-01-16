@@ -1,7 +1,7 @@
-From cba465030163626d903df723be651e763fda100f Mon Sep 17 00:00:00 2001
+From 10693e18e0a9ceeff3843b9f135f0cc7f10eeb1f Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
 Date: Tue, 10 Jan 2017 07:50:06 +0100
-Subject: [PATCH 27/32] Revert "i965/fs: double-precision execution does not
+Subject: [PATCH 27/34] Revert "i965/fs: double-precision execution does not
  use 2 channels per DF in IVB/BYT"
 
 This reverts commit ad9a14a277a8a6e2d9191415897a342023c07a84.
@@ -10,7 +10,7 @@ This reverts commit ad9a14a277a8a6e2d9191415897a342023c07a84.
  1 file changed, 1 insertion(+), 5 deletions(-)
 
 diff --git a/src/mesa/drivers/dri/i965/brw_fs_generator.cpp b/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
-index 869908f464..51248c07cb 100644
+index 869908f4649..51248c07cb9 100644
 --- a/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
 +++ b/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
 @@ -1685,11 +1685,7 @@ fs_generator::generate_code(const cfg_t *cfg, int dispatch_width)

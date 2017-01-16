@@ -1,7 +1,7 @@
-From f732b711ccd67c0cebf4c16e45d62d6e71683a9c Mon Sep 17 00:00:00 2001
+From 51cf39018032fcca1831080684b3eb0c072ed918 Mon Sep 17 00:00:00 2001
 From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
 Date: Tue, 2 Aug 2016 16:00:03 +0000
-Subject: [PATCH 09/32] i965/fs: fix dst stride in IVB/BYT type conversions
+Subject: [PATCH 09/34] i965/fs: fix dst stride in IVB/BYT type conversions
 
 When converting a DF to F, we set dst stride to 2, to fulfil alignment
 restrictions.
@@ -15,7 +15,7 @@ explicitly to avoid ending up with stride = 4.
  1 file changed, 10 insertions(+)
 
 diff --git a/src/mesa/drivers/dri/i965/brw_fs_generator.cpp b/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
-index d7ed123e7a..c89688bb93 100644
+index d7ed123e7a9..c89688bb931 100644
 --- a/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
 +++ b/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
 @@ -1634,6 +1634,16 @@ fs_generator::generate_code(const cfg_t *cfg, int dispatch_width)

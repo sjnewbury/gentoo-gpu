@@ -1,7 +1,7 @@
-From 36230033d2e1fbc58f34a4281a2988d646f44528 Mon Sep 17 00:00:00 2001
+From 0db1bf6e583d890e88fe9f69c530625114fd67f3 Mon Sep 17 00:00:00 2001
 From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
 Date: Wed, 3 Aug 2016 11:51:44 +0000
-Subject: [PATCH 10/32] i965/fs: fix lower SIMD width for IVB/BYT's
+Subject: [PATCH 10/34] i965/fs: fix lower SIMD width for IVB/BYT's
  MOVE_INDIRECT
 
 Previous to Broadwell, we have 8 registers for MOV_INDIRECT. But if
@@ -13,7 +13,7 @@ This patch limits the SIMD width to 4 in this case.
  1 file changed, 7 insertions(+), 2 deletions(-)
 
 diff --git a/src/mesa/drivers/dri/i965/brw_fs.cpp b/src/mesa/drivers/dri/i965/brw_fs.cpp
-index bedbd3864d..0d2a9a6317 100644
+index bd8f5b246b7..6b3534b2d1b 100644
 --- a/src/mesa/drivers/dri/i965/brw_fs.cpp
 +++ b/src/mesa/drivers/dri/i965/brw_fs.cpp
 @@ -4933,8 +4933,13 @@ get_lowered_simd_width(const struct gen_device_info *devinfo,

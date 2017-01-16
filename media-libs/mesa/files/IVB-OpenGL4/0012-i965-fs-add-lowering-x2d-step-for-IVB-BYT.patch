@@ -1,7 +1,7 @@
-From 4ed6b8eaf35e1a144d8aa2ae2e77e18ec853e83d Mon Sep 17 00:00:00 2001
+From 4546eaa64d997030fb43e00acd4e6916a2e26b2d Mon Sep 17 00:00:00 2001
 From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
 Date: Thu, 4 Aug 2016 16:33:01 +0000
-Subject: [PATCH 12/32] i965/fs: add lowering x2d step for IVB/BYT
+Subject: [PATCH 12/34] i965/fs: add lowering x2d step for IVB/BYT
 
 On Ivybridge/Baytrail, when converting a float (F) to a double
 precision float (DF), the hardware automatically doubles the source
@@ -21,7 +21,7 @@ value.
  create mode 100644 src/mesa/drivers/dri/i965/brw_fs_lower_ivb_x2d.cpp
 
 diff --git a/src/mesa/drivers/dri/i965/Makefile.sources b/src/mesa/drivers/dri/i965/Makefile.sources
-index dd546826d1..1366fe9c90 100644
+index dd546826d19..1366fe9c90d 100644
 --- a/src/mesa/drivers/dri/i965/Makefile.sources
 +++ b/src/mesa/drivers/dri/i965/Makefile.sources
 @@ -25,6 +25,7 @@ i965_compiler_FILES = \
@@ -33,7 +33,7 @@ index dd546826d1..1366fe9c90 100644
  	brw_fs_nir.cpp \
  	brw_fs_reg_allocate.cpp \
 diff --git a/src/mesa/drivers/dri/i965/brw_fs.cpp b/src/mesa/drivers/dri/i965/brw_fs.cpp
-index 3a63db828b..ace66ccf3b 100644
+index 4c6aed2944a..74adc0bbb91 100644
 --- a/src/mesa/drivers/dri/i965/brw_fs.cpp
 +++ b/src/mesa/drivers/dri/i965/brw_fs.cpp
 @@ -5749,8 +5749,10 @@ fs_visitor::optimize()
@@ -49,7 +49,7 @@ index 3a63db828b..ace66ccf3b 100644
     OPT(lower_simd_width);
  
 diff --git a/src/mesa/drivers/dri/i965/brw_fs.h b/src/mesa/drivers/dri/i965/brw_fs.h
-index 55c2b1c75b..7ad5751d29 100644
+index 55c2b1c75b6..7ad5751d29b 100644
 --- a/src/mesa/drivers/dri/i965/brw_fs.h
 +++ b/src/mesa/drivers/dri/i965/brw_fs.h
 @@ -131,6 +131,7 @@ public:
@@ -61,7 +61,7 @@ index 55c2b1c75b..7ad5751d29 100644
     bool opt_cse();
     bool opt_cse_local(bblock_t *block);
 diff --git a/src/mesa/drivers/dri/i965/brw_fs_generator.cpp b/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
-index c89688bb93..3f954b202d 100644
+index c89688bb931..3f954b202d1 100644
 --- a/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
 +++ b/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
 @@ -67,6 +67,25 @@ brw_reg_from_fs_reg(const struct gen_device_info *devinfo, fs_inst *inst,
@@ -110,7 +110,7 @@ index c89688bb93..3f954b202d 100644
            *   than 8 and all regioning parameters are twice what the values
 diff --git a/src/mesa/drivers/dri/i965/brw_fs_lower_ivb_x2d.cpp b/src/mesa/drivers/dri/i965/brw_fs_lower_ivb_x2d.cpp
 new file mode 100644
-index 0000000000..56454c24b9
+index 00000000000..56454c24b9e
 --- /dev/null
 +++ b/src/mesa/drivers/dri/i965/brw_fs_lower_ivb_x2d.cpp
 @@ -0,0 +1,80 @@

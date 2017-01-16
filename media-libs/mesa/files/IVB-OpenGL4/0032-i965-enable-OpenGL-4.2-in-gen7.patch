@@ -1,23 +1,20 @@
-From c38344050ae673f4c78398c7067121e31a7ddc10 Mon Sep 17 00:00:00 2001
+From 1f6f96f7d794f1ceb37a158275370350c3affe2a Mon Sep 17 00:00:00 2001
 From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
 Date: Tue, 11 Oct 2016 15:25:52 +0000
-Subject: [PATCH 31/32] i965: enable OpenGL 4.2 in gen7+
+Subject: [PATCH 32/34] i965: enable OpenGL 4.2 in gen7+
 
 ---
- src/mesa/drivers/dri/i965/intel_extensions.c | 4 +---
- src/mesa/drivers/dri/i965/intel_screen.c     | 6 ++----
- 2 files changed, 3 insertions(+), 7 deletions(-)
+ src/mesa/drivers/dri/i965/intel_extensions.c | 2 +-
+ src/mesa/drivers/dri/i965/intel_screen.c     | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/src/mesa/drivers/dri/i965/intel_extensions.c b/src/mesa/drivers/dri/i965/intel_extensions.c
-index 9284ebdd3f..d82fce8fc1 100644
+index d66d616f0c6..aee79fe5a1e 100644
 --- a/src/mesa/drivers/dri/i965/intel_extensions.c
 +++ b/src/mesa/drivers/dri/i965/intel_extensions.c
-@@ -136,10 +136,8 @@ intelInitExtensions(struct gl_context *ctx)
- 
-    if (brw->gen >= 8)
+@@ -139,7 +139,7 @@ intelInitExtensions(struct gl_context *ctx)
+    else if (brw->is_haswell && can_do_pipelined_register_writes(brw->screen))
        ctx->Const.GLSLVersion = 450;
--   else if (brw->is_haswell && can_do_pipelined_register_writes(brw->screen))
--      ctx->Const.GLSLVersion = 420;
     else if (brw->gen >= 7 && can_do_pipelined_register_writes(brw->screen))
 -      ctx->Const.GLSLVersion = 400;
 +      ctx->Const.GLSLVersion = 420;
@@ -25,19 +22,15 @@ index 9284ebdd3f..d82fce8fc1 100644
        ctx->Const.GLSLVersion = 330;
     else
 diff --git a/src/mesa/drivers/dri/i965/intel_screen.c b/src/mesa/drivers/dri/i965/intel_screen.c
-index 1f1cf0f429..8019265c09 100644
+index 99ea9f21b73..7f65823754d 100644
 --- a/src/mesa/drivers/dri/i965/intel_screen.c
 +++ b/src/mesa/drivers/dri/i965/intel_screen.c
-@@ -1538,10 +1538,8 @@ set_max_gl_versions(struct intel_screen *screen)
-       dri_screen->max_gl_es2_version = has_astc ? 32 : 31;
-       break;
-    case 7:
--      if (screen->devinfo.is_haswell)
--         dri_screen->max_gl_core_version = can_do_pipelined_register_writes(screen) ? 42 : 33;
--      else
+@@ -1541,7 +1541,7 @@ set_max_gl_versions(struct intel_screen *screen)
+       if (screen->devinfo.is_haswell)
+          dri_screen->max_gl_core_version = can_do_pipelined_register_writes(screen) ? 45 : 33;
+       else
 -         dri_screen->max_gl_core_version = can_do_pipelined_register_writes(screen) ? 40 : 33;
-+      dri_screen->max_gl_core_version =
-+         can_do_pipelined_register_writes(screen) ? 42 : 33;
++         dri_screen->max_gl_core_version = can_do_pipelined_register_writes(screen) ? 42 : 33;
        dri_screen->max_gl_compat_version = 30;
        dri_screen->max_gl_es1_version = 11;
        dri_screen->max_gl_es2_version = screen->devinfo.is_haswell ? 31 : 30;

@@ -1,7 +1,7 @@
-From e64ccafb9a4efe02b6c72b24eaa68961cd2cebd7 Mon Sep 17 00:00:00 2001
+From dce13c03c9d079a359967a6123622e44660ea568 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
 Date: Mon, 10 Oct 2016 12:39:45 +0200
-Subject: [PATCH 21/32] i965/vec4: adapt setup_imm_df() to allow inserting
+Subject: [PATCH 21/34] i965/vec4: adapt setup_imm_df() to allow inserting
  instructions before another one
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
@@ -18,7 +18,7 @@ Signed-off-by: Samuel Iglesias Gonsálvez <siglesias@igalia.com>
  2 files changed, 19 insertions(+), 4 deletions(-)
 
 diff --git a/src/mesa/drivers/dri/i965/brw_vec4.h b/src/mesa/drivers/dri/i965/brw_vec4.h
-index 29b203af89..01b928ef4a 100644
+index 29b203af89e..01b928ef4a7 100644
 --- a/src/mesa/drivers/dri/i965/brw_vec4.h
 +++ b/src/mesa/drivers/dri/i965/brw_vec4.h
 @@ -328,6 +328,8 @@ public:
@@ -31,7 +31,7 @@ index 29b203af89..01b928ef4a 100644
     vec4_instruction *shuffle_64bit_data(dst_reg dst, src_reg src,
                                          bool for_write,
 diff --git a/src/mesa/drivers/dri/i965/brw_vec4_nir.cpp b/src/mesa/drivers/dri/i965/brw_vec4_nir.cpp
-index 71156ec5b3..e7d26bae51 100644
+index 71156ec5b3b..e7d26bae517 100644
 --- a/src/mesa/drivers/dri/i965/brw_vec4_nir.cpp
 +++ b/src/mesa/drivers/dri/i965/brw_vec4_nir.cpp
 @@ -1212,6 +1212,12 @@ vec4_visitor::emit_conversion_to_double(dst_reg dst, src_reg src,

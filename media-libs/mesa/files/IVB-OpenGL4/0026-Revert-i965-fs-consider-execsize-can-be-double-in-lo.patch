@@ -1,7 +1,7 @@
-From 356231389e8c7d783c3d63aaddfe94db5d5b852e Mon Sep 17 00:00:00 2001
+From fbb573198a2902e9d8f6e79abb2eeb4445215cc0 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
 Date: Tue, 10 Jan 2017 07:49:33 +0100
-Subject: [PATCH 26/32] Revert "i965/fs: consider execsize can be double in
+Subject: [PATCH 26/34] Revert "i965/fs: consider execsize can be double in
  lower_simd_with"
 
 This reverts commit 3bcf62e3eb0d275161d33b1e7429085d83e79db9.
@@ -10,7 +10,7 @@ This reverts commit 3bcf62e3eb0d275161d33b1e7429085d83e79db9.
  1 file changed, 1 insertion(+), 12 deletions(-)
 
 diff --git a/src/mesa/drivers/dri/i965/brw_fs.cpp b/src/mesa/drivers/dri/i965/brw_fs.cpp
-index f08568eb50..04cdbac2a0 100644
+index 4c3e4a0eef8..19e162377e1 100644
 --- a/src/mesa/drivers/dri/i965/brw_fs.cpp
 +++ b/src/mesa/drivers/dri/i965/brw_fs.cpp
 @@ -4525,15 +4525,8 @@ static unsigned

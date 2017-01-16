@@ -1,7 +1,7 @@
-From 5fdf47dd88d3174e6efbbb6563846f554c86f088 Mon Sep 17 00:00:00 2001
+From 4231c1e8f3632a2366d688ca4ea4f8ff863ec10d Mon Sep 17 00:00:00 2001
 From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
 Date: Mon, 12 Sep 2016 16:06:22 +0000
-Subject: [PATCH 16/32] i965/vec4: keep original type when dealing with null
+Subject: [PATCH 16/34] i965/vec4: keep original type when dealing with null
  registers
 
 Keep the original type when dealing with null registers. Specially
@@ -15,7 +15,7 @@ on Ivybridge/Baytrail.
  1 file changed, 4 insertions(+)
 
 diff --git a/src/mesa/drivers/dri/i965/brw_vec4.cpp b/src/mesa/drivers/dri/i965/brw_vec4.cpp
-index 4b9fee0024..9383e78fee 100644
+index 3584d9f040d..be1c535df36 100644
 --- a/src/mesa/drivers/dri/i965/brw_vec4.cpp
 +++ b/src/mesa/drivers/dri/i965/brw_vec4.cpp
 @@ -1996,6 +1996,7 @@ vec4_visitor::convert_to_hw_regs()

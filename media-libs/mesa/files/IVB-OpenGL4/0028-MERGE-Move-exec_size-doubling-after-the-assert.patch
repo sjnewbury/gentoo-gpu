@@ -1,7 +1,7 @@
-From 28216bce93d462f4425b63782135ae4a878f3aa4 Mon Sep 17 00:00:00 2001
+From 906125a281e223265c69b9dea4c27238e1989eae Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
 Date: Tue, 10 Jan 2017 09:01:46 +0100
-Subject: [PATCH 28/32] MERGE??? Move exec_size doubling after the assert
+Subject: [PATCH 28/34] MERGE??? Move exec_size doubling after the assert
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
@@ -12,7 +12,7 @@ Signed-off-by: Samuel Iglesias Gonsálvez <siglesias@igalia.com>
  1 file changed, 8 insertions(+), 6 deletions(-)
 
 diff --git a/src/mesa/drivers/dri/i965/brw_fs_generator.cpp b/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
-index 51248c07cb..0405a70af9 100644
+index 51248c07cb9..0405a70af94 100644
 --- a/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
 +++ b/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
 @@ -1605,11 +1605,6 @@ fs_generator::generate_code(const cfg_t *cfg, int dispatch_width)

@@ -1,7 +1,7 @@
-From 7f86335b47f1f8ab68933d9e38de58e00df733de Mon Sep 17 00:00:00 2001
+From 1ed081815f99970769861f45a431eabfd46a300e Mon Sep 17 00:00:00 2001
 From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
 Date: Mon, 18 Jul 2016 07:17:39 +0000
-Subject: [PATCH 02/32] i965/fs: add helper to retrieve instruction data size
+Subject: [PATCH 02/34] i965/fs: add helper to retrieve instruction data size
 
 The execution data size is the biggest type size of any instruction
 operand.
@@ -17,7 +17,7 @@ v2:
  2 files changed, 15 insertions(+), 5 deletions(-)
 
 diff --git a/src/mesa/drivers/dri/i965/brw_fs.cpp b/src/mesa/drivers/dri/i965/brw_fs.cpp
-index b1f9f639c4..6aecdb77ee 100644
+index 13949c9d9f7..e3170a51804 100644
 --- a/src/mesa/drivers/dri/i965/brw_fs.cpp
 +++ b/src/mesa/drivers/dri/i965/brw_fs.cpp
 @@ -340,6 +340,19 @@ fs_inst::has_source_and_destination_hazard() const
@@ -54,7 +54,7 @@ index b1f9f639c4..6aecdb77ee 100644
  
        /* The hardware shifts exactly 8 channels per compressed half of the
 diff --git a/src/mesa/drivers/dri/i965/brw_ir_fs.h b/src/mesa/drivers/dri/i965/brw_ir_fs.h
-index cad371248c..9875f2dd62 100644
+index cad371248c4..9875f2dd62b 100644
 --- a/src/mesa/drivers/dri/i965/brw_ir_fs.h
 +++ b/src/mesa/drivers/dri/i965/brw_ir_fs.h
 @@ -349,6 +349,7 @@ public:
