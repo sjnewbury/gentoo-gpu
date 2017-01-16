@@ -1,0 +1,199 @@
+From 4ed6b8eaf35e1a144d8aa2ae2e77e18ec853e83d Mon Sep 17 00:00:00 2001
+From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
+Date: Thu, 4 Aug 2016 16:33:01 +0000
+Subject: [PATCH 12/32] i965/fs: add lowering x2d step for IVB/BYT
+
+On Ivybridge/Baytrail, when converting a float (F) to a double
+precision float (DF), the hardware automatically doubles the source
+horizontal stride, hence converting only the values in odd positions.
+
+This commit adds a new lowering step, exclusively for IVB/BYT, where the
+sources are first copied in a temporal register with stride 2, and
+then converted from this temporal register. Thus, we do not lose any
+value.
+---
+ src/mesa/drivers/dri/i965/Makefile.sources         |  1 +
+ src/mesa/drivers/dri/i965/brw_fs.cpp               |  4 +-
+ src/mesa/drivers/dri/i965/brw_fs.h                 |  1 +
+ src/mesa/drivers/dri/i965/brw_fs_generator.cpp     | 23 ++++++-
+ src/mesa/drivers/dri/i965/brw_fs_lower_ivb_x2d.cpp | 80 ++++++++++++++++++++++
+ 5 files changed, 106 insertions(+), 3 deletions(-)
+ create mode 100644 src/mesa/drivers/dri/i965/brw_fs_lower_ivb_x2d.cpp
+
+diff --git a/src/mesa/drivers/dri/i965/Makefile.sources b/src/mesa/drivers/dri/i965/Makefile.sources
+index dd546826d1..1366fe9c90 100644
+--- a/src/mesa/drivers/dri/i965/Makefile.sources
++++ b/src/mesa/drivers/dri/i965/Makefile.sources
+@@ -25,6 +25,7 @@ i965_compiler_FILES = \
+ 	brw_fs_live_variables.cpp \
+ 	brw_fs_live_variables.h \
+ 	brw_fs_lower_d2x.cpp \
++	brw_fs_lower_ivb_x2d.cpp \
+ 	brw_fs_lower_pack.cpp \
+ 	brw_fs_nir.cpp \
+ 	brw_fs_reg_allocate.cpp \
+diff --git a/src/mesa/drivers/dri/i965/brw_fs.cpp b/src/mesa/drivers/dri/i965/brw_fs.cpp
+index 3a63db828b..ace66ccf3b 100644
+--- a/src/mesa/drivers/dri/i965/brw_fs.cpp
++++ b/src/mesa/drivers/dri/i965/brw_fs.cpp
+@@ -5749,8 +5749,10 @@ fs_visitor::optimize()
+     * code has a bug in this hardware that is fixed later in the
+     * lower_simd_width step.
+     */
+-   if (devinfo->gen == 7 && !devinfo->is_haswell)
++   if (devinfo->gen == 7 && !devinfo->is_haswell) {
++     OPT(lower_ivb_x2d);
+      OPT(lower_ivb_64bit_scalar);
++   }
+ 
+    OPT(lower_simd_width);
+ 
+diff --git a/src/mesa/drivers/dri/i965/brw_fs.h b/src/mesa/drivers/dri/i965/brw_fs.h
+index 55c2b1c75b..7ad5751d29 100644
+--- a/src/mesa/drivers/dri/i965/brw_fs.h
++++ b/src/mesa/drivers/dri/i965/brw_fs.h
+@@ -131,6 +131,7 @@ public:
+    void validate();
+    bool opt_algebraic();
+    bool lower_ivb_64bit_scalar();
++   bool lower_ivb_x2d();
+    bool opt_redundant_discard_jumps();
+    bool opt_cse();
+    bool opt_cse_local(bblock_t *block);
+diff --git a/src/mesa/drivers/dri/i965/brw_fs_generator.cpp b/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
+index c89688bb93..3f954b202d 100644
+--- a/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
++++ b/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
+@@ -67,6 +67,25 @@ brw_reg_from_fs_reg(const struct gen_device_info *devinfo, fs_inst *inst,
+       if (reg->stride == 0) {
+          brw_reg = brw_vec1_reg(brw_file_from_reg(reg), reg->nr, 0);
+       } else {
++         unsigned reg_stride;
++
++         /* When converting from F->DF, in IVB/BYT the source is strided
++          * 2. But now we set it to 1 because the hardware will already double
++          * it internally.
++          */
++         if (devinfo->gen == 7 && !devinfo->is_haswell &&
++             inst->opcode == BRW_OPCODE_MOV &&
++             inst->dst.type == BRW_REGISTER_TYPE_DF &&
++             reg->file != BRW_IMMEDIATE_VALUE &&
++             (reg->type == BRW_REGISTER_TYPE_F ||
++              reg->type == BRW_REGISTER_TYPE_D ||
++              reg->type == BRW_REGISTER_TYPE_UD)) {
++            assert(reg->stride == 2);
++            reg_stride = 1;
++         } else {
++            reg_stride = reg->stride;
++         }
++
+          /* From the Haswell PRM:
+           *
+           *  "VertStride must be used to cross GRF register boundaries. This
+@@ -75,7 +94,7 @@ brw_reg_from_fs_reg(const struct gen_device_info *devinfo, fs_inst *inst,
+           *
+           * The maximum width value that could satisfy this restriction is:
+           */
+-         const unsigned reg_width = REG_SIZE / (reg->stride * type_sz(reg->type));
++         const unsigned reg_width = REG_SIZE / (reg_stride * type_sz(reg->type));
+ 
+          /* Because the hardware can only split source regions at a whole
+           * multiple of width during decompression (i.e. vertically), clamp
+@@ -93,7 +112,7 @@ brw_reg_from_fs_reg(const struct gen_device_info *devinfo, fs_inst *inst,
+           */
+          const unsigned width = MIN2(reg_width, phys_width);
+          brw_reg = brw_vecn_reg(width, brw_file_from_reg(reg), reg->nr, 0);
+-         brw_reg = stride(brw_reg, width * reg->stride, width, reg->stride);
++         brw_reg = stride(brw_reg, width * reg_stride, width, reg_stride);
+          /* From the IvyBridge PRM (EU Changes by Processor Generation, page 13):
+           *  "Each DF (Double Float) operand uses an element size of 4 rather
+           *   than 8 and all regioning parameters are twice what the values
+diff --git a/src/mesa/drivers/dri/i965/brw_fs_lower_ivb_x2d.cpp b/src/mesa/drivers/dri/i965/brw_fs_lower_ivb_x2d.cpp
+new file mode 100644
+index 0000000000..56454c24b9
+--- /dev/null
++++ b/src/mesa/drivers/dri/i965/brw_fs_lower_ivb_x2d.cpp
+@@ -0,0 +1,80 @@
++/*
++ * Copyright © 2016 Intel Corporation
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a
++ * copy of this software and associated documentation files (the "Software"),
++ * to deal in the Software without restriction, including without limitation
++ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
++ * and/or sell copies of the Software, and to permit persons to whom the
++ * Software is furnished to do so, subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice (including the next
++ * paragraph) shall be included in all copies or substantial portions of the
++ * Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
++ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
++ * IN THE SOFTWARE.
++ */
++
++#include "brw_fs.h"
++#include "brw_cfg.h"
++#include "brw_fs_builder.h"
++
++using namespace brw;
++
++bool
++fs_visitor::lower_ivb_x2d()
++{
++   bool progress = false;
++
++   assert(devinfo->gen == 7 && !devinfo->is_haswell);
++
++   foreach_block_and_inst_safe(block, fs_inst, inst, cfg) {
++      if (inst->opcode != BRW_OPCODE_MOV)
++         continue;
++
++      if (inst->dst.type != BRW_REGISTER_TYPE_DF)
++         continue;
++
++      if (inst->src[0].type != BRW_REGISTER_TYPE_F &&
++          inst->src[0].type != BRW_REGISTER_TYPE_D &&
++          inst->src[0].type != BRW_REGISTER_TYPE_UD)
++         continue;
++
++      assert(inst->dst.file == VGRF);
++      assert(inst->saturate == false);
++
++      fs_reg dst = inst->dst;
++
++      const fs_builder ibld(this, block, inst);
++
++      /* In Ivybridge, converting 4 single-precision type values to 4
++       * double-precision type values require to set exec_size to 8 in the
++       * generated assembler:
++       *
++       * mov(8)   g9<1>:DF   g5<4,4,1>
++       *
++       * Internally, the hardware doubles the horizontal stride, hence
++       * converting just one out of two values. To avoid missing values, we
++       * copy first the values in a temporal register strided to 2, and then
++       * perform the conversion from there.
++       */
++      fs_reg temp = ibld.vgrf(inst->dst.type, 1);
++      fs_reg strided_temp = subscript(temp, inst->src[0].type, 0);
++      ibld.MOV(strided_temp, inst->src[0]);
++      ibld.MOV(dst, strided_temp);
++
++      inst->remove(block);
++      progress = true;
++   }
++
++   if (progress)
++      invalidate_live_intervals();
++
++   return progress;
++}
+-- 
+2.11.0
+

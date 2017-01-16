@@ -1,0 +1,46 @@
+From 356231389e8c7d783c3d63aaddfe94db5d5b852e Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
+Date: Tue, 10 Jan 2017 07:49:33 +0100
+Subject: [PATCH 26/32] Revert "i965/fs: consider execsize can be double in
+ lower_simd_with"
+
+This reverts commit 3bcf62e3eb0d275161d33b1e7429085d83e79db9.
+---
+ src/mesa/drivers/dri/i965/brw_fs.cpp | 13 +------------
+ 1 file changed, 1 insertion(+), 12 deletions(-)
+
+diff --git a/src/mesa/drivers/dri/i965/brw_fs.cpp b/src/mesa/drivers/dri/i965/brw_fs.cpp
+index f08568eb50..04cdbac2a0 100644
+--- a/src/mesa/drivers/dri/i965/brw_fs.cpp
++++ b/src/mesa/drivers/dri/i965/brw_fs.cpp
+@@ -4525,15 +4525,8 @@ static unsigned
+ get_fpu_lowered_simd_width(const struct gen_device_info *devinfo,
+                            const fs_inst *inst)
+ {
+-   /* Note that in IVB/BYT for instructions that handles DF, we will double
+-    * the exec_size. So take this value for calculus purposes.
+-    */
+-   unsigned exec_size = inst->exec_size;
+-   if (devinfo->gen == 7 && !devinfo->is_haswell && inst->exec_data_size() == 8)
+-      exec_size *= 2;
+-
+    /* Maximum execution size representable in the instruction controls. */
+-   unsigned max_width = MIN2(32, exec_size);
++   unsigned max_width = MIN2(32, inst->exec_size);
+ 
+    /* According to the PRMs:
+     *  "A. In Direct Addressing mode, a source cannot span more than 2
+@@ -4646,10 +4639,6 @@ get_fpu_lowered_simd_width(const struct gen_device_info *devinfo,
+          max_width = MIN2(max_width, 4);
+    }
+ 
+-   /* If we have doubled exec_size, then readjust max_width if required. */
+-   if (exec_size != inst->exec_size && max_width == exec_size)
+-      max_width = inst->exec_size;
+-
+    /* Only power-of-two execution sizes are representable in the instruction
+     * control fields.
+     */
+-- 
+2.11.0
+

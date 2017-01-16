@@ -1,0 +1,45 @@
+From 9cff272ccf879d8de0702ce5e817555425ca535a Mon Sep 17 00:00:00 2001
+From: Iago Toral Quiroga <itoral@igalia.com>
+Date: Fri, 22 Jul 2016 13:41:21 +0200
+Subject: [PATCH 08/32] i965/fs: double-precision execution does not use 2
+ channels per DF in IVB/BYT
+
+It seems to use 1 channel por DF, just like later hardware. The docs say things
+like:
+
+"Each DF operand uses a pair of channels and all masking  and swizzling
+ should be adjusted appropriately."
+
+"In Align16, all regioning parameters must use the syntax of a pair of packed
+ floats, including channel selects and channel enables."
+
+In these cases, masking and channel select/enables seem to refere only to
+Align16's swizzle and writemasks respectively, not to execution masking.
+
+In any case, this means that execution masking controls and execsize go
+in different units and we need to adjust the assertion on the relation
+between the two accordingly.
+---
+ src/mesa/drivers/dri/i965/brw_fs_generator.cpp | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/src/mesa/drivers/dri/i965/brw_fs_generator.cpp b/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
+index 16670b7ce8..d7ed123e7a 100644
+--- a/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
++++ b/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
+@@ -1647,7 +1647,11 @@ fs_generator::generate_code(const cfg_t *cfg, int dispatch_width)
+       brw_set_default_exec_size(p, cvt(inst->exec_size) - 1);
+ 
+       assert(inst->force_writemask_all || inst->exec_size >= 4);
+-      assert(inst->force_writemask_all || inst->group % inst->exec_size == 0);
++      assert(inst->force_writemask_all ||
++             ((devinfo->gen != 7 || devinfo->is_haswell) &&
++              inst->group % inst->exec_size == 0) ||
++             ((devinfo->gen == 7 && !devinfo->is_haswell) &&
++              (2 * inst->group) % inst->exec_size == 0));
+       assert(inst->base_mrf + inst->mlen <= BRW_MAX_MRF(devinfo->gen));
+       assert(inst->mlen <= BRW_MAX_MSG_LENGTH);
+ 
+-- 
+2.11.0
+

@@ -1,0 +1,24 @@
+From ab21d9f65def6f722c733b48e98f86cfedcf79b2 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
+Date: Mon, 17 Oct 2016 14:40:06 +0000
+Subject: [PATCH 30/32] i965: enable ARB_shader_precision in gen7+
+
+---
+ src/mesa/drivers/dri/i965/intel_extensions.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/mesa/drivers/dri/i965/intel_extensions.c b/src/mesa/drivers/dri/i965/intel_extensions.c
+index 67730a3c7b..9284ebdd3f 100644
+--- a/src/mesa/drivers/dri/i965/intel_extensions.c
++++ b/src/mesa/drivers/dri/i965/intel_extensions.c
+@@ -212,6 +212,7 @@ intelInitExtensions(struct gl_context *ctx)
+       ctx->Extensions.ARB_shader_clock = true;
+       ctx->Extensions.ARB_shader_image_load_store = true;
+       ctx->Extensions.ARB_shader_image_size = true;
++      ctx->Extensions.ARB_shader_precision = true;
+       ctx->Extensions.ARB_shader_texture_image_samples = true;
+       ctx->Extensions.ARB_tessellation_shader = true;
+       ctx->Extensions.ARB_texture_compression_bptc = true;
+-- 
+2.11.0
+

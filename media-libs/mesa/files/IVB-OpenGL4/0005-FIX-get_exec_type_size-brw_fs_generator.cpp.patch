@@ -1,0 +1,25 @@
+From a567893f755ac822795e67ec2e8d9131dd37ac0a Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
+Date: Tue, 10 Jan 2017 08:35:07 +0100
+Subject: [PATCH 05/32] FIX: get_exec_type_size() brw_fs_generator.cpp
+
+---
+ src/mesa/drivers/dri/i965/brw_fs_generator.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/mesa/drivers/dri/i965/brw_fs_generator.cpp b/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
+index 10b2643ed9..16670b7ce8 100644
+--- a/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
++++ b/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
+@@ -1578,7 +1578,7 @@ fs_generator::generate_code(const cfg_t *cfg, int dispatch_width)
+       bool multiple_instructions_emitted = false;
+ 
+       if (devinfo->gen == 7 && !devinfo->is_haswell &&
+-          (inst->exec_data_size() == 8 || type_sz(inst->dst.type) == 8)) {
++          (get_exec_type_size(inst) == 8 || type_sz(inst->dst.type) == 8)) {
+         inst->exec_size *= 2;
+       }
+ 
+-- 
+2.11.0
+

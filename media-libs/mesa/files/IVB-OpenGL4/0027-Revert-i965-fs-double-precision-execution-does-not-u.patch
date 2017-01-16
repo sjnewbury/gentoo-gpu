@@ -1,0 +1,31 @@
+From cba465030163626d903df723be651e763fda100f Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
+Date: Tue, 10 Jan 2017 07:50:06 +0100
+Subject: [PATCH 27/32] Revert "i965/fs: double-precision execution does not
+ use 2 channels per DF in IVB/BYT"
+
+This reverts commit ad9a14a277a8a6e2d9191415897a342023c07a84.
+---
+ src/mesa/drivers/dri/i965/brw_fs_generator.cpp | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
+
+diff --git a/src/mesa/drivers/dri/i965/brw_fs_generator.cpp b/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
+index 869908f464..51248c07cb 100644
+--- a/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
++++ b/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
+@@ -1685,11 +1685,7 @@ fs_generator::generate_code(const cfg_t *cfg, int dispatch_width)
+       brw_set_default_exec_size(p, cvt(inst->exec_size) - 1);
+ 
+       assert(inst->force_writemask_all || inst->exec_size >= 4);
+-      assert(inst->force_writemask_all ||
+-             ((devinfo->gen != 7 || devinfo->is_haswell) &&
+-              inst->group % inst->exec_size == 0) ||
+-             ((devinfo->gen == 7 && !devinfo->is_haswell) &&
+-              (2 * inst->group) % inst->exec_size == 0));
++      assert(inst->force_writemask_all || inst->group % inst->exec_size == 0);
+       assert(inst->base_mrf + inst->mlen <= BRW_MAX_MRF(devinfo->gen));
+       assert(inst->mlen <= BRW_MAX_MSG_LENGTH);
+ 
+-- 
+2.11.0
+

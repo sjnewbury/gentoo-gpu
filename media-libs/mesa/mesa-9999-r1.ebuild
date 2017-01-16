@@ -50,7 +50,7 @@ done
 
 IUSE="${IUSE_VIDEO_CARDS}
 	bindist +classic d3d9 debug +dri3 +egl +gallium +gbm gles1 gles2 +llvm
-	+nptl opencl osmesa pax_kernel openmax pic selinux +udev vaapi valgrind
+	+nptl opencl osmesa pax_kernel openmax pic selinux vaapi valgrind
 	vdpau wayland xvmc xa kernel_FreeBSD
 	glvnd vulkan"
 
@@ -99,7 +99,7 @@ RDEPEND="
 	classic? ( app-eselect/eselect-mesa )
 	gallium? ( app-eselect/eselect-mesa )
 	>=app-eselect/eselect-opengl-1.3.0
-	udev? ( kernel_linux? ( >=virtual/libudev-215:=[${MULTILIB_USEDEP}] ) )
+	kernel_linux? ( >=virtual/libudev-215:=[${MULTILIB_USEDEP}] )
 	>=dev-libs/expat-2.1.0-r3:=[${MULTILIB_USEDEP}]
 	gbm? ( >=virtual/libudev-215:=[${MULTILIB_USEDEP}] )
 	dri3? ( >=virtual/libudev-215:=[${MULTILIB_USEDEP}] )
@@ -269,6 +269,8 @@ apply_mesa_patches() {
 	fi
 
 	epatch "${FILESDIR}/${P}-fix-missing-openmp-include.patch"
+
+	epatch "${FILESDIR}"/IVB-OpenGL4/*
 }
 
 src_prepare() {
@@ -302,7 +304,6 @@ glvnd_src_configure() {
 		$(use_enable !bindist texture-float) \
 		$(use_enable debug) \
 		$(use_enable dri3) \
-		$(use_enable !udev sysfs) \
 		--enable-llvm-shared-libs \
 		--with-dri-drivers=${DRI_DRIVERS} \
 		--with-gallium-drivers=${GALLIUM_DRIVERS} \
@@ -456,7 +457,6 @@ multilib_src_configure() {
 		$(use_enable gles1) \
 		$(use_enable gles2) \
 		$(use_enable nptl glx-tls) \
-		$(use_enable !udev sysfs) \
 		--enable-valgrind=$(usex valgrind auto no) \
 		--enable-llvm-shared-libs \
 		--with-dri-drivers=${DRI_DRIVERS} \

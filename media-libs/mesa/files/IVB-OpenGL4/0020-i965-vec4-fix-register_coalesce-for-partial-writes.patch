@@ -1,0 +1,45 @@
+From cce6e7fa800166162aad5630b76b2aeafb6b825b Mon Sep 17 00:00:00 2001
+From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
+Date: Fri, 23 Sep 2016 16:11:14 +0000
+Subject: [PATCH 20/32] i965/vec4: fix register_coalesce() for partial writes
+
+When lowering double_to_single() we added a final mov() that puts 32-bit
+values from one register in the second half of destination.
+---
+ src/mesa/drivers/dri/i965/brw_vec4.cpp                  | 5 +++++
+ src/mesa/drivers/dri/i965/brw_vec4_copy_propagation.cpp | 3 ++-
+ 2 files changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/src/mesa/drivers/dri/i965/brw_vec4.cpp b/src/mesa/drivers/dri/i965/brw_vec4.cpp
+index f5d115ad33..affb4c9f01 100644
+--- a/src/mesa/drivers/dri/i965/brw_vec4.cpp
++++ b/src/mesa/drivers/dri/i965/brw_vec4.cpp
+@@ -1223,6 +1223,11 @@ vec4_visitor::opt_register_coalesce()
+                }
+             }
+ 
++            /* Disallow partial register writes. */
++            if (scan_inst->exec_size < 8 &&
++                type_sz(scan_inst->src[0].type) == 4)
++               break;
++
+             /* This doesn't handle saturation on the instruction we
+              * want to coalesce away if the register types do not match.
+              * But if scan_inst is a non type-converting 'mov', we can fix
+diff --git a/src/mesa/drivers/dri/i965/brw_vec4_copy_propagation.cpp b/src/mesa/drivers/dri/i965/brw_vec4_copy_propagation.cpp
+index e7f6f93f8b..f5c10d1899 100644
+--- a/src/mesa/drivers/dri/i965/brw_vec4_copy_propagation.cpp
++++ b/src/mesa/drivers/dri/i965/brw_vec4_copy_propagation.cpp
+@@ -499,7 +499,8 @@ vec4_visitor::opt_copy_propagation(bool do_constant_prop)
+ 
+          /* We only handle register-aligned single GRF copies. */
+          if (inst->size_read(i) != REG_SIZE ||
+-             inst->src[i].offset % REG_SIZE)
++             inst->src[i].offset % REG_SIZE ||
++             inst->dst.offset % REG_SIZE)
+             continue;
+ 
+          const unsigned reg = (alloc.offsets[inst->src[i].nr] +
+-- 
+2.11.0
+
