@@ -52,7 +52,7 @@ IUSE="${IUSE_VIDEO_CARDS}
 	bindist +classic d3d9 debug +dri3 +egl +gallium +gbm gles1 gles2 +llvm
 	+nptl opencl osmesa pax_kernel openmax pic selinux vaapi valgrind
 	vdpau wayland xvmc xa kernel_FreeBSD
-	glvnd vulkan"
+	glvnd vulkan gcrypt"
 
 #  Not available at present unfortunately
 #	openvg? ( egl gallium )
@@ -146,6 +146,7 @@ RDEPEND="
 	wayland? ( >=dev-libs/wayland-1.2.0:=[${MULTILIB_USEDEP}] )
 	xvmc? ( >=x11-libs/libXvMC-1.0.8:=[${MULTILIB_USEDEP}] )
 	glvnd? ( media-libs/libglvnd[${MULTILIB_USEDEP}] )
+	gcrypt? ( dev-libs/libgcrypt )
 	${LIBDRM_DEPSTRING}[video_cards_freedreno?,video_cards_nouveau?,video_cards_vc4?,video_cards_vmware?,video_cards_virgl?,${MULTILIB_USEDEP}]
 "
 
@@ -297,6 +298,7 @@ glvnd_src_configure() {
 		--enable-dri \
 		--enable-glx \
 		--enable-shared-glapi \
+		$(use_with gcrypt sha1=libgcrypt) \
 		$(use_enable gles1) \
 		$(use_enable gles2) \
 		$(use_enable gbm) \
@@ -449,6 +451,7 @@ multilib_src_configure() {
 		--enable-glx \
 		--enable-shared-glapi \
 		--enable-shader-cache \
+		$(use_with gcrypt sha1=libgcrypt) \
 		$(use_enable !bindist texture-float) \
 		$(use_enable debug) \
 		$(use_enable dri3) \
