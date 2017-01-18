@@ -74,6 +74,7 @@ DEPEND="${RDEPEND}
 PATCHES=(
 	# https://bugzilla.libsdl.org/show_bug.cgi?id=1431
 	"${FILESDIR}"/${PN}-2.0.5-static-libs.patch
+	"${FILESDIR}"/${PN}-2.0.5-wayland-before-x11.patch
 )
 
 S=${WORKDIR}/${MY_P}
