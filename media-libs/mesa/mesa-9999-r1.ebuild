@@ -270,8 +270,8 @@ apply_mesa_patches() {
 	fi
 
 	epatch "${FILESDIR}/${P}-fix-missing-openmp-include.patch"
-
 	epatch "${FILESDIR}"/IVB-OpenGL4/*
+	epatch "${FILESDIR}"/${P}-with-sha1.patch
 }
 
 src_prepare() {
@@ -450,7 +450,6 @@ multilib_src_configure() {
 		--enable-dri \
 		--enable-glx \
 		--enable-shared-glapi \
-		--enable-shader-cache \
 		$(use_with gcrypt sha1=libgcrypt) \
 		$(use_enable !bindist texture-float) \
 		$(use_enable debug) \
