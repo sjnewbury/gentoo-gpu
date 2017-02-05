@@ -41,7 +41,7 @@ LICENSE="MIT"
 SLOT="0"
 RESTRICT="!bindist? ( bindist )"
 
-INTEL_CARDS="i915 i965 ilo intel"
+INTEL_CARDS="i915 i965 intel"
 RADEON_CARDS="r100 r200 r300 r600 radeon radeonsi"
 VIDEO_CARDS="${INTEL_CARDS} ${RADEON_CARDS} freedreno nouveau vmware vc4 virgl"
 for card in ${VIDEO_CARDS}; do
@@ -77,7 +77,6 @@ REQUIRED_USE="
 	video_cards_intel?  ( || ( classic ) )
 	video_cards_i915?   ( || ( classic gallium ) )
 	video_cards_i965?   ( classic )
-	video_cards_ilo?    ( gallium )
 	video_cards_nouveau? ( || ( classic gallium ) )
 	video_cards_radeon? ( || ( classic gallium ) )
 	video_cards_r100?   ( classic )
@@ -89,7 +88,7 @@ REQUIRED_USE="
 	video_cards_virgl? ( gallium )
 "
 
-LIBDRM_DEPSTRING=">=x11-libs/libdrm-2.4.67"
+LIBDRM_DEPSTRING=">=x11-libs/libdrm-2.4.75"
 # keep correct libdrm and dri2proto dep
 # keep blocks in rdepend for binpkg
 RDEPEND="
@@ -329,8 +328,7 @@ multilib_src_configure() {
 
 	if use vulkan; then
 		if use video_cards_i965 || \
-			use video_cards_intel || \
-			use video_cards_ilo; then
+			use video_cards_intel; then
 			vulkan_enable intel
 		fi
 		if use video_cards_radeon || \
@@ -347,8 +345,7 @@ multilib_src_configure() {
 		driver_enable video_cards_i915 i915
 		driver_enable video_cards_i965 i965
 		if ! use video_cards_i915 && \
-			! use video_cards_i965 && \
-				! use video_cards_ilo; then
+			! use video_cards_i965; then
 			driver_enable video_cards_intel i915 i965
 		fi
 
@@ -398,10 +395,8 @@ multilib_src_configure() {
 		gallium_enable video_cards_virgl virgl
 		gallium_enable video_cards_nouveau nouveau
 		gallium_enable video_cards_i915 i915
-		gallium_enable video_cards_ilo ilo
-		if ! use video_cards_i915 && \
-			! use video_cards_ilo; then
-			gallium_enable video_cards_intel i915 ilo
+		if ! use video_cards_i915; then
+			gallium_enable video_cards_intel i915
 		fi
 
 		gallium_enable video_cards_r300 r300
