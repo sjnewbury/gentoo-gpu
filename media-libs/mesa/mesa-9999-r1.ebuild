@@ -270,6 +270,7 @@ apply_mesa_patches() {
 
 	epatch "${FILESDIR}/${P}-fix-missing-openmp-include.patch"
 	epatch "${FILESDIR}"/IVB-OpenGL4/*
+	epatch "${FILESDIR}"/glthread/*
 	epatch "${FILESDIR}"/${P}-with-sha1.patch
 }
 

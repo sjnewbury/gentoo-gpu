@@ -1,0 +1,572 @@
+From 7225355cc228595059bea9775aeb574d19e2f6e0 Mon Sep 17 00:00:00 2001
+From: Eric Anholt <eric@anholt.net>
+Date: Mon, 4 Mar 2013 10:30:15 -0800
+Subject: [PATCH 23/30] mesa: Track the current vertex/element array buffers
+ for glthread.
+
+We want to support glthread on GLES contexts with reasonable apps, and on
+desktop for apps that use VBOs but haven't completely moved to core GL.
+To do so, we have to deal with the "the user may or may not pass user
+pointers to draw calls" problem.
+---
+ src/mapi/glapi/gen/ARB_base_instance.xml           |   9 +-
+ .../glapi/gen/ARB_draw_elements_base_vertex.xml    |  12 ++-
+ src/mapi/glapi/gen/ARB_draw_instanced.xml          |   3 +-
+ src/mapi/glapi/gen/ARB_vertex_array_object.xml     |   3 +-
+ src/mapi/glapi/gen/GL3x.xml                        |   3 +-
+ src/mapi/glapi/gen/gl_API.xml                      |  59 ++++++++----
+ src/mapi/glapi/gen/gl_marshal.py                   |   4 -
+ src/mesa/main/glthread.h                           |  12 +++
+ src/mesa/main/marshal.c                            | 103 +++++++++++++++++++++
+ src/mesa/main/marshal.h                            |  57 ++++++++++++
+ 10 files changed, 231 insertions(+), 34 deletions(-)
+
+diff --git a/src/mapi/glapi/gen/ARB_base_instance.xml b/src/mapi/glapi/gen/ARB_base_instance.xml
+index 5bd6cabf9c..e3bbcd198e 100644
+--- a/src/mapi/glapi/gen/ARB_base_instance.xml
++++ b/src/mapi/glapi/gen/ARB_base_instance.xml
+@@ -8,7 +8,8 @@
+ 
+ <category name="GL_ARB_base_instance" number="107">
+ 
+-  <function name="DrawArraysInstancedBaseInstance" exec="dynamic" marshal="draw">
++  <function name="DrawArraysInstancedBaseInstance" exec="dynamic" marshal="draw"
++            marshal_fail="_mesa_glthread_is_non_vbo_draw_elements(ctx)">
+     <param name="mode" type="GLenum"/>
+     <param name="first" type="GLint"/>
+     <param name="count" type="GLsizei"/>
+@@ -16,7 +17,8 @@
+     <param name="baseinstance" type="GLuint"/>
+   </function>
+ 
+-  <function name="DrawElementsInstancedBaseInstance" exec="dynamic" marshal="draw">
++  <function name="DrawElementsInstancedBaseInstance" exec="dynamic" marshal="draw"
++            marshal_fail="_mesa_glthread_is_non_vbo_draw_elements(ctx)">
+     <param name="mode" type="GLenum"/>
+     <param name="count" type="GLsizei"/>
+     <param name="type" type="GLenum"/>
+@@ -25,7 +27,8 @@
+     <param name="baseinstance" type="GLuint"/>
+   </function>
+ 
+-  <function name="DrawElementsInstancedBaseVertexBaseInstance" exec="dynamic" marshal="draw">
++  <function name="DrawElementsInstancedBaseVertexBaseInstance" exec="dynamic" marshal="draw"
++            marshal_fail="_mesa_glthread_is_non_vbo_draw_elements(ctx)">
+     <param name="mode" type="GLenum"/>
+     <param name="count" type="GLsizei"/>
+     <param name="type" type="GLenum"/>
+diff --git a/src/mapi/glapi/gen/ARB_draw_elements_base_vertex.xml b/src/mapi/glapi/gen/ARB_draw_elements_base_vertex.xml
+index 7c7a6a4958..2f1a93dc8a 100644
+--- a/src/mapi/glapi/gen/ARB_draw_elements_base_vertex.xml
++++ b/src/mapi/glapi/gen/ARB_draw_elements_base_vertex.xml
+@@ -8,7 +8,8 @@
+ 
+ <category name="GL_ARB_draw_elements_base_vertex" number="62">
+ 
+-    <function name="DrawElementsBaseVertex" es2="3.2" exec="dynamic" marshal="draw">
++    <function name="DrawElementsBaseVertex" es2="3.2" exec="dynamic" marshal="draw"
++              marshal_fail="_mesa_glthread_is_non_vbo_draw_elements(ctx)">
+         <param name="mode" type="GLenum"/>
+         <param name="count" type="GLsizei"/>
+         <param name="type" type="GLenum"/>
+@@ -16,7 +17,8 @@
+         <param name="basevertex" type="GLint"/>
+     </function>
+ 
+-    <function name="DrawRangeElementsBaseVertex" es2="3.2" exec="dynamic" marshal="draw">
++    <function name="DrawRangeElementsBaseVertex" es2="3.2" exec="dynamic" marshal="draw"
++              marshal_fail="_mesa_glthread_is_non_vbo_draw_elements(ctx)">
+         <param name="mode" type="GLenum"/>
+         <param name="start" type="GLuint"/>
+         <param name="end" type="GLuint"/>
+@@ -26,7 +28,8 @@
+         <param name="basevertex" type="GLint"/>
+     </function>
+ 
+-    <function name="MultiDrawElementsBaseVertex" exec="dynamic" marshal="draw">
++    <function name="MultiDrawElementsBaseVertex" exec="dynamic" marshal="draw"
++              marshal_fail="_mesa_glthread_is_non_vbo_draw_elements(ctx)">
+         <param name="mode" type="GLenum"/>
+         <param name="count" type="const GLsizei *"/>
+         <param name="type" type="GLenum"/>
+@@ -35,7 +38,8 @@
+         <param name="basevertex" type="const GLint *"/>
+     </function>
+ 
+-    <function name="DrawElementsInstancedBaseVertex" es2="3.2" exec="dynamic" marshal="draw">
++    <function name="DrawElementsInstancedBaseVertex" es2="3.2" exec="dynamic" marshal="draw"
++              marshal_fail="_mesa_glthread_is_non_vbo_draw_elements(ctx)">
+         <param name="mode" type="GLenum"/>
+         <param name="count" type="GLsizei"/>
+         <param name="type" type="GLenum"/>
+diff --git a/src/mapi/glapi/gen/ARB_draw_instanced.xml b/src/mapi/glapi/gen/ARB_draw_instanced.xml
+index 52dba3cf3c..8d7fd6301b 100644
+--- a/src/mapi/glapi/gen/ARB_draw_instanced.xml
++++ b/src/mapi/glapi/gen/ARB_draw_instanced.xml
+@@ -15,7 +15,8 @@
+     <param name="primcount" type="GLsizei"/>
+   </function>
+ 
+-  <function name="DrawElementsInstancedARB" exec="dynamic" marshal="draw">
++  <function name="DrawElementsInstancedARB" exec="dynamic" marshal="draw"
++            marshal_fail="_mesa_glthread_is_non_vbo_draw_elements(ctx)">
+     <param name="mode" type="GLenum"/>
+     <param name="count" type="GLsizei"/>
+     <param name="type" type="GLenum"/>
+diff --git a/src/mapi/glapi/gen/ARB_vertex_array_object.xml b/src/mapi/glapi/gen/ARB_vertex_array_object.xml
+index 4a392dbb42..4f21137ab0 100644
+--- a/src/mapi/glapi/gen/ARB_vertex_array_object.xml
++++ b/src/mapi/glapi/gen/ARB_vertex_array_object.xml
+@@ -10,7 +10,8 @@
+ 
+     <enum name="VERTEX_ARRAY_BINDING" value="0x85B5"/>
+ 
+-    <function name="BindVertexArray" es2="3.0">
++    <function name="BindVertexArray" es2="3.0"
++              marshal_fail="_mesa_glthread_is_compat_bind_vertex_array(ctx)">
+         <param name="array" type="GLuint"/>
+     </function>
+ 
+diff --git a/src/mapi/glapi/gen/GL3x.xml b/src/mapi/glapi/gen/GL3x.xml
+index 65f12a4258..b603e1f82f 100644
+--- a/src/mapi/glapi/gen/GL3x.xml
++++ b/src/mapi/glapi/gen/GL3x.xml
+@@ -256,7 +256,8 @@
+ 
+   <!-- These functions alias ones from GL_EXT_gpu_shader4 -->
+ 
+-  <function name="VertexAttribIPointer" es2="3.0" marshal="async">
++  <function name="VertexAttribIPointer" es2="3.0" marshal="async"
++            marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
+     <param name="index" type="GLuint"/>
+     <param name="size" type="GLint"/>
+     <param name="type" type="GLenum"/>
+diff --git a/src/mapi/glapi/gen/gl_API.xml b/src/mapi/glapi/gen/gl_API.xml
+index 79dda8467c..f81ad1dc77 100644
+--- a/src/mapi/glapi/gen/gl_API.xml
++++ b/src/mapi/glapi/gen/gl_API.xml
+@@ -3153,7 +3153,8 @@
+         <glx handcode="true"/>
+     </function>
+ 
+-    <function name="ColorPointer" es1="1.0" deprecated="3.1" marshal="async">
++    <function name="ColorPointer" es1="1.0" deprecated="3.1" marshal="async"
++              marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
+         <param name="size" type="GLint"/>
+         <param name="type" type="GLenum"/>
+         <param name="stride" type="GLsizei"/>
+@@ -3173,7 +3174,8 @@
+         <glx rop="193" handcode="true"/>
+     </function>
+ 
+-    <function name="DrawElements" es1="1.0" es2="2.0" exec="dynamic" marshal="draw">
++    <function name="DrawElements" es1="1.0" es2="2.0" exec="dynamic" marshal="draw"
++              marshal_fail="_mesa_glthread_is_non_vbo_draw_elements(ctx)">
+         <param name="mode" type="GLenum"/>
+         <param name="count" type="GLsizei"/>
+         <param name="type" type="GLenum"/>
+@@ -3181,7 +3183,8 @@
+         <glx handcode="true"/>
+     </function>
+ 
+-    <function name="EdgeFlagPointer" deprecated="3.1" marshal="async">
++    <function name="EdgeFlagPointer" deprecated="3.1" marshal="async"
++              marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
+         <param name="stride" type="GLsizei"/>
+         <param name="pointer" type="const GLvoid *"/>
+         <glx handcode="true"/>
+@@ -3198,7 +3201,8 @@
+         <glx handcode="true"/>
+     </function>
+ 
+-    <function name="IndexPointer" deprecated="3.1" marshal="async">
++    <function name="IndexPointer" deprecated="3.1" marshal="async"
++              marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
+         <param name="type" type="GLenum"/>
+         <param name="stride" type="GLsizei"/>
+         <param name="pointer" type="const GLvoid *"/>
+@@ -3212,14 +3216,16 @@
+         <glx handcode="true"/>
+     </function>
+ 
+-    <function name="NormalPointer" es1="1.0" deprecated="3.1" marshal="async">
++    <function name="NormalPointer" es1="1.0" deprecated="3.1" marshal="async"
++              marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
+         <param name="type" type="GLenum"/>
+         <param name="stride" type="GLsizei"/>
+         <param name="pointer" type="const GLvoid *"/>
+         <glx handcode="true"/>
+     </function>
+ 
+-    <function name="TexCoordPointer" es1="1.0" deprecated="3.1" marshal="async">
++    <function name="TexCoordPointer" es1="1.0" deprecated="3.1" marshal="async"
++              marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
+         <param name="size" type="GLint"/>
+         <param name="type" type="GLenum"/>
+         <param name="stride" type="GLsizei"/>
+@@ -3227,7 +3233,8 @@
+         <glx handcode="true"/>
+     </function>
+ 
+-    <function name="VertexPointer" es1="1.0" deprecated="3.1" marshal="async">
++    <function name="VertexPointer" es1="1.0" deprecated="3.1" marshal="async"
++              marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
+         <param name="size" type="GLint"/>
+         <param name="type" type="GLenum"/>
+         <param name="stride" type="GLsizei"/>
+@@ -3730,7 +3737,8 @@
+         <glx rop="4097"/>
+     </function>
+ 
+-    <function name="DrawRangeElements" es2="3.0" exec="dynamic" marshal="draw">
++    <function name="DrawRangeElements" es2="3.0" exec="dynamic" marshal="draw"
++              marshal_fail="_mesa_glthread_is_non_vbo_draw_elements(ctx)">
+         <param name="mode" type="GLenum"/>
+         <param name="start" type="GLuint"/>
+         <param name="end" type="GLuint"/>
+@@ -4716,7 +4724,8 @@
+         <glx rop="4125"/>
+     </function>
+ 
+-    <function name="FogCoordPointer" deprecated="3.1" marshal="async">
++    <function name="FogCoordPointer" deprecated="3.1" marshal="async"
++              marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
+         <param name="type" type="GLenum"/>
+         <param name="stride" type="GLsizei"/>
+         <param name="pointer" type="const GLvoid *"/>
+@@ -4852,7 +4861,8 @@
+         <glx rop="4132"/>
+     </function>
+ 
+-    <function name="SecondaryColorPointer" deprecated="3.1" marshal="async">
++    <function name="SecondaryColorPointer" deprecated="3.1" marshal="async"
++              marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
+         <param name="size" type="GLint"/>
+         <param name="type" type="GLenum"/>
+         <param name="stride" type="GLsizei"/>
+@@ -5017,7 +5027,7 @@
+     <type name="intptr"   size="4"                  glx_name="CARD32"/>
+     <type name="sizeiptr" size="4"  unsigned="true" glx_name="CARD32"/>
+ 
+-    <function name="BindBuffer" es1="1.1" es2="2.0">
++    <function name="BindBuffer" es1="1.1" es2="2.0" marshal="custom">
+         <param name="target" type="GLenum"/>
+         <param name="buffer" type="GLuint"/>
+         <glx ignore="true"/>
+@@ -5806,7 +5816,8 @@
+         <glx rop="4233"/>
+     </function>
+ 
+-    <function name="VertexAttribPointer" es2="2.0" marshal="async">
++    <function name="VertexAttribPointer" es2="2.0" marshal="async"
++              marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
+         <param name="index" type="GLuint"/>
+         <param name="size" type="GLint"/>
+         <param name="type" type="GLenum"/>
+@@ -9179,7 +9190,8 @@
+         <param name="i" type="GLint"/>
+     </function>
+ 
+-    <function name="ColorPointerEXT" deprecated="3.1" marshal="async">
++    <function name="ColorPointerEXT" deprecated="3.1" marshal="async"
++              marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
+         <param name="size" type="GLint"/>
+         <param name="type" type="GLenum"/>
+         <param name="stride" type="GLsizei"/>
+@@ -9194,7 +9206,8 @@
+         <param name="count" type="GLsizei"/>
+     </function>
+ 
+-    <function name="EdgeFlagPointerEXT" deprecated="3.1" marshal="async">
++    <function name="EdgeFlagPointerEXT" deprecated="3.1" marshal="async"
++              marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
+         <param name="stride" type="GLsizei"/>
+         <param name="count" type="GLsizei"/>
+         <param name="pointer" type="const GLboolean *"/>
+@@ -9206,7 +9219,8 @@
+         <param name="params" type="GLvoid **" output="true"/>
+     </function>
+ 
+-    <function name="IndexPointerEXT" deprecated="3.1" marshal="async">
++    <function name="IndexPointerEXT" deprecated="3.1" marshal="async"
++              marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
+         <param name="type" type="GLenum"/>
+         <param name="stride" type="GLsizei"/>
+         <param name="count" type="GLsizei"/>
+@@ -9214,7 +9228,8 @@
+         <glx handcode="true"/>
+     </function>
+ 
+-    <function name="NormalPointerEXT" deprecated="3.1" marshal="async">
++    <function name="NormalPointerEXT" deprecated="3.1" marshal="async"
++              marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
+         <param name="type" type="GLenum"/>
+         <param name="stride" type="GLsizei"/>
+         <param name="count" type="GLsizei"/>
+@@ -9222,7 +9237,8 @@
+         <glx handcode="true"/>
+     </function>
+ 
+-    <function name="TexCoordPointerEXT" deprecated="3.1" marshal="async">
++    <function name="TexCoordPointerEXT" deprecated="3.1" marshal="async"
++              marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
+         <param name="size" type="GLint"/>
+         <param name="type" type="GLenum"/>
+         <param name="stride" type="GLsizei"/>
+@@ -9231,7 +9247,8 @@
+         <glx handcode="true"/>
+     </function>
+ 
+-    <function name="VertexPointerEXT" deprecated="3.1" marshal="async">
++    <function name="VertexPointerEXT" deprecated="3.1" marshal="async"
++              marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
+         <param name="size" type="GLint"/>
+         <param name="type" type="GLenum"/>
+         <param name="stride" type="GLsizei"/>
+@@ -10206,7 +10223,8 @@
+         <param name="primcount" type="GLsizei"/>
+     </function>
+ 
+-    <function name="MultiDrawElementsEXT" es1="1.0" es2="2.0" exec="dynamic" marshal="draw">
++    <function name="MultiDrawElementsEXT" es1="1.0" es2="2.0" exec="dynamic" marshal="draw"
++              marshal_fail="_mesa_glthread_is_non_vbo_draw_elements(ctx)">
+         <param name="mode" type="GLenum"/>
+         <param name="count" type="const GLsizei *"/>
+         <param name="type" type="GLenum"/>
+@@ -11225,7 +11243,8 @@
+         <glx handcode="true" ignore="true"/>
+     </function>
+ 
+-    <function name="MultiModeDrawElementsIBM" marshal="draw">
++    <function name="MultiModeDrawElementsIBM" marshal="draw"
++              marshal_fail="_mesa_glthread_is_non_vbo_draw_elements(ctx)">
+         <param name="mode" type="const GLenum *"/>
+         <param name="count" type="const GLsizei *"/>
+         <param name="type" type="GLenum"/>
+diff --git a/src/mapi/glapi/gen/gl_marshal.py b/src/mapi/glapi/gen/gl_marshal.py
+index a50d773e27..165275904f 100644
+--- a/src/mapi/glapi/gen/gl_marshal.py
++++ b/src/mapi/glapi/gen/gl_marshal.py
+@@ -252,10 +252,6 @@ class PrintCode(gl_XML.gl_print_base):
+                 self.print_sync_dispatch(func)
+             out('}')
+ 
+-            if func.marshal == 'draw':
+-                out('/* We relied on all vertex and index data being in VBOs */')
+-                out('assert(ctx->API == API_OPENGL_CORE);')
+-
+         out('}')
+ 
+     def print_async_body(self, func):
+diff --git a/src/mesa/main/glthread.h b/src/mesa/main/glthread.h
+index 98ae11509a..04eb5ffabc 100644
+--- a/src/mesa/main/glthread.h
++++ b/src/mesa/main/glthread.h
+@@ -79,6 +79,18 @@ struct glthread_state
+     * be accessed.
+     */
+    struct glthread_batch *batch;
++
++   /**
++    * Tracks on the main thread side whether the current vertex array binding
++    * is in a VBO.
++    */
++   bool vertex_array_is_vbo;
++
++   /**
++    * Tracks on the main thread side whether the current element array (index
++    * buffer) binding is in a VBO.
++    */
++   bool element_array_is_vbo;
+ };
+ 
+ /**
+diff --git a/src/mesa/main/marshal.c b/src/mesa/main/marshal.c
+index 14577dd4cb..37c7b1b3dd 100644
+--- a/src/mesa/main/marshal.c
++++ b/src/mesa/main/marshal.c
+@@ -154,3 +154,106 @@ _mesa_marshal_ShaderSource(GLuint shader, GLsizei count,
+    }
+    free(length_tmp);
+ }
++
++
++/* BindBufferBase: marshalled asynchronously */
++struct marshal_cmd_BindBufferBase
++{
++   struct marshal_cmd_base cmd_base;
++   GLenum target;
++   GLuint index;
++   GLuint buffer;
++};
++static inline void
++_mesa_unmarshal_BindBufferBase(struct gl_context *ctx, const struct marshal_cmd_BindBufferBase *cmd)
++{
++   const GLenum target = cmd->target;
++   const GLuint index = cmd->index;
++   const GLuint buffer = cmd->buffer;
++   CALL_BindBufferBase(ctx->CurrentServerDispatch, (target, index, buffer));
++}
++
++/** Tracks the current bindings for the vertex array and index array buffers.
++ *
++ * This is part of what we need to enable glthread on compat-GL contexts that
++ * happen to use VBOs, without also supporting the full tracking of VBO vs
++ * user vertex array bindings per attribute on each vertex array for
++ * determining what to upload at draw call time.
++ *
++ * Note that GL core makes it so that a buffer binding with an invalid handle
++ * in the "buffer" parameter will throw an error, and then a
++ * glVertexAttribPointer() that followsmight not end up pointing at a VBO.
++ * However, in GL core the draw call would throw an error as well, so we don't
++ * really care if our tracking is wrong for this case -- we never need to
++ * marshal user data for draw calls, and the unmarshal will just generate an
++ * error or not as appropriate.
++ *
++ * For compatibility GL, we do need to accurately know whether the draw call
++ * on the unmarshal side will dereference a user pointer or load data from a
++ * VBO per vertex.  That would make it seem like we need to track whether a
++ * "buffer" is valid, so that we can know when an error will be generated
++ * instead of updating the binding.  However, compat GL has the ridiculous
++ * feature that if you pass a bad name, it just gens a buffer object for you,
++ * so we escape without having to know if things are valid or not.
++ */
++static void
++track_vbo_binding(struct gl_context *ctx, GLenum target, GLuint buffer)
++{
++   struct glthread_state *glthread = ctx->GLThread;
++
++   switch (target) {
++   case GL_ARRAY_BUFFER:
++      glthread->vertex_array_is_vbo = (buffer != 0);
++      break;
++   case GL_ELEMENT_ARRAY_BUFFER:
++      /* The current element array buffer binding is actually tracked in the
++       * vertex array object instead of the context, so this would need to
++       * change on vertex array object updates.
++       */
++      glthread->element_array_is_vbo = (buffer != 0);
++      break;
++   }
++}
++
++
++struct marshal_cmd_BindBuffer
++{
++   struct marshal_cmd_base cmd_base;
++   GLenum target;
++   GLuint buffer;
++};
++
++/**
++ * This is just like the code-generated glBindBuffer() support, except that we
++ * call track_vbo_binding().
++ */
++void
++_mesa_unmarshal_BindBuffer(struct gl_context *ctx,
++                           const struct marshal_cmd_BindBuffer *cmd)
++{
++   const GLenum target = cmd->target;
++   const GLuint buffer = cmd->buffer;
++   CALL_BindBuffer(ctx->CurrentServerDispatch, (target, buffer));
++}
++void GLAPIENTRY
++_mesa_marshal_BindBuffer(GLenum target, GLuint buffer)
++{
++   GET_CURRENT_CONTEXT(ctx);
++   size_t cmd_size = sizeof(struct marshal_cmd_BindBuffer);
++   struct marshal_cmd_BindBuffer *cmd;
++   debug_print_marshal("BindBuffer");
++
++   track_vbo_binding(ctx, target, buffer);
++
++   if (cmd_size <= MARSHAL_MAX_CMD_SIZE) {
++      cmd = _mesa_glthread_allocate_command(ctx, DISPATCH_CMD_BindBuffer,
++                                            cmd_size);
++      cmd->target = target;
++      cmd->buffer = buffer;
++      _mesa_post_marshal_hook(ctx);
++   } else {
++      _mesa_glthread_finish(ctx);
++      CALL_BindBuffer(ctx->CurrentServerDispatch, (target, buffer));
++   }
++}
++
+diff --git a/src/mesa/main/marshal.h b/src/mesa/main/marshal.h
+index 0e0e9b280c..23b33002e4 100644
+--- a/src/mesa/main/marshal.h
++++ b/src/mesa/main/marshal.h
+@@ -109,8 +109,58 @@ _mesa_post_marshal_hook(struct gl_context *ctx)
+       _mesa_glthread_finish(ctx);
+ }
+ 
++
++/**
++ * Checks whether we're on a compat context for code-generated
++ * glBindVertexArray().
++ *
++ * In order to decide whether a draw call uses only VBOs for vertex and index
++ * buffers, we track the current vertex and index buffer bindings by
++ * glBindBuffer().  However, the index buffer binding is stored in the vertex
++ * array as opposed to the context.  If we were to accurately track whether
++ * the index buffer was a user pointer ot not, we'd have to track it per
++ * vertex array, which would mean synchronizing with the client thread and
++ * looking into the hash table to find the actual vertex array object.  That's
++ * more tracking than we'd like to do in the main thread, if possible.
++ *
++ * Instead, just punt for now and disable threading on apps using vertex
++ * arrays and compat contexts.  Apps using vertex arrays can probably use a
++ * core context.
++ */
++static inline bool
++_mesa_glthread_is_compat_bind_vertex_array(const struct gl_context *ctx)
++{
++   return ctx->API != API_OPENGL_CORE;
++}
++
++/**
++ * Instead of conditionally handling marshaling previously-bound user vertex
++ * array data in draw calls (deprecated and removed in GL core), we just
++ * disable threading at the point where the user sets a user vertex array.
++ */
++static inline bool
++_mesa_glthread_is_non_vbo_vertex_attrib_pointer(const struct gl_context *ctx)
++{
++   struct glthread_state *glthread = ctx->GLThread;
++
++   return ctx->API != API_OPENGL_CORE && !glthread->vertex_array_is_vbo;
++}
++
++/**
++ * Instead of conditionally handling marshaling immediate index data in draw
++ * calls (deprecated and removed in GL core), we just disable threading.
++ */
++static inline bool
++_mesa_glthread_is_non_vbo_draw_elements(const struct gl_context *ctx)
++{
++   struct glthread_state *glthread = ctx->GLThread;
++
++   return ctx->API != API_OPENGL_CORE && !glthread->element_array_is_vbo;
++}
++
+ struct marshal_cmd_ShaderSource;
+ struct marshal_cmd_Flush;
++struct marshal_cmd_BindBuffer;
+ 
+ void GLAPIENTRY
+ _mesa_marshal_ShaderSource(GLuint shader, GLsizei count,
+@@ -127,4 +177,11 @@ void
+ _mesa_unmarshal_Flush(struct gl_context *ctx,
+                       const struct marshal_cmd_Flush *cmd);
+ 
++void GLAPIENTRY
++_mesa_marshal_BindBuffer(GLenum target, GLuint buffer);
++
++void
++_mesa_unmarshal_BindBuffer(struct gl_context *ctx,
++                           const struct marshal_cmd_BindBuffer *cmd);
++
+ #endif /* MARSHAL_H */
+-- 
+2.11.0
+

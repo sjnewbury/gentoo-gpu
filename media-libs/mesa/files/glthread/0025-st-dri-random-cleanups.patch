@@ -1,0 +1,94 @@
+From d7c8d38282e87311fc452635839fcc76d3e05f53 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Marek=20Ol=C5=A1=C3=A1k?= <marek.olsak@amd.com>
+Date: Sun, 5 Feb 2017 01:12:59 +0100
+Subject: [PATCH 25/30] st/dri: random cleanups
+
+---
+ src/gallium/state_trackers/dri/dri_drawable.c | 11 +++++++----
+ src/gallium/state_trackers/dri/dri_screen.c   |  8 +++++---
+ 2 files changed, 12 insertions(+), 7 deletions(-)
+
+diff --git a/src/gallium/state_trackers/dri/dri_drawable.c b/src/gallium/state_trackers/dri/dri_drawable.c
+index edcd0e6843..fd3b458de6 100644
+--- a/src/gallium/state_trackers/dri/dri_drawable.c
++++ b/src/gallium/state_trackers/dri/dri_drawable.c
+@@ -443,6 +443,7 @@ dri_flush(__DRIcontext *cPriv,
+ {
+    struct dri_context *ctx = dri_context(cPriv);
+    struct dri_drawable *drawable = dri_drawable(dPriv);
++   struct st_context_iface *st;
+    unsigned flush_flags;
+    boolean swap_msaa_buffers = FALSE;
+ 
+@@ -451,6 +452,8 @@ dri_flush(__DRIcontext *cPriv,
+       return;
+    }
+ 
++   st = ctx->st;
++
+    if (drawable) {
+       /* prevent recursion */
+       if (drawable->flushing)
+@@ -465,12 +468,12 @@ dri_flush(__DRIcontext *cPriv,
+    /* Flush the drawable. */
+    if ((flags & __DRI2_FLUSH_DRAWABLE) &&
+        drawable->textures[ST_ATTACHMENT_BACK_LEFT]) {
+-      struct pipe_context *pipe = ctx->st->pipe;
++      struct pipe_context *pipe = st->pipe;
+ 
+       if (drawable->stvis.samples > 1 &&
+           reason == __DRI2_THROTTLE_SWAPBUFFER) {
+          /* Resolve the MSAA back buffer. */
+-         dri_pipe_blit(ctx->st->pipe,
++         dri_pipe_blit(st->pipe,
+                        drawable->textures[ST_ATTACHMENT_BACK_LEFT],
+                        drawable->msaa_textures[ST_ATTACHMENT_BACK_LEFT]);
+ 
+@@ -529,7 +532,7 @@ dri_flush(__DRIcontext *cPriv,
+          screen->fence_reference(screen, &fence, NULL);
+       }
+ 
+-      ctx->st->flush(ctx->st, flush_flags, &fence);
++      st->flush(st, flush_flags, &fence);
+ 
+       if (fence) {
+          swap_fences_push_back(drawable, fence);
+@@ -537,7 +540,7 @@ dri_flush(__DRIcontext *cPriv,
+       }
+    }
+    else if (flags & (__DRI2_FLUSH_DRAWABLE | __DRI2_FLUSH_CONTEXT)) {
+-      ctx->st->flush(ctx->st, flush_flags, NULL);
++      st->flush(st, flush_flags, NULL);
+    }
+ 
+    if (drawable) {
+diff --git a/src/gallium/state_trackers/dri/dri_screen.c b/src/gallium/state_trackers/dri/dri_screen.c
+index a950f5241d..9a8a0f9881 100644
+--- a/src/gallium/state_trackers/dri/dri_screen.c
++++ b/src/gallium/state_trackers/dri/dri_screen.c
+@@ -82,9 +82,11 @@ const __DRIconfigOptionsExtension gallium_config_options = {
+ #define false 0
+ 
+ static void
+-dri_fill_st_options(struct st_config_options *options,
+-                    const struct driOptionCache * optionCache)
++dri_fill_st_options(struct dri_screen *screen)
+ {
++   struct st_config_options *options = &screen->options;
++   const struct driOptionCache *optionCache = &screen->optionCache;
++
+    options->disable_blend_func_extended =
+       driQueryOptionb(optionCache, "disable_blend_func_extended");
+    options->disable_glsl_line_continuations =
+@@ -450,7 +452,7 @@ dri_init_screen_helper(struct dri_screen *screen,
+                        screen->sPriv->myNum,
+                        driver_name);
+ 
+-   dri_fill_st_options(&screen->options, &screen->optionCache);
++   dri_fill_st_options(screen);
+ 
+    /* Handle force_s3tc_enable. */
+    if (!util_format_s3tc_enabled && screen->options.force_s3tc_enable) {
+-- 
+2.11.0
+

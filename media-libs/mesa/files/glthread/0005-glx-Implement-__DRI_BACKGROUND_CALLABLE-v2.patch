@@ -1,0 +1,97 @@
+From 463f36973749b1e8694ba1e684c8a784216371d2 Mon Sep 17 00:00:00 2001
+From: Paul Berry <stereotype441@gmail.com>
+Date: Wed, 14 Nov 2012 15:50:27 -0800
+Subject: [PATCH 05/30] glx: Implement __DRI_BACKGROUND_CALLABLE (v2)
+
+v2: Marek: Add DRI3 support.
+---
+ src/glx/dri2_glx.c | 16 +++++++++++++++-
+ src/glx/dri3_glx.c | 13 +++++++++++++
+ 2 files changed, 28 insertions(+), 1 deletion(-)
+
+diff --git a/src/glx/dri2_glx.c b/src/glx/dri2_glx.c
+index d6eb281cf9..8dabcb31b1 100644
+--- a/src/glx/dri2_glx.c
++++ b/src/glx/dri2_glx.c
+@@ -74,7 +74,7 @@ struct dri2_display
+ 
+    __glxHashTable *dri2Hash;
+ 
+-   const __DRIextension *loader_extensions[4];
++   const __DRIextension *loader_extensions[5];
+ };
+ 
+ struct dri2_drawable
+@@ -946,6 +946,13 @@ dri2GetSwapInterval(__GLXDRIdrawable *pdraw)
+   return priv->swap_interval;
+ }
+ 
++static void
++driSetBackgroundContext(void *loaderPrivate)
++{
++   struct dri2_context *pcp = (struct dri2_context *) loaderPrivate;
++   __glXSetCurrentContext(&pcp->base);
++}
++
+ static const __DRIdri2LoaderExtension dri2LoaderExtension = {
+    .base = { __DRI_DRI2_LOADER, 3 },
+ 
+@@ -966,6 +973,11 @@ static const __DRIuseInvalidateExtension dri2UseInvalidate = {
+    .base = { __DRI_USE_INVALIDATE, 1 }
+ };
+ 
++static const __DRIbackgroundCallableExtension driBackgroundCallable = {
++   { __DRI_BACKGROUND_CALLABLE, __DRI_BACKGROUND_CALLABLE_VERSION },
++   driSetBackgroundContext,
++};
++
+ _X_HIDDEN void
+ dri2InvalidateBuffers(Display *dpy, XID drawable)
+ {
+@@ -1397,6 +1409,8 @@ dri2CreateDisplay(Display * dpy)
+ 
+    pdp->loader_extensions[i++] = &dri2UseInvalidate.base;
+ 
++   pdp->loader_extensions[i++] = &driBackgroundCallable.base;
++
+    pdp->loader_extensions[i++] = NULL;
+ 
+    pdp->dri2Hash = __glxHashCreate();
+diff --git a/src/glx/dri3_glx.c b/src/glx/dri3_glx.c
+index 4472a0bed2..5c28c5fb3a 100644
+--- a/src/glx/dri3_glx.c
++++ b/src/glx/dri3_glx.c
+@@ -490,6 +490,13 @@ dri3_flush_front_buffer(__DRIdrawable *driDrawable, void *loaderPrivate)
+    loader_dri3_wait_gl(draw);
+ }
+ 
++static void
++dri_set_background_context(void *loaderPrivate)
++{
++   struct dri3_context *pcp = (struct dri3_context *)loaderPrivate;
++   __glXSetCurrentContext(&pcp->base);
++}
++
+ /* The image loader extension record for DRI3
+  */
+ static const __DRIimageLoaderExtension imageLoaderExtension = {
+@@ -503,10 +510,16 @@ const __DRIuseInvalidateExtension dri3UseInvalidate = {
+    .base = { __DRI_USE_INVALIDATE, 1 }
+ };
+ 
++static const __DRIbackgroundCallableExtension driBackgroundCallable = {
++   { __DRI_BACKGROUND_CALLABLE, 1 },
++   dri_set_background_context,
++};
++
+ static const __DRIextension *loader_extensions[] = {
+    &imageLoaderExtension.base,
+    &systemTimeExtension.base,
+    &dri3UseInvalidate.base,
++   &driBackgroundCallable.base,
+    NULL
+ };
+ 
+-- 
+2.11.0
+

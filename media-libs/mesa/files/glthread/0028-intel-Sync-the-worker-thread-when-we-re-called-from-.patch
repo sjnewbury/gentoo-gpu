@@ -1,0 +1,143 @@
+From 12c7f6b028e3ba587376aba59bcc2d5a0f07c6f8 Mon Sep 17 00:00:00 2001
+From: Eric Anholt <eric@anholt.net>
+Date: Fri, 28 Dec 2012 13:26:33 -0800
+Subject: [PATCH 28/30] intel: Sync the worker thread when we're called from
+ the loader.
+
+The EGL image creation entrypoints don't appear to do anything to
+the GL context, so they don't need this treatment.
+---
+ src/mesa/drivers/dri/i915/intel_context.c   |  8 ++++++++
+ src/mesa/drivers/dri/i915/intel_screen.c    | 10 ++++++++++
+ src/mesa/drivers/dri/i915/intel_tex_image.c | 13 +++++++++++++
+ src/mesa/main/context.c                     | 11 ++++++++++-
+ 4 files changed, 41 insertions(+), 1 deletion(-)
+
+diff --git a/src/mesa/drivers/dri/i915/intel_context.c b/src/mesa/drivers/dri/i915/intel_context.c
+index 5607d5b5b6..01100d11a1 100644
+--- a/src/mesa/drivers/dri/i915/intel_context.c
++++ b/src/mesa/drivers/dri/i915/intel_context.c
+@@ -32,6 +32,7 @@
+ #include "main/fbobject.h"
+ #include "main/framebuffer.h"
+ #include "main/imports.h"
++#include "main/glthread.h"
+ #include "main/points.h"
+ #include "main/renderbuffer.h"
+ 
+@@ -630,6 +631,13 @@ intelMakeCurrent(__DRIcontext * driContextPriv,
+    else
+       intel = NULL;
+ 
++   /* This entrypoint is called from the loader in the main thread, so we need
++    * to make sure any worker thread is done before we do anything to the
++    * context (such as changing its drawable).
++    */
++   if (curCtx)
++      _mesa_glthread_finish(curCtx);
++
+    /* According to the glXMakeCurrent() man page: "Pending commands to
+     * the previous context, if any, are flushed before it is released."
+     * But only flush if we're actually changing contexts.
+diff --git a/src/mesa/drivers/dri/i915/intel_screen.c b/src/mesa/drivers/dri/i915/intel_screen.c
+index 5c7c06a9c1..9af06275e0 100644
+--- a/src/mesa/drivers/dri/i915/intel_screen.c
++++ b/src/mesa/drivers/dri/i915/intel_screen.c
+@@ -36,6 +36,7 @@
+ #include "main/hash.h"
+ #include "main/fbobject.h"
+ #include "main/version.h"
++#include "main/marshal.h"
+ #include "swrast/s_renderbuffer.h"
+ 
+ #include "utils.h"
+@@ -157,6 +158,12 @@ intelDRI2Flush(__DRIdrawable *drawable)
+    if (intel == NULL)
+       return;
+ 
++   /* This entrypoint is called from the loader in the main thread, so we need
++    * to make sure any worker thread is done before we do anything to the
++    * context.
++    */
++   _mesa_glthread_finish(ctx);
++
+    INTEL_FIREVERTICES(intel);
+ 
+    intel->need_throttle = true;
+@@ -331,9 +338,12 @@ intel_create_image_from_renderbuffer(__DRIcontext *context,
+ {
+    __DRIimage *image;
+    struct intel_context *intel = context->driverPrivate;
++   struct gl_context *ctx = &intel->ctx;
+    struct gl_renderbuffer *rb;
+    struct intel_renderbuffer *irb;
+ 
++   _mesa_glthread_finish(ctx);
++
+    rb = _mesa_lookup_renderbuffer(&intel->ctx, renderbuffer);
+    if (!rb) {
+       _mesa_error(&intel->ctx,
+diff --git a/src/mesa/drivers/dri/i915/intel_tex_image.c b/src/mesa/drivers/dri/i915/intel_tex_image.c
+index 63ef08b44a..efa322c893 100644
+--- a/src/mesa/drivers/dri/i915/intel_tex_image.c
++++ b/src/mesa/drivers/dri/i915/intel_tex_image.c
+@@ -7,6 +7,7 @@
+ #include "main/context.h"
+ #include "main/formats.h"
+ #include "main/image.h"
++#include "main/glthread.h"
+ #include "main/pbo.h"
+ #include "main/renderbuffer.h"
+ #include "main/texcompress.h"
+@@ -288,6 +289,12 @@ intelSetTexBuffer2(__DRIcontext *pDRICtx, GLint target,
+    int level = 0, internalFormat = 0;
+    mesa_format texFormat = MESA_FORMAT_NONE;
+ 
++   /* This entrypoint is called from the loader in the main thread, so we need
++    * to make sure any worker thread is done before we do anything to the
++    * context.
++    */
++   _mesa_glthread_finish(ctx);
++
+    texObj = _mesa_get_current_tex_object(ctx, target);
+    intelObj = intel_texture_object(texObj);
+ 
+@@ -348,6 +355,12 @@ intel_image_target_texture_2d(struct gl_context *ctx, GLenum target,
+    __DRIscreen *screen;
+    __DRIimage *image;
+ 
++   /* This entrypoint is called from the loader in the main thread, so we need
++    * to make sure any worker thread is done before we do anything to the
++    * context.
++    */
++   _mesa_glthread_finish(ctx);
++
+    screen = intel->intelScreen->driScrnPriv;
+    image = screen->dri2.image->lookupEGLImage(screen, image_handle,
+ 					      screen->loaderPrivate);
+diff --git a/src/mesa/main/context.c b/src/mesa/main/context.c
+index fabb63fe82..60d065e2c9 100644
+--- a/src/mesa/main/context.c
++++ b/src/mesa/main/context.c
+@@ -1654,8 +1654,17 @@ _mesa_make_current( struct gl_context *newCtx,
+        /* make sure this context is valid for flushing */
+        curCtx != newCtx &&
+        curCtx->Const.ContextReleaseBehavior ==
+-       GL_CONTEXT_RELEASE_BEHAVIOR_FLUSH)
++       GL_CONTEXT_RELEASE_BEHAVIOR_FLUSH) {
++
++      /* HACK: it's possible that next time the context becomes current it
++       * will have different drawables.  So if we're marshalling, we need to
++       * synchronize with the server thread so that any pending drawing gets
++       * finished before we switch drawables around.
++       */
++      _mesa_glthread_finish(curCtx);
++
+       _mesa_flush(curCtx);
++   }
+ 
+    /* We used to call _glapi_check_multithread() here.  Now do it in drivers */
+    _glapi_set_context((void *) newCtx);
+-- 
+2.11.0
+

@@ -1,0 +1,34 @@
+From 6ee5b92842d4feafd0687d12957e24dd7c1a7747 Mon Sep 17 00:00:00 2001
+From: Eric Anholt <eric@anholt.net>
+Date: Mon, 4 Mar 2013 13:58:26 -0800
+Subject: [PATCH 24/30] mesa: Enable glthread on non-core contexts as well.
+
+I think I've fixed the last issue preventing trying glthread from being a
+reasonable thing to do on compat contexts.
+---
+ src/mesa/main/glthread.c | 9 ---------
+ 1 file changed, 9 deletions(-)
+
+diff --git a/src/mesa/main/glthread.c b/src/mesa/main/glthread.c
+index 3a7c753fac..27f011e95a 100644
+--- a/src/mesa/main/glthread.c
++++ b/src/mesa/main/glthread.c
+@@ -119,15 +119,6 @@ _mesa_glthread_init(struct gl_context *ctx)
+    if (!glthread)
+       return;
+ 
+-   /* The marshalling dispatch table isn't integrated with the Begin/End
+-    * dispatch table for desktop OpenGL, and the drawing functions are
+-    * synchronous to support user vertex arrays on everything but GL core
+-    * (even GLES 2/3) anyway, which means you'll end up with too much overhead
+-    * from threading.
+-    */
+-   if (ctx->API != API_OPENGL_CORE)
+-      return;
+-
+    ctx->MarshalExec = _mesa_create_marshal_table(ctx);
+    if (!ctx->MarshalExec) {
+       free(glthread);
+-- 
+2.11.0
+

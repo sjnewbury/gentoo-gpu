@@ -1,0 +1,56 @@
+From 380d0d133d259bd2882bd2a7346dfddcad14bf9d Mon Sep 17 00:00:00 2001
+From: Paul Berry <stereotype441@gmail.com>
+Date: Wed, 14 Nov 2012 14:26:22 -0800
+Subject: [PATCH 04/30] mesa: Add SetBackgroundContext to dd_function_table
+
+---
+ src/mesa/drivers/common/driverfuncs.c |  3 +++
+ src/mesa/main/dd.h                    | 18 ++++++++++++++++++
+ 2 files changed, 21 insertions(+)
+
+diff --git a/src/mesa/drivers/common/driverfuncs.c b/src/mesa/drivers/common/driverfuncs.c
+index 6069138e35..642cd91ce1 100644
+--- a/src/mesa/drivers/common/driverfuncs.c
++++ b/src/mesa/drivers/common/driverfuncs.c
+@@ -201,6 +201,9 @@ _mesa_init_driver_functions(struct dd_function_table *driver)
+ 
+    /* GL_ARB_texture_multisample */
+    driver->GetSamplePosition = NULL;
++
++   /* Multithreading */
++   driver->SetBackgroundContext = NULL;
+ }
+ 
+ 
+diff --git a/src/mesa/main/dd.h b/src/mesa/main/dd.h
+index 7ebd084ca3..da073dbd5b 100644
+--- a/src/mesa/main/dd.h
++++ b/src/mesa/main/dd.h
+@@ -984,6 +984,24 @@ struct dd_function_table {
+     */
+    void (*QueryMemoryInfo)(struct gl_context *ctx,
+                            struct gl_memory_info *info);
++
++   /**
++    * Indicate that this thread is being used by Mesa as a background drawing
++    * thread for the given GL context.
++    *
++    * If this function is called more than once from any given thread, each
++    * subsequent call overrides the context that was passed in the previous
++    * call.  Mesa takes advantage of this to re-use a background thread to
++    * perform drawing on behalf of multiple contexts.
++    *
++    * Mesa may sometimes call this function from a non-background thread
++    * (i.e. a thread that has already been bound to a context using
++    * __DriverAPIRec::MakeCurrent()); when this happens, ctx will be equal to
++    * the context that is bound to this thread.
++    *
++    * Mesa will only call this function if GL multithreading is enabled.
++    */
++   void (*SetBackgroundContext)(struct gl_context *ctx);
+ };
+ 
+ 
+-- 
+2.11.0
+

@@ -1,0 +1,96 @@
+From 170424276c831e01c65864106e11a7d5621455c8 Mon Sep 17 00:00:00 2001
+From: Eric Anholt <eric@anholt.net>
+Date: Wed, 2 Jan 2013 14:12:04 -0800
+Subject: [PATCH 14/30] mesa: Connect the generated GL command marshalling code
+ to the build.
+
+v2: Rebase on the Begin/End changes, and just disable this feature on
+    non-GL-core.
+---
+ src/mapi/glapi/gen/gl_marshal.py | 10 ++++++++++
+ src/mesa/Makefile.sources        |  2 ++
+ src/mesa/main/glthread.c         | 25 +++++++++++++++++++++++++
+ 3 files changed, 37 insertions(+)
+
+diff --git a/src/mapi/glapi/gen/gl_marshal.py b/src/mapi/glapi/gen/gl_marshal.py
+index f8dfa003b0..e4137f46ab 100644
+--- a/src/mapi/glapi/gen/gl_marshal.py
++++ b/src/mapi/glapi/gen/gl_marshal.py
+@@ -66,6 +66,16 @@ class PrintCode(gl_XML.gl_print_base):
+ 
+     def printRealHeader(self):
+         print header
++        print '#include <X11/Xlib-xcb.h>'
++        print
++        print 'static _X_INLINE int safe_mul(int a, int b)'
++        print '{'
++        print '    if (a < 0 || b < 0) return -1;'
++        print '    if (a == 0 || b == 0) return 0;'
++        print '    if (a > INT_MAX / b) return -1;'
++        print '    return a * b;'
++        print '}'
++        print
+ 
+     def printRealFooter(self):
+         pass
+diff --git a/src/mesa/Makefile.sources b/src/mesa/Makefile.sources
+index 87d675d86b..65e1fc9c47 100644
+--- a/src/mesa/Makefile.sources
++++ b/src/mesa/Makefile.sources
+@@ -132,6 +132,8 @@ MAIN_FILES = \
+ 	main/lines.c \
+ 	main/lines.h \
+ 	main/macros.h \
++	main/marshal_generated.c \
++	main/marshal_generated.h \
+ 	main/matrix.c \
+ 	main/matrix.h \
+ 	main/mipmap.c \
+diff --git a/src/mesa/main/glthread.c b/src/mesa/main/glthread.c
+index 8877a695f0..01ca78c275 100644
+--- a/src/mesa/main/glthread.c
++++ b/src/mesa/main/glthread.c
+@@ -54,8 +54,16 @@ glthread_allocate_batch(struct gl_context *ctx)
+ static void
+ glthread_unmarshal_batch(struct gl_context *ctx, struct glthread_batch *batch)
+ {
++   size_t pos = 0;
++
+    _glapi_set_dispatch(ctx->CurrentServerDispatch);
+ 
++   while (pos < batch->used) {
++      pos += _mesa_unmarshal_dispatch_cmd(ctx, &batch->buffer[pos]);
++   }
++
++   assert(pos == batch->used);
++
+    free(batch->buffer);
+    free(batch);
+ }
+@@ -112,6 +120,23 @@ _mesa_glthread_init(struct gl_context *ctx)
+    if (!glthread)
+       return;
+ 
++   /* The marshalling dispatch table isn't integrated with the Begin/End
++    * dispatch table for desktop OpenGL, and the drawing functions are
++    * synchronous to support user vertex arrays on everything but GL core
++    * (even GLES 2/3) anyway, which means you'll end up with too much overhead
++    * from threading.
++    */
++   if (ctx->API != API_OPENGL_CORE)
++      return;
++
++   ctx->MarshalExec = _mesa_create_marshal_table(ctx);
++   if (!ctx->MarshalExec) {
++      free(glthread);
++      return;
++   }
++
++   ctx->CurrentClientDispatch = ctx->MarshalExec;
++
+    pthread_mutex_init(&glthread->mutex, NULL);
+    pthread_cond_init(&glthread->new_work, NULL);
+    pthread_cond_init(&glthread->work_done, NULL);
+-- 
+2.11.0
+

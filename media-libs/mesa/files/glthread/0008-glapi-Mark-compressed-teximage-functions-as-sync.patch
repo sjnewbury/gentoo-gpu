@@ -1,0 +1,66 @@
+From ca5267a26d5038bff0e117234582572d648fa8ae Mon Sep 17 00:00:00 2001
+From: Eric Anholt <eric@anholt.net>
+Date: Tue, 5 Mar 2013 11:51:18 -0800
+Subject: [PATCH 08/30] glapi: Mark compressed teximage functions as sync.
+
+Without doing some additional tracking, we won't know whether the data
+will be immediate user data, or will be loaded from a PBO.  The normal
+teximage functions will be sync by default because they don't know up
+front what the size of their image data is.  But for compressed teximage,
+we have the count information, so they would end up async by default.
+---
+ src/mapi/glapi/gen/gl_API.xml | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/src/mapi/glapi/gen/gl_API.xml b/src/mapi/glapi/gen/gl_API.xml
+index 493b0b01fe..e2e27195ed 100644
+--- a/src/mapi/glapi/gen/gl_API.xml
++++ b/src/mapi/glapi/gen/gl_API.xml
+@@ -4494,7 +4494,7 @@
+         <glx rop="229"/>
+     </function>
+ 
+-    <function name="CompressedTexImage3D" es2="3.0">
++    <function name="CompressedTexImage3D" es2="3.0" marshal="sync">
+         <param name="target" type="GLenum"/>
+         <param name="level" type="GLint"/>
+         <param name="internalformat" type="GLenum"/>
+@@ -4507,7 +4507,7 @@
+         <glx rop="216" handcode="client"/>
+     </function>
+ 
+-    <function name="CompressedTexImage2D" es1="1.0" es2="2.0">
++    <function name="CompressedTexImage2D" es1="1.0" es2="2.0" marshal="sync">
+         <param name="target" type="GLenum"/>
+         <param name="level" type="GLint"/>
+         <param name="internalformat" type="GLenum"/>
+@@ -4519,7 +4519,7 @@
+         <glx rop="215" handcode="client"/>
+     </function>
+ 
+-    <function name="CompressedTexImage1D">
++    <function name="CompressedTexImage1D" marshal="sync">
+         <param name="target" type="GLenum"/>
+         <param name="level" type="GLint"/>
+         <param name="internalformat" type="GLenum"/>
+@@ -4530,7 +4530,7 @@
+         <glx rop="214" handcode="client"/>
+     </function>
+ 
+-    <function name="CompressedTexSubImage3D" es2="3.0">
++    <function name="CompressedTexSubImage3D" es2="3.0" marshal="sync">
+         <param name="target" type="GLenum"/>
+         <param name="level" type="GLint"/>
+         <param name="xoffset" type="GLint"/>
+@@ -4545,7 +4545,7 @@
+         <glx rop="219" handcode="client"/>
+     </function>
+ 
+-    <function name="CompressedTexSubImage2D" es1="1.0" es2="2.0">
++    <function name="CompressedTexSubImage2D" es1="1.0" es2="2.0" marshal="sync">
+         <param name="target" type="GLenum"/>
+         <param name="level" type="GLint"/>
+         <param name="xoffset" type="GLint"/>
+-- 
+2.11.0
+
