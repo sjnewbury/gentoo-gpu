@@ -7,27 +7,25 @@ Subject: [PATCH 28/30] intel: Sync the worker thread when we're called from
 The EGL image creation entrypoints don't appear to do anything to
 the GL context, so they don't need this treatment.
 ---
- src/mesa/drivers/dri/i915/intel_context.c   |  8 ++++++++
- src/mesa/drivers/dri/i915/intel_screen.c    | 10 ++++++++++
- src/mesa/drivers/dri/i915/intel_tex_image.c | 13 +++++++++++++
+ src/mesa/drivers/dri/i965/brw_context.c   |  8 ++++++++
+ src/mesa/drivers/dri/i965/intel_screen.c    | 10 ++++++++++
+ src/mesa/drivers/dri/i965/intel_tex_image.c | 13 +++++++++++++
  src/mesa/main/context.c                     | 11 ++++++++++-
  4 files changed, 41 insertions(+), 1 deletion(-)
 
-diff --git a/src/mesa/drivers/dri/i915/intel_context.c b/src/mesa/drivers/dri/i915/intel_context.c
+diff --git a/src/mesa/drivers/dri/i965/brw_context.c b/src/mesa/drivers/dri/i965/brw_context.c
 index 5607d5b5b6..01100d11a1 100644
---- a/src/mesa/drivers/dri/i915/intel_context.c
-+++ b/src/mesa/drivers/dri/i915/intel_context.c
-@@ -32,6 +32,7 @@
- #include "main/fbobject.h"
- #include "main/framebuffer.h"
+@@ -38,6 +38,7 @@
+ #include "main/extensions.h"
  #include "main/imports.h"
+ #include "main/macros.h"
 +#include "main/glthread.h"
  #include "main/points.h"
- #include "main/renderbuffer.h"
- 
-@@ -630,6 +631,13 @@ intelMakeCurrent(__DRIcontext * driContextPriv,
+ #include "main/version.h"
+ #include "main/vtxfmt.h"
+@@ -1303,6 +1304,13 @@
     else
-       intel = NULL;
+       brw = NULL;
  
 +   /* This entrypoint is called from the loader in the main thread, so we need
 +    * to make sure any worker thread is done before we do anything to the
@@ -39,21 +37,21 @@ index 5607d5b5b6..01100d11a1 100644
     /* According to the glXMakeCurrent() man page: "Pending commands to
      * the previous context, if any, are flushed before it is released."
      * But only flush if we're actually changing contexts.
-diff --git a/src/mesa/drivers/dri/i915/intel_screen.c b/src/mesa/drivers/dri/i915/intel_screen.c
+diff --git a/src/mesa/drivers/dri/i965/intel_screen.c b/src/mesa/drivers/dri/i965/intel_screen.c
 index 5c7c06a9c1..9af06275e0 100644
---- a/src/mesa/drivers/dri/i915/intel_screen.c
-+++ b/src/mesa/drivers/dri/i915/intel_screen.c
-@@ -36,6 +36,7 @@
+--- a/src/mesa/drivers/dri/i965/intel_screen.c
++++ b/src/mesa/drivers/dri/i965/intel_screen.c
+@@ -33,6 +33,7 @@
  #include "main/hash.h"
  #include "main/fbobject.h"
  #include "main/version.h"
 +#include "main/marshal.h"
  #include "swrast/s_renderbuffer.h"
+ #include "util/ralloc.h"
+ #include "brw_shader.h"
+@@ -176,6 +177,12 @@
  
- #include "utils.h"
-@@ -157,6 +158,12 @@ intelDRI2Flush(__DRIdrawable *drawable)
-    if (intel == NULL)
-       return;
+    struct gl_context *ctx = &brw->ctx;
  
 +   /* This entrypoint is called from the loader in the main thread, so we need
 +    * to make sure any worker thread is done before we do anything to the
@@ -61,37 +59,33 @@ index 5c7c06a9c1..9af06275e0 100644
 +    */
 +   _mesa_glthread_finish(ctx);
 +
-    INTEL_FIREVERTICES(intel);
+    FLUSH_VERTICES(ctx, 0);
  
-    intel->need_throttle = true;
-@@ -331,9 +338,12 @@ intel_create_image_from_renderbuffer(__DRIcontext *context,
- {
-    __DRIimage *image;
-    struct intel_context *intel = context->driverPrivate;
-+   struct gl_context *ctx = &intel->ctx;
+    if (flags & __DRI2_FLUSH_DRAWABLE)
+@@ -449,6 +456,8 @@
     struct gl_renderbuffer *rb;
     struct intel_renderbuffer *irb;
  
 +   _mesa_glthread_finish(ctx);
-+
-    rb = _mesa_lookup_renderbuffer(&intel->ctx, renderbuffer);
++   
+    rb = _mesa_lookup_renderbuffer(ctx, renderbuffer);
     if (!rb) {
-       _mesa_error(&intel->ctx,
-diff --git a/src/mesa/drivers/dri/i915/intel_tex_image.c b/src/mesa/drivers/dri/i915/intel_tex_image.c
+       _mesa_error(ctx, GL_INVALID_OPERATION, "glRenderbufferExternalMESA");
+diff --git a/src/mesa/drivers/dri/i965/intel_tex_image.c b/src/mesa/drivers/dri/i965/intel_tex_image.c
 index 63ef08b44a..efa322c893 100644
---- a/src/mesa/drivers/dri/i915/intel_tex_image.c
-+++ b/src/mesa/drivers/dri/i915/intel_tex_image.c
+--- a/src/mesa/drivers/dri/i965/intel_tex_image.c
++++ b/src/mesa/drivers/dri/i965/intel_tex_image.c
 @@ -7,6 +7,7 @@
- #include "main/context.h"
  #include "main/formats.h"
+ #include "main/glformats.h"
  #include "main/image.h"
 +#include "main/glthread.h"
  #include "main/pbo.h"
  #include "main/renderbuffer.h"
  #include "main/texcompress.h"
-@@ -288,6 +289,12 @@ intelSetTexBuffer2(__DRIcontext *pDRICtx, GLint target,
-    int level = 0, internalFormat = 0;
-    mesa_format texFormat = MESA_FORMAT_NONE;
+@@ -305,6 +306,12 @@
+    struct intel_mipmap_tree *mt;
+    GLenum internal_format = 0;
  
 +   /* This entrypoint is called from the loader in the main thread, so we need
 +    * to make sure any worker thread is done before we do anything to the
@@ -100,10 +94,14 @@ index 63ef08b44a..efa322c893 100644
 +   _mesa_glthread_finish(ctx);
 +
     texObj = _mesa_get_current_tex_object(ctx, target);
-    intelObj = intel_texture_object(texObj);
  
-@@ -348,6 +355,12 @@ intel_image_target_texture_2d(struct gl_context *ctx, GLenum target,
-    __DRIscreen *screen;
+    if (!texObj)
+@@ -405,9 +412,16 @@
+ {
+    struct brw_context *brw = brw_context(ctx);
+    struct intel_mipmap_tree *mt;
+-   __DRIscreen *dri_screen = brw->screen->driScrnPriv;
++   __DRIscreen *dri_screen;
     __DRIimage *image;
  
 +   /* This entrypoint is called from the loader in the main thread, so we need
@@ -112,9 +110,10 @@ index 63ef08b44a..efa322c893 100644
 +    */
 +   _mesa_glthread_finish(ctx);
 +
-    screen = intel->intelScreen->driScrnPriv;
-    image = screen->dri2.image->lookupEGLImage(screen, image_handle,
- 					      screen->loaderPrivate);
++   dri_screen = brw->screen->driScrnPriv;
+    image = dri_screen->dri2.image->lookupEGLImage(dri_screen, image_handle,
+                                                   dri_screen->loaderPrivate);
+    if (image == NULL)
 diff --git a/src/mesa/main/context.c b/src/mesa/main/context.c
 index fabb63fe82..60d065e2c9 100644
 --- a/src/mesa/main/context.c

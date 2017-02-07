@@ -1,0 +1,45 @@
+
+*** These modified files were found in JOE when it aborted on Mon Feb  6 15:55:20 2017
+*** JOE was aborted by UNIX signal 15
+
+*** File '(Unnamed)'
+6.3.0
+4
+compile
+libs
+disable-while-typing
+planes
+AYUV
+unsigned int
+buffer->texture[0]
+
+*** File '(Unnamed)'
+sound
+audioopts
+audio
+IUSE
+adlib
+sb16
+GL4
+glthread
+early z
+DRI_CONF_SECTION_END
+
+*** File '(Unnamed)'
+/tmp/.private/root/virshgFZ0Au.xml
+/usr/share/libvirt/schemas/domaincommon.rng
+/tmp/.private/root/virshkAgvK7.xml
+/tmp/.private/root/virshBYC2ae.xml
+/usr/share/libvirt/schemas/domaincommon.rng
+mesa-9999-r1.ebuild
+files/glthread/0029-i965-Enable-offloading-GL-to-a-separate-thread-throu.patch
+/net/eater/Overlays/gentoo-opencl/media-libs/mesa/files/glthread/0029-i965-Enable-offloading-GL-to-a-separate-thread-throu.patch
+intel_screen.c
+../i915/intel_screen.c
+files/glthread/0029-i965-Enable-offloading-GL-to-a-separate-thread-throu.patch
+
+*** File '* Startup Log *'
+Processing '/etc/joe/joerc'...
+Processing '/etc/joe/ftyperc'...
+Finished processing /etc/joe/ftyperc
+Finished processing /etc/joe/joerc
