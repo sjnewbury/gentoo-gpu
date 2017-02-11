@@ -1,0 +1,58 @@
+From bb763bbad5d04fa347de24e1f474dc1fbf7673b8 Mon Sep 17 00:00:00 2001
+From: Matt Turner <mattst88@gmail.com>
+Date: Fri, 20 Jan 2017 13:35:32 -0800
+Subject: [PATCH 23/37] i965/vec4: Fix exec size for MOVs SET_{HIGH,LOW}_32BIT.
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Otherwise for a pack_double_2x32_split opcode, we emit:
+
+   vec1 64 ssa_135 = pack_double_2x32_split ssa_133, ssa_134
+mov(8)          g5<1>UD         g5<4>.xUD                       { align16 1Q compacted };
+mov(8)          g7<2>UD         g5<4,4,1>UD                     { align1 1Q };
+        ERROR: When the destination spans two registers, the source must span two registers
+               (exceptions for scalar source and packed-word to packed-dword expansion)
+mov(8)          g8<2>UD         g5.4<4,4,1>UD                   { align1 2N };
+        ERROR: The offset from the two source registers must be the same
+mov(8)          g5<1>UD         g6<4>.xUD                       { align16 1Q compacted };
+mov(8)          g7.1<2>UD       g5<4,4,1>UD                     { align1 1Q };
+        ERROR: When the destination spans two registers, the source must span two registers
+               (exceptions for scalar source and packed-word to packed-dword expansion)
+mov(8)          g8.1<2>UD       g5.4<4,4,1>UD                   { align1 2N };
+        ERROR: The offset from the two source registers must be the same
+
+The intention was to emit mov(4)s for the instructions that have ERROR
+annotations.
+
+See tests/spec/arb_gpu_shader_fp64/execution/vs-isinf-dvec.shader_test
+for example.
+
+Reviewed-by: Samuel Iglesias Gonsálvez <siglesias@igalia.com>
+---
+ src/mesa/drivers/dri/i965/brw_vec4_generator.cpp | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/src/mesa/drivers/dri/i965/brw_vec4_generator.cpp b/src/mesa/drivers/dri/i965/brw_vec4_generator.cpp
+index b570792badd..f6034bc8b76 100644
+--- a/src/mesa/drivers/dri/i965/brw_vec4_generator.cpp
++++ b/src/mesa/drivers/dri/i965/brw_vec4_generator.cpp
+@@ -2025,6 +2025,7 @@ generate_code(struct brw_codegen *p,
+          assert(type_sz(dst.type) == 8);
+ 
+          brw_set_default_access_mode(p, BRW_ALIGN_1);
++         brw_set_default_exec_size(p, BRW_EXECUTE_4);
+ 
+          dst = retype(dst, BRW_REGISTER_TYPE_UD);
+          if (inst->opcode == VEC4_OPCODE_SET_HIGH_32BIT)
+@@ -2037,6 +2038,7 @@ generate_code(struct brw_codegen *p,
+          src[0].hstride = BRW_HORIZONTAL_STRIDE_1;
+          brw_MOV(p, dst, src[0]);
+ 
++         brw_set_default_exec_size(p, BRW_EXECUTE_8);
+          brw_set_default_access_mode(p, BRW_ALIGN_16);
+          break;
+       }
+-- 
+2.11.0
+

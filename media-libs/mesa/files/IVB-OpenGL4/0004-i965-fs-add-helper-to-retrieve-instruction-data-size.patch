@@ -1,0 +1,70 @@
+From 3252bc231cc210802b30d24c431561963aa40485 Mon Sep 17 00:00:00 2001
+From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
+Date: Mon, 18 Jul 2016 07:17:39 +0000
+Subject: [PATCH 04/37] i965/fs: add helper to retrieve instruction data size
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The execution data size is the biggest type size of any instruction
+operand.
+
+We will use it to know if the instruction deals with DF, because in Ivy
+we need to double the execution size and regioning parameters.
+
+v2:
+- Fix typo in commit log (Matt)
+- Use static inline function instead of fs_inst's method (Curro).
+- Define the result as a constant (Curro).
+- Fix indentation (Matt).
+- Add braces to nested control flow (Matt).
+
+Signed-off-by: Samuel Iglesias Gonsálvez <siglesias@igalia.com>
+Reviewed-by: Francisco Jerez <currojerez@riseup.net>
+---
+ src/mesa/drivers/dri/i965/brw_fs.cpp |  6 +-----
+ src/mesa/drivers/dri/i965/brw_fs.h   | 14 ++++++++++++++
+ 2 files changed, 15 insertions(+), 5 deletions(-)
+
+diff --git a/src/mesa/drivers/dri/i965/brw_fs.cpp b/src/mesa/drivers/dri/i965/brw_fs.cpp
+index c348bc7138d..9fb5dabe6f3 100644
+--- a/src/mesa/drivers/dri/i965/brw_fs.cpp
++++ b/src/mesa/drivers/dri/i965/brw_fs.cpp
+@@ -4566,11 +4566,7 @@ get_fpu_lowered_simd_width(const struct gen_device_info *devinfo,
+        !inst->force_writemask_all) {
+       const unsigned channels_per_grf = inst->exec_size /
+          DIV_ROUND_UP(inst->size_written, REG_SIZE);
+-      unsigned exec_type_size = 0;
+-      for (int i = 0; i < inst->sources; i++) {
+-         if (inst->src[i].file != BAD_FILE)
+-            exec_type_size = MAX2(exec_type_size, type_sz(inst->src[i].type));
+-      }
++      const unsigned exec_type_size = get_exec_type_size(inst);
+       assert(exec_type_size);
+ 
+       /* The hardware shifts exactly 8 channels per compressed half of the
+diff --git a/src/mesa/drivers/dri/i965/brw_fs.h b/src/mesa/drivers/dri/i965/brw_fs.h
+index d0e272bb9ee..95b2b8eaa81 100644
+--- a/src/mesa/drivers/dri/i965/brw_fs.h
++++ b/src/mesa/drivers/dri/i965/brw_fs.h
+@@ -501,3 +501,17 @@ fs_reg setup_imm_df(const brw::fs_builder &bld,
+ 
+ enum brw_barycentric_mode brw_barycentric_mode(enum glsl_interp_mode mode,
+                                                nir_intrinsic_op op);
++
++static inline unsigned
++get_exec_type_size(const fs_inst *inst)
++{
++   unsigned exec_type_size = 0;
++
++   for (int i = 0; i < inst->sources; i++) {
++      if (inst->src[i].type != BAD_FILE) {
++         exec_type_size = MAX2(exec_type_size, type_sz(inst->src[i].type));
++      }
++   }
++
++   return exec_type_size;
++}
+-- 
+2.11.0
+

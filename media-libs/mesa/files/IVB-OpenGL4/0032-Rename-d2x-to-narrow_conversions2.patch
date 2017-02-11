@@ -1,0 +1,35 @@
+From 1b8c675fb524f93a990ae9b26d22861e3886fa08 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
+Date: Fri, 10 Feb 2017 11:32:31 +0100
+Subject: [PATCH 32/37] Rename d2x to narrow_conversions2
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Signed-off-by: Samuel Iglesias Gonsálvez <siglesias@igalia.com>
+---
+ src/mesa/drivers/dri/i965/Makefile.sources                              | 2 +-
+ .../i965/{brw_fs_lower_d2x.cpp => brw_fs_lower_narrow_conversions.cpp}  | 0
+ 2 files changed, 1 insertion(+), 1 deletion(-)
+ rename src/mesa/drivers/dri/i965/{brw_fs_lower_d2x.cpp => brw_fs_lower_narrow_conversions.cpp} (100%)
+
+diff --git a/src/mesa/drivers/dri/i965/Makefile.sources b/src/mesa/drivers/dri/i965/Makefile.sources
+index dd546826d19..7316c943a21 100644
+--- a/src/mesa/drivers/dri/i965/Makefile.sources
++++ b/src/mesa/drivers/dri/i965/Makefile.sources
+@@ -24,7 +24,7 @@ i965_compiler_FILES = \
+ 	brw_fs.h \
+ 	brw_fs_live_variables.cpp \
+ 	brw_fs_live_variables.h \
+-	brw_fs_lower_d2x.cpp \
++	brw_fs_lower_narrow_conversions.cpp \
+ 	brw_fs_lower_pack.cpp \
+ 	brw_fs_nir.cpp \
+ 	brw_fs_reg_allocate.cpp \
+diff --git a/src/mesa/drivers/dri/i965/brw_fs_lower_d2x.cpp b/src/mesa/drivers/dri/i965/brw_fs_lower_narrow_conversions.cpp
+similarity index 100%
+rename from src/mesa/drivers/dri/i965/brw_fs_lower_d2x.cpp
+rename to src/mesa/drivers/dri/i965/brw_fs_lower_narrow_conversions.cpp
+-- 
+2.11.0
+

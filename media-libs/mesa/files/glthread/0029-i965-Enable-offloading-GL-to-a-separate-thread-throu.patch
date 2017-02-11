@@ -20,7 +20,7 @@ index 9af06275e0..3b5b6a8fa5 100644
  	 DRI_CONF_DESC(en, "Enable Hierarchical Z on gen6+")
        DRI_CONF_OPT_END
 +
-+      DRI_CONF_OPT_BEGIN(glthread, bool, false)
++      DRI_CONF_OPT_BEGIN_B(mesa_glthread, "false")
 +	 DRI_CONF_DESC(en, "Enable offloading GL driver work to a separate thread")
 +      DRI_CONF_OPT_END
 +
@@ -44,7 +44,7 @@ index 3705a9140c..025a82b419 100644
     _mesa_initialize_vbo_vtxfmt(ctx);
  
 +   if (driContextPriv->driScreenPriv->dri2.backgroundCallable &&
-+       driQueryOptionb(&brw->optionCache, "glthread")) {
++       driQueryOptionb(&brw->optionCache, "mesa_glthread")) {
 +      /* Loader supports multithreading, and so do we. */
 +      _mesa_glthread_init(ctx);
 +   }

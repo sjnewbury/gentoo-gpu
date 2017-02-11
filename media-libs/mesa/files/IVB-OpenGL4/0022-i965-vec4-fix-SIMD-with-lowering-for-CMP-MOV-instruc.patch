@@ -1,7 +1,7 @@
-From af114ce625508665a3dcacb70d3161a20e9cc013 Mon Sep 17 00:00:00 2001
+From cf4a49a5fcc318a08894c93ab00f73b7b877ea91 Mon Sep 17 00:00:00 2001
 From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
 Date: Wed, 28 Sep 2016 10:40:50 +0000
-Subject: [PATCH 22/34] i965/vec4: fix SIMD-with lowering for CMP/MOV
+Subject: [PATCH 22/37] i965/vec4: fix SIMD-with lowering for CMP/MOV
  instructions with conditional modifiers
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
@@ -19,6 +19,9 @@ can be replaced with a CMP against zero with the same conditional
 modifier. By doing this replacement, we can do the SIMD lowering
 without any problem.
 
+v2:
+- Fix typo (Matt)
+
 Signed-off-by: Samuel Iglesias Gonsálvez <siglesias@igalia.com>
 Signed-off-by: Juan A. Suarez Romero <jasuarez@igalia.com
 ---
@@ -26,10 +29,10 @@ Signed-off-by: Juan A. Suarez Romero <jasuarez@igalia.com
  1 file changed, 74 insertions(+), 6 deletions(-)
 
 diff --git a/src/mesa/drivers/dri/i965/brw_vec4.cpp b/src/mesa/drivers/dri/i965/brw_vec4.cpp
-index 1acade58a3c..1c4f0f86774 100644
+index adcde085305..819674e8cb9 100644
 --- a/src/mesa/drivers/dri/i965/brw_vec4.cpp
 +++ b/src/mesa/drivers/dri/i965/brw_vec4.cpp
-@@ -2195,6 +2195,46 @@ vec4_visitor::lower_simd_width()
+@@ -2177,6 +2177,46 @@ vec4_visitor::lower_simd_width()
         * value of the instruction's dst.
         */
        bool needs_temp = dst_src_regions_overlap(inst);
@@ -40,7 +43,7 @@ index 1acade58a3c..1c4f0f86774 100644
 +       * move those values into flags.
 +       */
 +      bool inst_df_dst_null =
-+         inst->dst.is_null() && inst->exec_data_size() == 8 &&
++         inst->dst.is_null() && get_exec_type_size(inst) == 8 &&
 +         inst->conditional_mod != BRW_CONDITIONAL_NONE;
 +
 +      if (inst_df_dst_null) {
@@ -51,7 +54,7 @@ index 1acade58a3c..1c4f0f86774 100644
 +         assert(inst->opcode == BRW_OPCODE_MOV ||
 +                inst->opcode == BRW_OPCODE_CMP);
 +
-+         /* Replace MOV.XX with null destination with the equivalente CMP.XX
++         /* Replace MOV.XX with null destination with the equivalent CMP.XX
 +          * with null destination, so we can lower it as explained before.
 +          */
 +         if (inst->opcode == BRW_OPCODE_MOV) {
@@ -76,7 +79,7 @@ index 1acade58a3c..1c4f0f86774 100644
        for (unsigned n = 0; n < inst->exec_size / lowered_width; n++)  {
           unsigned channel_offset = lowered_width * n;
  
-@@ -2217,7 +2257,7 @@ vec4_visitor::lower_simd_width()
+@@ -2199,7 +2239,7 @@ vec4_visitor::lower_simd_width()
           bool d2f_pass = (inst->opcode == VEC4_OPCODE_FROM_DOUBLE && n > 0);
           /* Compute split dst region */
           dst_reg dst;
@@ -85,7 +88,7 @@ index 1acade58a3c..1c4f0f86774 100644
              unsigned num_regs = DIV_ROUND_UP(size_written, REG_SIZE);
              dst = retype(dst_reg(VGRF, alloc.allocate(num_regs)),
                           inst->dst.type);
-@@ -2247,24 +2287,52 @@ vec4_visitor::lower_simd_width()
+@@ -2229,24 +2269,52 @@ vec4_visitor::lower_simd_width()
  
           inst->insert_before(block, linst);
  

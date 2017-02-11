@@ -1,21 +1,24 @@
-From dce13c03c9d079a359967a6123622e44660ea568 Mon Sep 17 00:00:00 2001
+From aecdcde29e93bdc514aeb6c5a62a18a6ce7651be Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
 Date: Mon, 10 Oct 2016 12:39:45 +0200
-Subject: [PATCH 21/34] i965/vec4: adapt setup_imm_df() to allow inserting
+Subject: [PATCH 21/37] i965/vec4: adapt setup_imm_df() to allow inserting
  instructions before another one
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
 
-Add a new setup_imm_df() that alows the insertion of the instructions
+Add a new setup_imm_df() that allows the insertion of the instructions
 before another one. This will be used in the lowering passes for DF
 instructions.
+
+v2:
+- Adapt emission of DIM instruction too.
 
 Signed-off-by: Samuel Iglesias Gonsálvez <siglesias@igalia.com>
 ---
  src/mesa/drivers/dri/i965/brw_vec4.h       |  2 ++
- src/mesa/drivers/dri/i965/brw_vec4_nir.cpp | 21 +++++++++++++++++----
- 2 files changed, 19 insertions(+), 4 deletions(-)
+ src/mesa/drivers/dri/i965/brw_vec4_nir.cpp | 26 +++++++++++++++++++++-----
+ 2 files changed, 23 insertions(+), 5 deletions(-)
 
 diff --git a/src/mesa/drivers/dri/i965/brw_vec4.h b/src/mesa/drivers/dri/i965/brw_vec4.h
 index 29b203af89e..01b928ef4a7 100644
@@ -31,10 +34,10 @@ index 29b203af89e..01b928ef4a7 100644
     vec4_instruction *shuffle_64bit_data(dst_reg dst, src_reg src,
                                          bool for_write,
 diff --git a/src/mesa/drivers/dri/i965/brw_vec4_nir.cpp b/src/mesa/drivers/dri/i965/brw_vec4_nir.cpp
-index 71156ec5b3b..e7d26bae517 100644
+index 2127415be7a..e99db2cef8e 100644
 --- a/src/mesa/drivers/dri/i965/brw_vec4_nir.cpp
 +++ b/src/mesa/drivers/dri/i965/brw_vec4_nir.cpp
-@@ -1212,6 +1212,12 @@ vec4_visitor::emit_conversion_to_double(dst_reg dst, src_reg src,
+@@ -1213,6 +1213,12 @@ vec4_visitor::emit_conversion_to_double(dst_reg dst, src_reg src,
  src_reg
  vec4_visitor::setup_imm_df(double v)
  {
@@ -47,7 +50,19 @@ index 71156ec5b3b..e7d26bae517 100644
     assert(devinfo->gen >= 7);
  
     if (devinfo->gen >= 8)
-@@ -1247,10 +1253,17 @@ vec4_visitor::setup_imm_df(double v)
+@@ -1223,7 +1229,10 @@ vec4_visitor::setup_imm_df(double v)
+     */
+    if (devinfo->is_haswell) {
+       dst_reg dst = retype(dst_reg(VGRF, alloc.allocate(2)), BRW_REGISTER_TYPE_DF);
+-      emit(DIM(dst, brw_imm_df(v)))->force_writemask_all = true;
++      if (block)
++         emit_before(block, inst, DIM(dst, brw_imm_df(v)))->force_writemask_all = true;
++      else
++         emit(DIM(dst, brw_imm_df(v)))->force_writemask_all = true;
+       return swizzle(src_reg(retype(dst, BRW_REGISTER_TYPE_DF)), BRW_SWIZZLE_XXXX);
+    }
+ 
+@@ -1248,10 +1257,17 @@ vec4_visitor::setup_imm_df(double v)
     const dst_reg tmp =
        retype(dst_reg(VGRF, alloc.allocate(2)), BRW_REGISTER_TYPE_UD);
     for (int n = 0; n < 2; n++) {

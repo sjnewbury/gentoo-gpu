@@ -1,0 +1,44 @@
+From a2e04f64b5e37eb7570e3a3ea69d291d0cbfe8ca Mon Sep 17 00:00:00 2001
+From: Matt Turner <mattst88@gmail.com>
+Date: Tue, 10 Jan 2017 19:33:22 -0800
+Subject: [PATCH 07/37] i965: Use <0,2,1> region for scalar DF sources on
+ IVB/BYT.
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+On HSW+, scalar DF sources can be accessed using the normal <0,1,0>
+region, but on IVB and BYT DF regions must be programmed in terms of
+floats. A <0,2,1> region accomplishes this.
+
+v2:
+- Apply region <0,2,1> in brw_reg_from_fs_reg() (Curro).
+
+Signed-off-by: Samuel Iglesias Gonsálvez <siglesias@igalia.com>
+---
+ src/mesa/drivers/dri/i965/brw_fs_generator.cpp | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/src/mesa/drivers/dri/i965/brw_fs_generator.cpp b/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
+index b0d5732ac5c..2f60ddd8706 100644
+--- a/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
++++ b/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
+@@ -145,6 +145,15 @@ brw_reg_from_fs_reg(const struct gen_device_info *devinfo, fs_inst *inst,
+       unreachable("not reached");
+    }
+ 
++   if (devinfo->gen == 7 && !devinfo->is_haswell &&
++       type_sz(reg->type) == 8 &&
++       brw_reg.vstride == BRW_VERTICAL_STRIDE_0 &&
++       brw_reg.width == BRW_WIDTH_1 &&
++       brw_reg.hstride == BRW_HORIZONTAL_STRIDE_0) {
++      brw_reg.width = BRW_WIDTH_2;
++      brw_reg.hstride = BRW_HORIZONTAL_STRIDE_1;
++   }
++
+    return brw_reg;
+ }
+ 
+-- 
+2.11.0
+

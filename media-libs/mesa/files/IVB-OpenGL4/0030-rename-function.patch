@@ -1,0 +1,57 @@
+From a8f46f626e6d30c709ada6d1598ee34833babd4c Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
+Date: Fri, 10 Feb 2017 10:31:06 +0100
+Subject: [PATCH 30/37] rename function
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Signed-off-by: Samuel Iglesias Gonsálvez <siglesias@igalia.com>
+---
+ src/mesa/drivers/dri/i965/brw_fs.cpp           | 2 +-
+ src/mesa/drivers/dri/i965/brw_fs.h             | 2 +-
+ src/mesa/drivers/dri/i965/brw_fs_lower_d2x.cpp | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/src/mesa/drivers/dri/i965/brw_fs.cpp b/src/mesa/drivers/dri/i965/brw_fs.cpp
+index 0099ae264b2..7698765b310 100644
+--- a/src/mesa/drivers/dri/i965/brw_fs.cpp
++++ b/src/mesa/drivers/dri/i965/brw_fs.cpp
+@@ -5695,7 +5695,7 @@ fs_visitor::optimize()
+       OPT(dead_code_eliminate);
+    }
+ 
+-   if (OPT(lower_d2x)) {
++   if (OPT(lower_narrow_conversions)) {
+       OPT(opt_copy_propagation);
+       OPT(dead_code_eliminate);
+    }
+diff --git a/src/mesa/drivers/dri/i965/brw_fs.h b/src/mesa/drivers/dri/i965/brw_fs.h
+index 95b2b8eaa81..431bf8d5112 100644
+--- a/src/mesa/drivers/dri/i965/brw_fs.h
++++ b/src/mesa/drivers/dri/i965/brw_fs.h
+@@ -160,7 +160,7 @@ public:
+    void lower_uniform_pull_constant_loads();
+    bool lower_load_payload();
+    bool lower_pack();
+-   bool lower_d2x();
++   bool lower_narrow_conversions();
+    bool lower_logical_sends();
+    bool lower_integer_multiplication();
+    bool lower_minmax();
+diff --git a/src/mesa/drivers/dri/i965/brw_fs_lower_d2x.cpp b/src/mesa/drivers/dri/i965/brw_fs_lower_d2x.cpp
+index 7fe197efa0f..c268d83a1f0 100644
+--- a/src/mesa/drivers/dri/i965/brw_fs_lower_d2x.cpp
++++ b/src/mesa/drivers/dri/i965/brw_fs_lower_d2x.cpp
+@@ -28,7 +28,7 @@
+ using namespace brw;
+ 
+ bool
+-fs_visitor::lower_d2x()
++fs_visitor::lower_narrow_conversions()
+ {
+    bool progress = false;
+ 
+-- 
+2.11.0
+
