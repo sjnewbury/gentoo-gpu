@@ -1,15 +1,16 @@
-# Copyright 1999-2015 Gentoo Foundation
+# Copyright 1999-2017 Gentoo Foundation
 # Distributed under the terms of the GNU General Public License v2
 # $Id$
 
-EAPI=5
+EAPI=6
 
-inherit eutils flag-o-matic linux-info linux-mod multilib nvidia-driver \
+inherit eutils flag-o-matic linux-info linux-mod multilib-minimal nvidia-driver \
 	portability toolchain-funcs unpacker user udev
 
 NV_URI="http://us.download.nvidia.com/XFree86/"
 X86_NV_PACKAGE="NVIDIA-Linux-x86-${PV}"
 AMD64_NV_PACKAGE="NVIDIA-Linux-x86_64-${PV}"
+ARM_NV_PACKAGE="NVIDIA-Linux-armv7l-gnueabihf-${PV}"
 X86_FBSD_NV_PACKAGE="NVIDIA-FreeBSD-x86-${PV}"
 AMD64_FBSD_NV_PACKAGE="NVIDIA-FreeBSD-x86_64-${PV}"
 
@@ -18,9 +19,13 @@ HOMEPAGE="http://www.nvidia.com/ http://www.nvidia.com/Download/Find.aspx"
 SRC_URI="
 	amd64-fbsd? ( ${NV_URI}FreeBSD-x86_64/${PV}/${AMD64_FBSD_NV_PACKAGE}.tar.gz )
 	amd64? ( ${NV_URI}Linux-x86_64/${PV}/${AMD64_NV_PACKAGE}.run )
+	arm? ( ${NV_URI}Linux-x86-ARM/${PV}/${ARM_NV_PACKAGE}.run )
 	x86-fbsd? ( ${NV_URI}FreeBSD-x86/${PV}/${X86_FBSD_NV_PACKAGE}.tar.gz )
 	x86? ( ${NV_URI}Linux-x86/${PV}/${X86_NV_PACKAGE}.run )
-	tools? ( ftp://download.nvidia.com/XFree86/nvidia-settings/nvidia-settings-${PV}.tar.bz2 )
+	tools? (
+		ftp://download.nvidia.com/XFree86/nvidia-settings/nvidia-settings-${PV}.tar.bz2
+		https://raw.githubusercontent.com/NVIDIA/nvidia-settings/168e17f53098254b4a5ab93eeb2f23c80ca1d97f/src/nvml.h -> nvml.h-${PV}
+	)
 "
 
 LICENSE="GPL-2 NVIDIA-r2"
@@ -29,7 +34,7 @@ KEYWORDS="-* ~amd64 ~x86 ~amd64-fbsd ~x86-fbsd"
 RESTRICT="bindist mirror"
 EMULTILIB_PKG="true"
 
-IUSE="acpi compat +driver gtk3 kernel_FreeBSD kernel_linux +kms multilib pax_kernel static-libs +tools uvm +X"
+IUSE="acpi compat +driver gtk3 kernel_FreeBSD kernel_linux +kms multilib pax_kernel static-libs +tools uvm wayland +X"
 REQUIRED_USE="
 	tools? ( X )
 	static-libs? ( tools )
@@ -39,19 +44,19 @@ COMMON="
 	app-eselect/eselect-opencl
 	kernel_linux? ( >=sys-libs/glibc-2.6.1 )
 	tools? (
-		dev-libs/atk
-		dev-libs/glib:2
-		dev-libs/jansson
-		gtk3? ( x11-libs/gtk+:3 )
-		x11-libs/cairo
-		x11-libs/gdk-pixbuf[X]
-		x11-libs/gtk+:2
-		x11-libs/libX11
-		x11-libs/libXext
-		x11-libs/libXrandr
-		x11-libs/libXv
-		x11-libs/libXxf86vm
-		x11-libs/pango[X]
+		dev-libs/atk[${MULTILIB_USEDEP}]
+		dev-libs/glib:2[${MULTILIB_USEDEP}]
+		dev-libs/jansson[${MULTILIB_USEDEP}]
+		gtk3? ( x11-libs/gtk+:3[${MULTILIB_USEDEP}] )
+		x11-libs/cairo[${MULTILIB_USEDEP}]
+		x11-libs/gdk-pixbuf[X,${MULTILIB_USEDEP}]
+		x11-libs/gtk+:2[${MULTILIB_USEDEP}]
+		x11-libs/libX11[${MULTILIB_USEDEP}]
+		x11-libs/libXext[${MULTILIB_USEDEP}]
+		x11-libs/libXrandr[${MULTILIB_USEDEP}]
+		x11-libs/libXv[${MULTILIB_USEDEP}]
+		x11-libs/libXxf86vm[${MULTILIB_USEDEP}]
+		x11-libs/pango[X,${MULTILIB_USEDEP}]
 	)
 	X? (
 		>=app-eselect/eselect-opengl-1.0.9
@@ -66,13 +71,13 @@ RDEPEND="
 	${COMMON}
 	acpi? ( sys-power/acpid )
 	tools? ( !media-video/nvidia-settings )
+	wayland? ( dev-libs/wayland[${MULTILIB_USEDEP}] )
 	X? (
-		x11-base/xorg-server:=
-		>=x11-libs/libvdpau-0.3-r1
-		multilib? (
-			>=x11-libs/libX11-1.6.2[abi_x86_32]
-			>=x11-libs/libXext-1.3.2[abi_x86_32]
-		)
+		|| ( =x11-base/xorg-server-9999:= <x11-base/xorg-server-1.19.99:= )
+		>=x11-libs/libX11-1.6.2[${MULTILIB_USEDEP}]
+		>=x11-libs/libXext-1.3.2[${MULTILIB_USEDEP}]
+		>=x11-libs/libvdpau-1.0[${MULTILIB_USEDEP}]
+		sys-libs/zlib[${MULTILIB_USEDEP}]
 	)
 "
 
@@ -87,11 +92,11 @@ pkg_pretend() {
 		die "Unexpected \${DEFAULT_ABI} = ${DEFAULT_ABI}"
 	fi
 
-	if use kernel_linux && kernel_is ge 4 5; then
+	if use kernel_linux && kernel_is ge 4 10; then
 		ewarn "Gentoo supports kernels which are supported by NVIDIA"
 		ewarn "which are limited to the following kernels:"
-		ewarn "<sys-kernel/gentoo-sources-4.5"
-		ewarn "<sys-kernel/vanilla-sources-4.5"
+		ewarn "<sys-kernel/gentoo-sources-4.10"
+		ewarn "<sys-kernel/vanilla-sources-4.10"
 		ewarn ""
 		ewarn "You are free to utilize epatch_user to provide whatever"
 		ewarn "support you feel is appropriate, but will not receive"
@@ -123,7 +128,7 @@ pkg_setup() {
 	if use driver && use kernel_linux; then
 		MODULE_NAMES="nvidia(video:${S}/kernel)"
 		use uvm && MODULE_NAMES+=" nvidia-uvm(video:${S}/kernel)"
-		use kms && MODULE_NAMES+=" nvidia-modeset(video:${S}/kernel)"
+		use kms && MODULE_NAMES+=" nvidia-modeset(video:${S}/kernel) nvidia-drm(video:${S}/kernel)"
 
 		# This needs to run after MODULE_NAMES (so that the eclass checks
 		# whether the kernel supports loadable modules) but before BUILD_PARAMS
@@ -171,11 +176,11 @@ src_prepare() {
 		ewarn "Using PAX patches is not supported. You will be asked to"
 		ewarn "use a standard kernel should you have issues. Should you"
 		ewarn "need support with these patches, contact the PaX team."
-		epatch "${FILESDIR}"/${PN}-355.06-pax.patch
+		eapply "${FILESDIR}"/${PN}-375.20-pax.patch
 	fi
 
 	# Allow user patches so they can support RC kernels and whatever else
-	epatch_user
+	eapply_user
 }
 
 src_compile() {
@@ -196,7 +201,9 @@ src_compile() {
 			AR="$(tc-getAR)" \
 			CC="$(tc-getCC)" \
 			LIBDIR="$(get_libdir)" \
+			NV_VERBOSE=1 \
 			RANLIB="$(tc-getRANLIB)" \
+			DO_STRIP= \
 			build-xnvctrl
 
 		emake -C "${S}"/nvidia-settings-${PV}/src \
@@ -207,7 +214,7 @@ src_compile() {
 			NVML_ENABLED=0 \
 			NV_USE_BUNDLED_LIBJANSSON=0 \
 			NV_VERBOSE=1 \
-			STRIP_CMD=true
+			DO_STRIP=
 	fi
 }
 
@@ -301,6 +308,15 @@ src_install() {
 			insinto /usr/share/X11/xorg.conf.d
 			newins {,50-}nvidia-drm-outputclass.conf
 		fi
+
+		insinto /usr/share/glvnd/egl_vendor.d
+		doins ${NV_X11}/10_nvidia.json
+
+	fi
+
+	if use wayland; then
+		insinto /usr/share/egl/egl_external_platform.d
+		doins ${NV_X11}/10_nvidia_wayland.json
 	fi
 
 	# OpenCL ICD for NVIDIA
@@ -310,7 +326,6 @@ src_install() {
 	fi
 
 	# Documentation
-	dohtml ${NV_DOC}/html/*
 	if use kernel_FreeBSD; then
 		dodoc "${NV_DOC}/README"
 		use X && doman "${NV_MAN}/nvidia-xconfig.1"
@@ -325,11 +340,18 @@ src_install() {
 		doman "${NV_MAN}/nvidia-cuda-mps-control.1.gz"
 	fi
 
+	docinto html
+	dodoc -r ${NV_DOC}/html/*
+
 	# Helper Apps
 	exeinto /opt/bin/
 
 	if use X; then
 		doexe ${NV_OBJ}/nvidia-xconfig
+
+		insinto /etc/vulkan/icd.d
+		doins nvidia_icd.json
+
 	fi
 
 	if use kernel_linux; then
@@ -358,8 +380,10 @@ src_install() {
 			DESTDIR="${D}" \
 			GTK3_AVAILABLE=$(usex gtk3 1 0) \
 			LIBDIR="${D}/usr/$(get_libdir)" \
-			PREFIX=/usr \
 			NV_USE_BUNDLED_LIBJANSSON=0 \
+			NV_VERBOSE=1 \
+			PREFIX=/usr \
+			DO_STRIP= \
 			install
 
 		if use static-libs; then
@@ -385,6 +409,7 @@ src_install() {
 		exeinto /etc/X11/xinit/xinitrc.d
 		newexe "${FILESDIR}"/95-nvidia-settings-r1 95-nvidia-settings
 	fi
+
 
 	dobin ${NV_OBJ}/nvidia-bug-report.sh
 
@@ -443,13 +468,29 @@ src_install-libs() {
 			"libvdpau_nvidia.so.${NV_SOVER}"
 		)
 
+		cat > "${T}"/09nvidia-primus << EOF
+PRIMUS_libGLa='/usr/\$LIB/opengl/nvidia/lib/libGL.so.${NV_SOVER}'
+EOF
+		doenvd "${T}"/09nvidia-primus
+
+		if use wayland && has_multilib_profile && [[ ${ABI} == "amd64" ]];
+		then
+			NV_GLX_LIBRARIES+=(
+				"libnvidia-egl-wayland.so.1.0.0"
+			)
+		fi
+
 		if use kernel_linux && has_multilib_profile && [[ ${ABI} == "amd64" ]];
 		then
-			NV_GLX_LIBRARIES+=( "libnvidia-wfb.so.${NV_SOVER}" )
+			NV_GLX_LIBRARIES+=(
+				"libnvidia-wfb.so.${NV_SOVER}"
+			)
 		fi
 
 		if use kernel_FreeBSD; then
-			NV_GLX_LIBRARIES+=( "libnvidia-tls.so.${NV_SOVER}" )
+			NV_GLX_LIBRARIES+=(
+				"libnvidia-tls.so.${NV_SOVER}"
+			)
 		fi
 
 		if use kernel_linux; then
@@ -469,7 +510,30 @@ src_install-libs() {
 		for x in "${GL_ROOT}"/lib*_nvidia.so* ; do
 			dosym "${x}" "${glvnd_ROOT}"/lib/"${x##*/}"
 		done
+
+
+		# Put in the full path to the Vulkan client library
+		sed -e "s|\(libGLX_nvidia\.so\.0\)|${glvnd_ROOT}/lib\1|g" \
+			-i "${ED}"/etc/vulkan/icd.d/nvidia_icd.json || die
+
+		# do same for OpenCL client ICD - don't install NVIDIA
+		# ICD loader
+		#dodir "${CL_ROOT}"
+		#dosym "/usr/$(get_libdir)/libnvidia-opencl.so.${NV_SOVER}" \
+		#		"${CL_ROOT}"/libOpenCL.so
 	fi
+
+	# Set a 64bit fixed reloc address for each shared library
+	# this fixes an issue with inability to share pages and a
+	# multi-megabyte memory leak per process
+	# (also requires non-upstreamed glibc patch)
+	local addr=0x3D00000000
+	for shared_lib in $(scanelf -R -E ET_DYN -y -M64 -F "%F" "${ED}/${GL_ROOT}"); do
+		[[ ${shared_lib} == "FILE" ]] && continue
+		prelink --reloc-only=$(printf "%05d" ${addr}) ${shared_lib} || \
+			die "${shared_lib}: relocation failed!"
+		addr=$((${addr} + 0x200000))
+	done
 }
 
 pkg_preinst() {
