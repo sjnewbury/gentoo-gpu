@@ -19,7 +19,8 @@ DESCRIPTION="A vector graphics library with cross-device output support"
 HOMEPAGE="http://cairographics.org/"
 LICENSE="|| ( LGPL-2.1 MPL-1.1 )"
 SLOT="0"
-IUSE="X aqua debug directfb gles2 +glib opengl static-libs +svg valgrind xcb xlib-xcb egl +glx"
+IUSE="X aqua debug directfb gles2 +glib opengl static-libs +svg valgrind xcb xlib-xcb egl glx"
+#  cogl gallium drm broken in various ways
 # gtk-doc regeneration doesn't seem to work with out-of-source builds
 #[[ ${PV} == *9999* ]] && IUSE="${IUSE} doc" # API docs are provided in tarball, no need to regenerate
 
@@ -49,6 +50,9 @@ RDEPEND=">=dev-libs/lzo-2.06-r1[${MULTILIB_USEDEP}]
 		!<=app-emulation/emul-linux-x86-gtklibs-20131008-r1
 		!app-emulation/emul-linux-x86-gtklibs[-abi_x86_32(-)]
 	)"
+#	gallium? ( media-libs/mesa[gallium,${MULTILIB_USEDEP}] )
+#	drm? ( x11-libs/drm )
+
 DEPEND="${RDEPEND}
 	virtual/pkgconfig
 	>=sys-devel/libtool-2
@@ -65,7 +69,9 @@ REQUIRED_USE="
 	gles2? ( !opengl egl )
 	opengl? ( || ( egl glx ) )
 	xlib-xcb? ( xcb )
+	glx? ( opengl )
 "
+#	gallium? ( drm )
 
 MULTILIB_WRAPPED_HEADERS=(
 	/usr/include/cairo/cairo-directfb.h
@@ -135,12 +141,13 @@ multilib_src_configure() {
 		$(use_enable xcb) \
 		$(use_enable xcb xcb-shm) \
 		$(use_enable xlib-xcb) \
+		--disable-drm \
+		--disable-gallium \
+		--disable-cogl \
 		--enable-ft \
 		--enable-pdf \
 		--enable-png \
 		--enable-ps \
-		--disable-drm \
-		--disable-gallium \
 		--disable-qt \
 		--disable-vg \
 		${myopts}
