@@ -427,7 +427,7 @@ src_install() {
 	# multi-megabyte memory leak per process
 	# (also requires non-upstreamed glibc patch)
 	local addr=0x3D00000000
-	for shared_lib in $(scanelf -R -E ET_DYN -y -M64 -F "%F" "${ED}/${GL_ROOT}"); do
+	for shared_lib in $(scanelf -R -E ET_DYN -y -M64 -F "%F" "${ED}"); do
 		[[ ${shared_lib} == "FILE" ]] && continue
 		prelink --reloc-only=$(printf "%05d" ${addr}) ${shared_lib} || \
 			die "${shared_lib}: relocation failed!"
