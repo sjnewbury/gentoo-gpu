@@ -1,7 +1,7 @@
-From b451050c748758f274ca6314bcd75c1b86042fb0 Mon Sep 17 00:00:00 2001
+From b2ffa1af0597174b6456b0238c52e05e981fc46c Mon Sep 17 00:00:00 2001
 From: Paul Berry <stereotype441@gmail.com>
 Date: Wed, 14 Nov 2012 10:40:22 -0800
-Subject: [PATCH 15/30] mesa: Custom thread marshalling for ShaderSource.
+Subject: [PATCH 15/33] mesa: Custom thread marshalling for ShaderSource.
 
 ---
  src/mapi/glapi/gen/gl_API.xml |   2 +-
@@ -12,7 +12,7 @@ Subject: [PATCH 15/30] mesa: Custom thread marshalling for ShaderSource.
  create mode 100644 src/mesa/main/marshal.c
 
 diff --git a/src/mapi/glapi/gen/gl_API.xml b/src/mapi/glapi/gen/gl_API.xml
-index e2e27195ed..817421c902 100644
+index e2e27195ed7..817421c9022 100644
 --- a/src/mapi/glapi/gen/gl_API.xml
 +++ b/src/mapi/glapi/gen/gl_API.xml
 @@ -5475,7 +5475,7 @@
@@ -25,7 +25,7 @@ index e2e27195ed..817421c902 100644
          <param name="count" type="GLsizei"/>
          <param name="string" type="const GLchar * const *"/>
 diff --git a/src/mesa/Makefile.sources b/src/mesa/Makefile.sources
-index 65e1fc9c47..bae89b979f 100644
+index 65e1fc9c477..bae89b979f4 100644
 --- a/src/mesa/Makefile.sources
 +++ b/src/mesa/Makefile.sources
 @@ -132,6 +132,7 @@ MAIN_FILES = \
@@ -38,7 +38,7 @@ index 65e1fc9c47..bae89b979f 100644
  	main/matrix.c \
 diff --git a/src/mesa/main/marshal.c b/src/mesa/main/marshal.c
 new file mode 100644
-index 0000000000..c0760d2551
+index 00000000000..c0760d25518
 --- /dev/null
 +++ b/src/mesa/main/marshal.c
 @@ -0,0 +1,123 @@
@@ -166,7 +166,7 @@ index 0000000000..c0760d2551
 +   free(length_tmp);
 +}
 diff --git a/src/mesa/main/marshal.h b/src/mesa/main/marshal.h
-index ad32b6b3f4..0b69d66d9a 100644
+index ad32b6b3f4d..0b69d66d9af 100644
 --- a/src/mesa/main/marshal.h
 +++ b/src/mesa/main/marshal.h
 @@ -109,4 +109,14 @@ _mesa_post_marshal_hook(struct gl_context *ctx)
@@ -185,5 +185,5 @@ index ad32b6b3f4..0b69d66d9a 100644
 +
  #endif /* MARSHAL_H */
 -- 
-2.11.0
+2.11.1
 

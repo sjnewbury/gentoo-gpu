@@ -1,7 +1,7 @@
-From 953c59e15e1825d1b8fa9f7457c572a262b4e1a9 Mon Sep 17 00:00:00 2001
+From 1d274c10c29717282d9dcd7839eb03b95248605f Mon Sep 17 00:00:00 2001
 From: Eric Anholt <eric@anholt.net>
 Date: Thu, 3 Jan 2013 11:56:54 -0800
-Subject: [PATCH 10/30] mesa: Validate count parameters when marshalling.
+Subject: [PATCH 10/33] mesa: Validate count parameters when marshalling.
 
 Otherwise, for example, glDeleteBuffers(-1, &bo) gets you a segfault
 instead of GL_INVALID_VALUE.
@@ -10,7 +10,7 @@ instead of GL_INVALID_VALUE.
  1 file changed, 15 insertions(+)
 
 diff --git a/src/mapi/glapi/gen/gl_marshal.py b/src/mapi/glapi/gen/gl_marshal.py
-index c9ed45dd63..f8dfa003b0 100644
+index c9ed45dd63a..f8dfa003b0f 100644
 --- a/src/mapi/glapi/gen/gl_marshal.py
 +++ b/src/mapi/glapi/gen/gl_marshal.py
 @@ -165,6 +165,19 @@ class PrintCode(gl_XML.gl_print_base):
@@ -43,5 +43,5 @@ index c9ed45dd63..f8dfa003b0 100644
              with indent():
                  self.print_async_dispatch(func)
 -- 
-2.11.0
+2.11.1
 

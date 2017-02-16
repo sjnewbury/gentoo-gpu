@@ -1,0 +1,39 @@
+From 348c17c1a538d438f4c471a89bc0c033a2e3e110 Mon Sep 17 00:00:00 2001
+From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
+Date: Tue, 11 Oct 2016 15:25:52 +0000
+Subject: [PATCH 30/31] i965: enable OpenGL 4.2 in gen7+
+
+---
+ src/mesa/drivers/dri/i965/intel_extensions.c | 2 +-
+ src/mesa/drivers/dri/i965/intel_screen.c     | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/mesa/drivers/dri/i965/intel_extensions.c b/src/mesa/drivers/dri/i965/intel_extensions.c
+index f4f20bf586d..58bdf0c72c6 100644
+--- a/src/mesa/drivers/dri/i965/intel_extensions.c
++++ b/src/mesa/drivers/dri/i965/intel_extensions.c
+@@ -139,7 +139,7 @@ intelInitExtensions(struct gl_context *ctx)
+    else if (brw->is_haswell && can_do_pipelined_register_writes(brw->screen))
+       ctx->Const.GLSLVersion = 450;
+    else if (brw->gen >= 7 && can_do_pipelined_register_writes(brw->screen))
+-      ctx->Const.GLSLVersion = 400;
++      ctx->Const.GLSLVersion = 420;
+    else if (brw->gen >= 6)
+       ctx->Const.GLSLVersion = 330;
+    else
+diff --git a/src/mesa/drivers/dri/i965/intel_screen.c b/src/mesa/drivers/dri/i965/intel_screen.c
+index 5668987fa37..711ed1a0d69 100644
+--- a/src/mesa/drivers/dri/i965/intel_screen.c
++++ b/src/mesa/drivers/dri/i965/intel_screen.c
+@@ -1547,7 +1547,7 @@ set_max_gl_versions(struct intel_screen *screen)
+       break;
+    case 7:
+       if (can_do_pipelined_register_writes(screen))
+-         dri_screen->max_gl_core_version = screen->devinfo.is_haswell ? 45 : 40;
++         dri_screen->max_gl_core_version = screen->devinfo.is_haswell ? 45 : 42;
+       else
+          dri_screen->max_gl_core_version = 33;
+       dri_screen->max_gl_compat_version = 30;
+-- 
+2.11.1
+

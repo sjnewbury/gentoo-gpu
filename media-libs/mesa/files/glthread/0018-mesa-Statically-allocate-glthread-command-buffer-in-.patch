@@ -1,7 +1,7 @@
-From 14da01d4d5cc9771144f39ba92b327182b0c03c6 Mon Sep 17 00:00:00 2001
+From 598d05c0ee3bd5877a529e67cecb19a492522081 Mon Sep 17 00:00:00 2001
 From: Eric Anholt <eric@anholt.net>
 Date: Fri, 15 Feb 2013 16:33:33 -0800
-Subject: [PATCH 18/30] mesa: Statically allocate glthread command buffer in
+Subject: [PATCH 18/33] mesa: Statically allocate glthread command buffer in
  the batch struct.
 
 This avoids an extra pointer dereference in the marshalling functions,
@@ -13,7 +13,7 @@ matter for main-thread performance.
  2 files changed, 6 insertions(+), 7 deletions(-)
 
 diff --git a/src/mesa/main/glthread.c b/src/mesa/main/glthread.c
-index 01ca78c275..3a7c753fac 100644
+index 01ca78c275f..3a7c753face 100644
 --- a/src/mesa/main/glthread.c
 +++ b/src/mesa/main/glthread.c
 @@ -45,10 +45,10 @@ glthread_allocate_batch(struct gl_context *ctx)
@@ -38,7 +38,7 @@ index 01ca78c275..3a7c753fac 100644
  }
  
 diff --git a/src/mesa/main/glthread.h b/src/mesa/main/glthread.h
-index c38fef32fa..98ae11509a 100644
+index c38fef32fa0..98ae11509a6 100644
 --- a/src/mesa/main/glthread.h
 +++ b/src/mesa/main/glthread.h
 @@ -94,14 +94,14 @@ struct glthread_batch
@@ -61,5 +61,5 @@ index c38fef32fa..98ae11509a 100644
  
  void _mesa_glthread_init(struct gl_context *ctx);
 -- 
-2.11.0
+2.11.1
 

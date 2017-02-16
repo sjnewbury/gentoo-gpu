@@ -1,0 +1,89 @@
+From 201bf40f972f45a6eca144f60501a57bb7cc7db5 Mon Sep 17 00:00:00 2001
+From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
+Date: Fri, 23 Sep 2016 15:57:39 +0000
+Subject: [PATCH 17/31] i965/vec4: consider subregister offset in live
+ variables
+
+Take into account offset values less than a full register (32 bytes)
+when getting the var from register.
+
+This is required when dealing with an operation that writes half of the
+register (like one d2x in IVB/BYT, which uses exec_size == 4).
+
+- v2: take in account this offset < 32 in liveness analysis too (Curro)
+---
+ src/mesa/drivers/dri/i965/brw_vec4_live_variables.cpp | 12 ++++++++----
+ src/mesa/drivers/dri/i965/brw_vec4_live_variables.h   |  6 ++++--
+ 2 files changed, 12 insertions(+), 6 deletions(-)
+
+diff --git a/src/mesa/drivers/dri/i965/brw_vec4_live_variables.cpp b/src/mesa/drivers/dri/i965/brw_vec4_live_variables.cpp
+index 73f658cd8fa..dc1ad21038c 100644
+--- a/src/mesa/drivers/dri/i965/brw_vec4_live_variables.cpp
++++ b/src/mesa/drivers/dri/i965/brw_vec4_live_variables.cpp
+@@ -78,7 +78,8 @@ vec4_live_variables::setup_def_use()
+ 	    if (inst->src[i].file == VGRF) {
+                for (unsigned j = 0; j < DIV_ROUND_UP(inst->size_read(i), 16); j++) {
+                   for (int c = 0; c < 4; c++) {
+-                     const unsigned v = var_from_reg(alloc, inst->src[i], c, j);
++                     const unsigned v =
++                        var_from_reg(alloc, inst->src[i], c, j);
+                      if (!BITSET_TEST(bd->def, v))
+                         BITSET_SET(bd->use, v);
+                   }
+@@ -101,7 +102,8 @@ vec4_live_variables::setup_def_use()
+             for (unsigned i = 0; i < DIV_ROUND_UP(inst->size_written, 16); i++) {
+                for (int c = 0; c < 4; c++) {
+                   if (inst->dst.writemask & (1 << c)) {
+-                     const unsigned v = var_from_reg(alloc, inst->dst, c, i);
++                     const unsigned v =
++                        var_from_reg(alloc, inst->dst, c, i);
+                      if (!BITSET_TEST(bd->use, v))
+                         BITSET_SET(bd->def, v);
+                   }
+@@ -257,7 +259,8 @@ vec4_visitor::calculate_live_intervals()
+ 	 if (inst->src[i].file == VGRF) {
+             for (unsigned j = 0; j < DIV_ROUND_UP(inst->size_read(i), 16); j++) {
+                for (int c = 0; c < 4; c++) {
+-                  const unsigned v = var_from_reg(alloc, inst->src[i], c, j);
++                  const unsigned v =
++                     var_from_reg(alloc, inst->src[i], c, j);
+                   start[v] = MIN2(start[v], ip);
+                   end[v] = ip;
+                }
+@@ -269,7 +272,8 @@ vec4_visitor::calculate_live_intervals()
+          for (unsigned i = 0; i < DIV_ROUND_UP(inst->size_written, 16); i++) {
+             for (int c = 0; c < 4; c++) {
+                if (inst->dst.writemask & (1 << c)) {
+-                  const unsigned v = var_from_reg(alloc, inst->dst, c, i);
++                  const unsigned v =
++                     var_from_reg(alloc, inst->dst, c, i);
+                   start[v] = MIN2(start[v], ip);
+                   end[v] = ip;
+                }
+diff --git a/src/mesa/drivers/dri/i965/brw_vec4_live_variables.h b/src/mesa/drivers/dri/i965/brw_vec4_live_variables.h
+index 8807c453743..b23df650c11 100644
+--- a/src/mesa/drivers/dri/i965/brw_vec4_live_variables.h
++++ b/src/mesa/drivers/dri/i965/brw_vec4_live_variables.h
+@@ -89,7 +89,8 @@ var_from_reg(const simple_allocator &alloc, const src_reg &reg,
+    const unsigned csize = DIV_ROUND_UP(type_sz(reg.type), 4);
+    unsigned result =
+       8 * (alloc.offsets[reg.nr] + reg.offset / REG_SIZE) +
+-      (BRW_GET_SWZ(reg.swizzle, c) + k / csize * 4) * csize + k % csize;
++      (BRW_GET_SWZ(reg.swizzle, c) + k / csize * 4) * csize + k % csize +
++      (reg.offset % REG_SIZE) / type_sz(reg.type);
+    /* Do not exceed the limit for this register */
+    assert(result < 8 * (alloc.offsets[reg.nr] + alloc.sizes[reg.nr]));
+    return result;
+@@ -103,7 +104,8 @@ var_from_reg(const simple_allocator &alloc, const dst_reg &reg,
+    const unsigned csize = DIV_ROUND_UP(type_sz(reg.type), 4);
+    unsigned result =
+       8 * (alloc.offsets[reg.nr] + reg.offset / REG_SIZE) +
+-      (c + k / csize * 4) * csize + k % csize;
++      (c + k / csize * 4) * csize + k % csize +
++      (reg.offset % REG_SIZE) / type_sz(reg.type);
+    /* Do not exceed the limit for this register */
+    assert(result < 8 * (alloc.offsets[reg.nr] + alloc.sizes[reg.nr]));
+    return result;
+-- 
+2.11.1
+

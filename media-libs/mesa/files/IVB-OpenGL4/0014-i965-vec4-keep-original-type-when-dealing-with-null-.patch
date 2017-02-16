@@ -1,0 +1,48 @@
+From 312ded085e8f7025dec1be1d04d29adcaab63d2d Mon Sep 17 00:00:00 2001
+From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
+Date: Mon, 12 Sep 2016 16:06:22 +0000
+Subject: [PATCH 14/31] i965/vec4: keep original type when dealing with null
+ registers
+
+Keep the original type when dealing with null registers. Specially
+because we do no want to introduce an implicit conversion between
+types that could affect the conditional flags.
+
+This affects specially when the original type is DF, and we are working
+on Ivybridge/Baytrail.
+---
+ src/mesa/drivers/dri/i965/brw_vec4.cpp | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/src/mesa/drivers/dri/i965/brw_vec4.cpp b/src/mesa/drivers/dri/i965/brw_vec4.cpp
+index 7080c93e550..64b435f3ec4 100644
+--- a/src/mesa/drivers/dri/i965/brw_vec4.cpp
++++ b/src/mesa/drivers/dri/i965/brw_vec4.cpp
+@@ -1983,6 +1983,7 @@ vec4_visitor::convert_to_hw_regs()
+          case BAD_FILE:
+             /* Probably unused. */
+             reg = brw_null_reg();
++            reg.type = src.type;
+             break;
+ 
+          case MRF:
+@@ -2033,6 +2034,7 @@ vec4_visitor::convert_to_hw_regs()
+ 
+       case BAD_FILE:
+          reg = brw_null_reg();
++         reg.type = dst.type;
+          break;
+ 
+       case IMM:
+@@ -2205,6 +2207,8 @@ vec4_visitor::lower_simd_width()
+          } else {
+             if (inst->dst.file != ARF)
+                dst = horiz_offset(inst->dst, channel_offset);
++            else
++               dst.type = inst->dst.type;
+          }
+          linst->dst = dst;
+ 
+-- 
+2.11.1
+

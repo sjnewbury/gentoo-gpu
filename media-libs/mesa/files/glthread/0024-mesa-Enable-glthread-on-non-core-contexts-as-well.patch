@@ -1,7 +1,7 @@
-From 6ee5b92842d4feafd0687d12957e24dd7c1a7747 Mon Sep 17 00:00:00 2001
+From ceaca99085a837c449af1e6535bd39a5f1df1fcb Mon Sep 17 00:00:00 2001
 From: Eric Anholt <eric@anholt.net>
 Date: Mon, 4 Mar 2013 13:58:26 -0800
-Subject: [PATCH 24/30] mesa: Enable glthread on non-core contexts as well.
+Subject: [PATCH 24/33] mesa: Enable glthread on non-core contexts as well.
 
 I think I've fixed the last issue preventing trying glthread from being a
 reasonable thing to do on compat contexts.
@@ -10,7 +10,7 @@ reasonable thing to do on compat contexts.
  1 file changed, 9 deletions(-)
 
 diff --git a/src/mesa/main/glthread.c b/src/mesa/main/glthread.c
-index 3a7c753fac..27f011e95a 100644
+index 3a7c753face..27f011e95a5 100644
 --- a/src/mesa/main/glthread.c
 +++ b/src/mesa/main/glthread.c
 @@ -119,15 +119,6 @@ _mesa_glthread_init(struct gl_context *ctx)
@@ -30,5 +30,5 @@ index 3a7c753fac..27f011e95a 100644
     if (!ctx->MarshalExec) {
        free(glthread);
 -- 
-2.11.0
+2.11.1
 

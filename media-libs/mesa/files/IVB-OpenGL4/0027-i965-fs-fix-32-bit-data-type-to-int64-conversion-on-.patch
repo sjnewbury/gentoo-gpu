@@ -1,0 +1,56 @@
+From b2d92c3d76db63a4e984b8613c322327c8f7b3d3 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
+Date: Fri, 10 Feb 2017 14:06:43 +0100
+Subject: [PATCH 27/31] i965/fs: fix 32-bit data type to int64 conversion on
+ BSW/BXT
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The 32-bit to 64-bit conversions need to have the 32-bit
+data source elements aligned to 64-bit but only with doubles as
+destination type.
+
+Bugzilla: https://bugs.freedesktop.org/show_bug.cgi?id=99660
+
+Signed-off-by: Samuel Iglesias Gonsálvez <siglesias@igalia.com>
+Tested-by: Mark Janes <mark.a.janes@intel.com>
+---
+ src/mesa/drivers/dri/i965/brw_fs_nir.cpp | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/src/mesa/drivers/dri/i965/brw_fs_nir.cpp b/src/mesa/drivers/dri/i965/brw_fs_nir.cpp
+index 8975940e10b..f5a5f8d3b38 100644
+--- a/src/mesa/drivers/dri/i965/brw_fs_nir.cpp
++++ b/src/mesa/drivers/dri/i965/brw_fs_nir.cpp
+@@ -655,13 +655,6 @@ fs_visitor::nir_emit_alu(const fs_builder &bld, nir_alu_instr *instr)
+    case nir_op_f2d:
+    case nir_op_i2d:
+    case nir_op_u2d:
+-   case nir_op_f2i64:
+-   case nir_op_f2u64:
+-   case nir_op_i2i64:
+-   case nir_op_i2u64:
+-   case nir_op_u2i64:
+-   case nir_op_u2u64:
+-   case nir_op_b2i64:
+       /* CHV PRM, vol07, 3D Media GPGPU Engine, Register Region Restrictions:
+        *
+        *    "When source or destination is 64b (...), regioning in Align1
+@@ -686,6 +679,13 @@ fs_visitor::nir_emit_alu(const fs_builder &bld, nir_alu_instr *instr)
+          break;
+       }
+       /* fallthrough */
++   case nir_op_f2i64:
++   case nir_op_f2u64:
++   case nir_op_i2i64:
++   case nir_op_i2u64:
++   case nir_op_u2i64:
++   case nir_op_u2u64:
++   case nir_op_b2i64:
+    case nir_op_d2f:
+    case nir_op_d2i:
+    case nir_op_d2u:
+-- 
+2.11.1
+

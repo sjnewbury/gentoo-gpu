@@ -1,7 +1,7 @@
-From 99dc5c499e72c872e94689d28383b347fb86b7bc Mon Sep 17 00:00:00 2001
+From ae49a2ec237dac964562b437deb6d9b5375890a8 Mon Sep 17 00:00:00 2001
 From: Eric Anholt <eric@anholt.net>
 Date: Thu, 27 Dec 2012 17:39:37 -0800
-Subject: [PATCH 06/30] egl: Implement __DRI_BACKGROUND_CALLABLE
+Subject: [PATCH 06/33] egl: Implement __DRI_BACKGROUND_CALLABLE
 
 ---
  src/egl/drivers/dri2/egl_dri2.c     | 14 ++++++++++++++
@@ -12,7 +12,7 @@ Subject: [PATCH 06/30] egl: Implement __DRI_BACKGROUND_CALLABLE
  5 files changed, 21 insertions(+), 1 deletion(-)
 
 diff --git a/src/egl/drivers/dri2/egl_dri2.c b/src/egl/drivers/dri2/egl_dri2.c
-index 94b7c20170..da26b4e2a9 100644
+index 94b7c201707..da26b4e2a97 100644
 --- a/src/egl/drivers/dri2/egl_dri2.c
 +++ b/src/egl/drivers/dri2/egl_dri2.c
 @@ -83,6 +83,20 @@
@@ -37,7 +37,7 @@ index 94b7c20170..da26b4e2a9 100644
     .base = { __DRI_USE_INVALIDATE, 1 }
  };
 diff --git a/src/egl/drivers/dri2/egl_dri2.h b/src/egl/drivers/dri2/egl_dri2.h
-index f3437e2b5a..4a093cb46f 100644
+index f3437e2b5a2..4a093cb46f1 100644
 --- a/src/egl/drivers/dri2/egl_dri2.h
 +++ b/src/egl/drivers/dri2/egl_dri2.h
 @@ -342,6 +342,7 @@ _EGL_DRIVER_TYPECAST(dri2_egl_sync, _EGLSync, obj)
@@ -49,7 +49,7 @@ index f3437e2b5a..4a093cb46f 100644
  EGLBoolean
  dri2_load_driver(_EGLDisplay *disp);
 diff --git a/src/egl/drivers/dri2/platform_x11.c b/src/egl/drivers/dri2/platform_x11.c
-index c5bb9734b1..2f1086e28f 100644
+index c5bb9734b1f..2f1086e28f0 100644
 --- a/src/egl/drivers/dri2/platform_x11.c
 +++ b/src/egl/drivers/dri2/platform_x11.c
 @@ -1423,12 +1423,14 @@ static const __DRIdri2LoaderExtension dri2_loader_extension = {
@@ -68,7 +68,7 @@ index c5bb9734b1..2f1086e28f 100644
  };
  
 diff --git a/src/egl/main/eglcontext.c b/src/egl/main/eglcontext.c
-index 5313e1dabc..05cc523c8d 100644
+index 5313e1dabcc..05cc523c8d1 100644
 --- a/src/egl/main/eglcontext.c
 +++ b/src/egl/main/eglcontext.c
 @@ -583,7 +583,7 @@ _eglQueryContext(_EGLDriver *drv, _EGLDisplay *dpy, _EGLContext *c,
@@ -81,7 +81,7 @@ index 5313e1dabc..05cc523c8d 100644
  {
     _EGLContext *oldCtx;
 diff --git a/src/egl/main/eglcontext.h b/src/egl/main/eglcontext.h
-index 69bf77d8af..f2fe806626 100644
+index 69bf77d8aff..f2fe8066265 100644
 --- a/src/egl/main/eglcontext.h
 +++ b/src/egl/main/eglcontext.h
 @@ -82,6 +82,9 @@ _eglBindContext(_EGLContext *ctx, _EGLSurface *draw, _EGLSurface *read,
@@ -95,5 +95,5 @@ index 69bf77d8af..f2fe806626 100644
  /**
   * Increment reference count for the context.
 -- 
-2.11.0
+2.11.1
 

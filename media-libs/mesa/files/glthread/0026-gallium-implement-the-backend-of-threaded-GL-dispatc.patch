@@ -1,7 +1,7 @@
-From 3477b4cdac285a696760ee03a825b8b32746af07 Mon Sep 17 00:00:00 2001
+From 6ce8abde8bbc5f7dc37590a2eae28498fce6ce7d Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Marek=20Ol=C5=A1=C3=A1k?= <marek.olsak@amd.com>
 Date: Sun, 5 Feb 2017 01:20:51 +0100
-Subject: [PATCH 26/30] gallium: implement the backend of threaded GL dispatch
+Subject: [PATCH 26/33] gallium: implement the backend of threaded GL dispatch
 
 ---
  src/gallium/include/state_tracker/st_api.h      | 19 +++++++++++++++++++
@@ -14,10 +14,10 @@ Subject: [PATCH 26/30] gallium: implement the backend of threaded GL dispatch
  7 files changed, 92 insertions(+)
 
 diff --git a/src/gallium/include/state_tracker/st_api.h b/src/gallium/include/state_tracker/st_api.h
-index a2e37d2e48..19c38afe90 100644
+index 1b9ef290b1f..28ec6b01a33 100644
 --- a/src/gallium/include/state_tracker/st_api.h
 +++ b/src/gallium/include/state_tracker/st_api.h
-@@ -414,6 +414,19 @@ struct st_context_iface
+@@ -415,6 +415,19 @@ struct st_context_iface
      */
     boolean (*get_resource_for_egl_image)(struct st_context_iface *stctxi,
                                           struct st_context_resource *stres);
@@ -37,7 +37,7 @@ index a2e37d2e48..19c38afe90 100644
  };
  
  
-@@ -451,6 +464,12 @@ struct st_manager
+@@ -452,6 +465,12 @@ struct st_manager
      */
     int (*get_param)(struct st_manager *smapi,
                      enum st_manager_param param);
@@ -51,7 +51,7 @@ index a2e37d2e48..19c38afe90 100644
  
  /**
 diff --git a/src/gallium/state_trackers/dri/dri_context.c b/src/gallium/state_trackers/dri/dri_context.c
-index 3d8af65ca6..91d2d1fbbe 100644
+index 3d8af65ca61..91d2d1fbbe8 100644
 --- a/src/gallium/state_trackers/dri/dri_context.c
 +++ b/src/gallium/state_trackers/dri/dri_context.c
 @@ -156,6 +156,13 @@ dri_create_context(gl_api api, const struct gl_config * visual,
@@ -79,7 +79,7 @@ index 3d8af65ca6..91d2d1fbbe 100644
     if (old_st && old_st != ctx->st)
        old_st->flush(old_st, ST_FLUSH_FRONT, NULL);
 diff --git a/src/gallium/state_trackers/dri/dri_drawable.c b/src/gallium/state_trackers/dri/dri_drawable.c
-index fd3b458de6..3c2e307524 100644
+index fd3b458de6c..3c2e3075249 100644
 --- a/src/gallium/state_trackers/dri/dri_drawable.c
 +++ b/src/gallium/state_trackers/dri/dri_drawable.c
 @@ -217,9 +217,13 @@ dri_set_tex_buffer2(__DRIcontext *pDRICtx, GLint target,
@@ -106,7 +106,7 @@ index fd3b458de6..3c2e307524 100644
     if (drawable) {
        /* prevent recursion */
 diff --git a/src/gallium/state_trackers/dri/dri_screen.c b/src/gallium/state_trackers/dri/dri_screen.c
-index 9a8a0f9881..308e12f218 100644
+index 9573de87639..a095a9a8794 100644
 --- a/src/gallium/state_trackers/dri/dri_screen.c
 +++ b/src/gallium/state_trackers/dri/dri_screen.c
 @@ -33,6 +33,7 @@
@@ -128,7 +128,7 @@ index 9a8a0f9881..308e12f218 100644
        DRI_CONF_SECTION_QUALITY
           DRI_CONF_FORCE_S3TC_ENABLE("false")
           DRI_CONF_PP_CELSHADE(0)
-@@ -427,6 +432,21 @@ dri_postprocessing_init(struct dri_screen *screen)
+@@ -430,6 +435,21 @@ dri_postprocessing_init(struct dri_screen *screen)
     }
  }
  
@@ -150,7 +150,7 @@ index 9a8a0f9881..308e12f218 100644
  const __DRIconfig **
  dri_init_screen_helper(struct dri_screen *screen,
                         struct pipe_screen *pscreen,
-@@ -435,6 +455,7 @@ dri_init_screen_helper(struct dri_screen *screen,
+@@ -438,6 +458,7 @@ dri_init_screen_helper(struct dri_screen *screen,
     screen->base.screen = pscreen;
     screen->base.get_egl_image = dri_get_egl_image;
     screen->base.get_param = dri_get_param;
@@ -159,10 +159,10 @@ index 9a8a0f9881..308e12f218 100644
     screen->st_api = st_gl_api_create();
     if (!screen->st_api)
 diff --git a/src/mesa/drivers/dri/common/xmlpool/t_options.h b/src/mesa/drivers/dri/common/xmlpool/t_options.h
-index a189bbedec..fde919172e 100644
+index f200093177d..c7c658d0aac 100644
 --- a/src/mesa/drivers/dri/common/xmlpool/t_options.h
 +++ b/src/mesa/drivers/dri/common/xmlpool/t_options.h
-@@ -308,6 +308,10 @@ DRI_CONF_OPT_BEGIN_V(texture_heaps,enum,def,"0:2") \
+@@ -313,6 +313,10 @@ DRI_CONF_OPT_BEGIN_V(texture_heaps,enum,def,"0:2") \
  	DRI_CONF_DESC_END \
  DRI_CONF_OPT_END
  
@@ -174,7 +174,7 @@ index a189bbedec..fde919172e 100644
  
  /**
 diff --git a/src/mesa/state_tracker/st_context.c b/src/mesa/state_tracker/st_context.c
-index 55237345fc..ab3db0eaba 100644
+index f4ad6d8ad16..e0470cbb0b9 100644
 --- a/src/mesa/state_tracker/st_context.c
 +++ b/src/mesa/state_tracker/st_context.c
 @@ -29,6 +29,7 @@
@@ -185,7 +185,7 @@ index 55237345fc..ab3db0eaba 100644
  #include "main/samplerobj.h"
  #include "main/shaderobj.h"
  #include "main/version.h"
-@@ -624,6 +625,17 @@ st_emit_string_marker(struct gl_context *ctx, const GLchar *string, GLsizei len)
+@@ -611,6 +612,17 @@ st_emit_string_marker(struct gl_context *ctx, const GLchar *string, GLsizei len)
     st->pipe->emit_string_marker(st->pipe, string, len);
  }
  
@@ -203,14 +203,14 @@ index 55237345fc..ab3db0eaba 100644
  void st_init_driver_functions(struct pipe_screen *screen,
                                struct dd_function_table *functions)
  {
-@@ -668,4 +680,5 @@ void st_init_driver_functions(struct pipe_screen *screen,
+@@ -655,4 +667,5 @@ void st_init_driver_functions(struct pipe_screen *screen,
     functions->Enable = st_Enable;
     functions->UpdateState = st_invalidate_state;
     functions->QueryMemoryInfo = st_query_memory_info;
 +   functions->SetBackgroundContext = st_set_background_context;
  }
 diff --git a/src/mesa/state_tracker/st_manager.c b/src/mesa/state_tracker/st_manager.c
-index c3d8286b5a..f2bd53b547 100644
+index c3d8286b5a7..f2bd53b547b 100644
 --- a/src/mesa/state_tracker/st_manager.c
 +++ b/src/mesa/state_tracker/st_manager.c
 @@ -29,6 +29,7 @@
@@ -254,5 +254,5 @@ index c3d8286b5a..f2bd53b547 100644
     st->iface.cso_context = st->cso_context;
     st->iface.pipe = st->pipe;
 -- 
-2.11.0
+2.11.1
 

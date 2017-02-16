@@ -1,7 +1,7 @@
-From 368d78155221105160722ead8d35f8789b278696 Mon Sep 17 00:00:00 2001
+From e9fb1ba512facae33d1b069ec1aa0a5a1e0d81b0 Mon Sep 17 00:00:00 2001
 From: Paul Berry <stereotype441@gmail.com>
 Date: Wed, 7 Nov 2012 13:03:13 -0800
-Subject: [PATCH 09/30] glapi: Generate GL API marshalling code from the XML.
+Subject: [PATCH 09/33] glapi: Generate GL API marshalling code from the XML.
 
 This is not yet used in the build, just generated.
 
@@ -22,7 +22,7 @@ v3: Avoid mixing declarations and code, remove logic for avoiding emitting
  create mode 100644 src/mapi/glapi/gen/marshal_XML.py
 
 diff --git a/src/mapi/glapi/gen/Makefile.am b/src/mapi/glapi/gen/Makefile.am
-index 079b1bb225..1375855858 100644
+index 079b1bb225e..1375855858f 100644
 --- a/src/mapi/glapi/gen/Makefile.am
 +++ b/src/mapi/glapi/gen/Makefile.am
 @@ -54,6 +54,8 @@ BUILT_SOURCES = \
@@ -49,7 +49,7 @@ index 079b1bb225..1375855858 100644
  
 diff --git a/src/mapi/glapi/gen/gl_marshal.py b/src/mapi/glapi/gen/gl_marshal.py
 new file mode 100644
-index 0000000000..c9ed45dd63
+index 00000000000..c9ed45dd63a
 --- /dev/null
 +++ b/src/mapi/glapi/gen/gl_marshal.py
 @@ -0,0 +1,288 @@
@@ -343,7 +343,7 @@ index 0000000000..c9ed45dd63
 +    printer.Print(api)
 diff --git a/src/mapi/glapi/gen/gl_marshal_h.py b/src/mapi/glapi/gen/gl_marshal_h.py
 new file mode 100644
-index 0000000000..6e39148d29
+index 00000000000..6e39148d29a
 --- /dev/null
 +++ b/src/mapi/glapi/gen/gl_marshal_h.py
 @@ -0,0 +1,86 @@
@@ -435,7 +435,7 @@ index 0000000000..6e39148d29
 +    printer.Print(api)
 diff --git a/src/mapi/glapi/gen/marshal_XML.py b/src/mapi/glapi/gen/marshal_XML.py
 new file mode 100644
-index 0000000000..e8ddb7ff8f
+index 00000000000..e8ddb7ff8f6
 --- /dev/null
 +++ b/src/mapi/glapi/gen/marshal_XML.py
 @@ -0,0 +1,96 @@
@@ -536,7 +536,7 @@ index 0000000000..e8ddb7ff8f
 +                return 'sync'
 +        return 'async'
 diff --git a/src/mesa/Android.gen.mk b/src/mesa/Android.gen.mk
-index a985f0a64b..a1e58a6d3b 100644
+index a985f0a64b1..a1e58a6d3b8 100644
 --- a/src/mesa/Android.gen.mk
 +++ b/src/mesa/Android.gen.mk
 @@ -113,6 +113,18 @@ $(intermediates)/main/api_exec.c: PRIVATE_XML := -f $(glapi)/gl_and_es_API.xml
@@ -559,7 +559,7 @@ index a985f0a64b..a1e58a6d3b 100644
  
  $(intermediates)/main/get_hash.h: PRIVATE_SCRIPT := $(MESA_PYTHON2) $(GET_HASH_GEN)
 diff --git a/src/mesa/SConscript b/src/mesa/SConscript
-index e375de6ee7..9398ddb13b 100644
+index e375de6ee77..9398ddb13bf 100644
 --- a/src/mesa/SConscript
 +++ b/src/mesa/SConscript
 @@ -118,6 +118,22 @@ if env['platform'] not in ('cygwin', 'darwin', 'windows', 'haiku'):
@@ -586,7 +586,7 @@ index e375de6ee7..9398ddb13b 100644
  # Libraries
  #
 diff --git a/src/mesa/main/.gitignore b/src/mesa/main/.gitignore
-index a4da567c94..836d8f104a 100644
+index a4da567c94e..836d8f104a8 100644
 --- a/src/mesa/main/.gitignore
 +++ b/src/mesa/main/.gitignore
 @@ -8,3 +8,5 @@ format_info.h
@@ -596,5 +596,5 @@ index a4da567c94..836d8f104a 100644
 +marshal_generated.c
 +marshal_generated.h
 -- 
-2.11.0
+2.11.1
 

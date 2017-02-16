@@ -1,7 +1,7 @@
-From 4e1f89021840118df420a846e43bd51f0e8b81d3 Mon Sep 17 00:00:00 2001
+From db1c506a2d4b0e43b491e96036b84578a8e6a12d Mon Sep 17 00:00:00 2001
 From: Paul Berry <stereotype441@gmail.com>
 Date: Fri, 16 Nov 2012 11:43:08 -0800
-Subject: [PATCH 16/30] mesa: Custom thread marshalling for Flush.
+Subject: [PATCH 16/33] mesa: Custom thread marshalling for Flush.
 
 ---
  src/mapi/glapi/gen/gl_API.xml |  3 +--
@@ -10,7 +10,7 @@ Subject: [PATCH 16/30] mesa: Custom thread marshalling for Flush.
  3 files changed, 42 insertions(+), 2 deletions(-)
 
 diff --git a/src/mapi/glapi/gen/gl_API.xml b/src/mapi/glapi/gen/gl_API.xml
-index 817421c902..306dc52867 100644
+index 817421c9022..306dc52867a 100644
 --- a/src/mapi/glapi/gen/gl_API.xml
 +++ b/src/mapi/glapi/gen/gl_API.xml
 @@ -2377,8 +2377,7 @@
@@ -24,7 +24,7 @@ index 817421c902..306dc52867 100644
      </function>
  
 diff --git a/src/mesa/main/marshal.c b/src/mesa/main/marshal.c
-index c0760d2551..14577dd4cb 100644
+index c0760d25518..14577dd4cb4 100644
 --- a/src/mesa/main/marshal.c
 +++ b/src/mesa/main/marshal.c
 @@ -31,6 +31,39 @@
@@ -68,7 +68,7 @@ index c0760d2551..14577dd4cb 100644
  {
     struct marshal_cmd_base cmd_base;
 diff --git a/src/mesa/main/marshal.h b/src/mesa/main/marshal.h
-index 0b69d66d9a..0e0e9b280c 100644
+index 0b69d66d9af..0e0e9b280c6 100644
 --- a/src/mesa/main/marshal.h
 +++ b/src/mesa/main/marshal.h
 @@ -110,6 +110,7 @@ _mesa_post_marshal_hook(struct gl_context *ctx)
@@ -92,5 +92,5 @@ index 0b69d66d9a..0e0e9b280c 100644
 +
  #endif /* MARSHAL_H */
 -- 
-2.11.0
+2.11.1
 

@@ -1,7 +1,7 @@
-From 211dddcc1f2727d05c72141d0a758bda7444d31d Mon Sep 17 00:00:00 2001
+From f5b41bff16e1743c00a0720c5afb35e8d3c2a918 Mon Sep 17 00:00:00 2001
 From: Eric Anholt <eric@anholt.net>
 Date: Wed, 27 Feb 2013 14:28:16 -0800
-Subject: [PATCH 20/30] mesa: Add support for asynchronous glDraw* on GL core.
+Subject: [PATCH 20/33] mesa: Add support for asynchronous glDraw* on GL core.
 
 ---
  src/mapi/glapi/gen/gl_marshal.py  | 4 ++++
@@ -9,7 +9,7 @@ Subject: [PATCH 20/30] mesa: Add support for asynchronous glDraw* on GL core.
  2 files changed, 6 insertions(+), 7 deletions(-)
 
 diff --git a/src/mapi/glapi/gen/gl_marshal.py b/src/mapi/glapi/gen/gl_marshal.py
-index 3b9868f9a1..1a63343500 100644
+index 3b9868f9a1f..1a633435001 100644
 --- a/src/mapi/glapi/gen/gl_marshal.py
 +++ b/src/mapi/glapi/gen/gl_marshal.py
 @@ -244,6 +244,10 @@ class PrintCode(gl_XML.gl_print_base):
@@ -24,7 +24,7 @@ index 3b9868f9a1..1a63343500 100644
  
      def print_async_body(self, func):
 diff --git a/src/mapi/glapi/gen/marshal_XML.py b/src/mapi/glapi/gen/marshal_XML.py
-index 9d5688deca..d56e4dda4a 100644
+index 9d5688decac..d56e4dda4af 100644
 --- a/src/mapi/glapi/gen/marshal_XML.py
 +++ b/src/mapi/glapi/gen/marshal_XML.py
 @@ -64,12 +64,7 @@ class marshal_function(gl_XML.gl_function):
@@ -51,5 +51,5 @@ index 9d5688deca..d56e4dda4a 100644
              if p.count_parameter_list:
                  # Parameter size is determined by enums; haven't
 -- 
-2.11.0
+2.11.1
 

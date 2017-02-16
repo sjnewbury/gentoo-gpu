@@ -1,7 +1,7 @@
-From 7879cac601f0ffcb12749119c3b945af4dd9b0c0 Mon Sep 17 00:00:00 2001
+From 4cec128155e1f103d26f48376e87718b6a729fc1 Mon Sep 17 00:00:00 2001
 From: Eric Anholt <eric@anholt.net>
 Date: Mon, 4 Mar 2013 09:47:40 -0800
-Subject: [PATCH 22/30] mesa: Disable glthread when glBegin() is called.
+Subject: [PATCH 22/33] mesa: Disable glthread when glBegin() is called.
 
 glBegin() swaps dispatch tables, and we don't have any code in place for
 handling that in glthread (which also messes with dispatch tables), and I
@@ -11,7 +11,7 @@ don't particularly care to at this point.
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/src/mapi/glapi/gen/gl_API.xml b/src/mapi/glapi/gen/gl_API.xml
-index d412c49205..79dda8467c 100644
+index d412c492057..79dda8467c4 100644
 --- a/src/mapi/glapi/gen/gl_API.xml
 +++ b/src/mapi/glapi/gen/gl_API.xml
 @@ -1148,7 +1148,7 @@
@@ -24,5 +24,5 @@ index d412c49205..79dda8467c 100644
          <glx rop="4"/>
      </function>
 -- 
-2.11.0
+2.11.1
 

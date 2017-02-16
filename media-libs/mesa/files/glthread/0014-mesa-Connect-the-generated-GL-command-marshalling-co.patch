@@ -1,7 +1,7 @@
-From 170424276c831e01c65864106e11a7d5621455c8 Mon Sep 17 00:00:00 2001
+From 41573e22e0e9950e18dfff263691af587f448386 Mon Sep 17 00:00:00 2001
 From: Eric Anholt <eric@anholt.net>
 Date: Wed, 2 Jan 2013 14:12:04 -0800
-Subject: [PATCH 14/30] mesa: Connect the generated GL command marshalling code
+Subject: [PATCH 14/33] mesa: Connect the generated GL command marshalling code
  to the build.
 
 v2: Rebase on the Begin/End changes, and just disable this feature on
@@ -13,7 +13,7 @@ v2: Rebase on the Begin/End changes, and just disable this feature on
  3 files changed, 37 insertions(+)
 
 diff --git a/src/mapi/glapi/gen/gl_marshal.py b/src/mapi/glapi/gen/gl_marshal.py
-index f8dfa003b0..e4137f46ab 100644
+index f8dfa003b0f..e4137f46abe 100644
 --- a/src/mapi/glapi/gen/gl_marshal.py
 +++ b/src/mapi/glapi/gen/gl_marshal.py
 @@ -66,6 +66,16 @@ class PrintCode(gl_XML.gl_print_base):
@@ -34,7 +34,7 @@ index f8dfa003b0..e4137f46ab 100644
      def printRealFooter(self):
          pass
 diff --git a/src/mesa/Makefile.sources b/src/mesa/Makefile.sources
-index 87d675d86b..65e1fc9c47 100644
+index 87d675d86bc..65e1fc9c477 100644
 --- a/src/mesa/Makefile.sources
 +++ b/src/mesa/Makefile.sources
 @@ -132,6 +132,8 @@ MAIN_FILES = \
@@ -47,7 +47,7 @@ index 87d675d86b..65e1fc9c47 100644
  	main/matrix.h \
  	main/mipmap.c \
 diff --git a/src/mesa/main/glthread.c b/src/mesa/main/glthread.c
-index 8877a695f0..01ca78c275 100644
+index 8877a695f0c..01ca78c275f 100644
 --- a/src/mesa/main/glthread.c
 +++ b/src/mesa/main/glthread.c
 @@ -54,8 +54,16 @@ glthread_allocate_batch(struct gl_context *ctx)
@@ -92,5 +92,5 @@ index 8877a695f0..01ca78c275 100644
     pthread_cond_init(&glthread->new_work, NULL);
     pthread_cond_init(&glthread->work_done, NULL);
 -- 
-2.11.0
+2.11.1
 

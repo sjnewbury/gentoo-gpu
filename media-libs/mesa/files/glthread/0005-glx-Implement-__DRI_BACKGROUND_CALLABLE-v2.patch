@@ -1,7 +1,7 @@
-From 463f36973749b1e8694ba1e684c8a784216371d2 Mon Sep 17 00:00:00 2001
+From 8f5e61a9edb18fda4c11350034255402bad59752 Mon Sep 17 00:00:00 2001
 From: Paul Berry <stereotype441@gmail.com>
 Date: Wed, 14 Nov 2012 15:50:27 -0800
-Subject: [PATCH 05/30] glx: Implement __DRI_BACKGROUND_CALLABLE (v2)
+Subject: [PATCH 05/33] glx: Implement __DRI_BACKGROUND_CALLABLE (v2)
 
 v2: Marek: Add DRI3 support.
 ---
@@ -10,7 +10,7 @@ v2: Marek: Add DRI3 support.
  2 files changed, 28 insertions(+), 1 deletion(-)
 
 diff --git a/src/glx/dri2_glx.c b/src/glx/dri2_glx.c
-index d6eb281cf9..8dabcb31b1 100644
+index d6eb281cf9e..8dabcb31b1c 100644
 --- a/src/glx/dri2_glx.c
 +++ b/src/glx/dri2_glx.c
 @@ -74,7 +74,7 @@ struct dri2_display
@@ -58,10 +58,10 @@ index d6eb281cf9..8dabcb31b1 100644
  
     pdp->dri2Hash = __glxHashCreate();
 diff --git a/src/glx/dri3_glx.c b/src/glx/dri3_glx.c
-index 4472a0bed2..5c28c5fb3a 100644
+index 42a94f9f242..688b4579049 100644
 --- a/src/glx/dri3_glx.c
 +++ b/src/glx/dri3_glx.c
-@@ -490,6 +490,13 @@ dri3_flush_front_buffer(__DRIdrawable *driDrawable, void *loaderPrivate)
+@@ -496,6 +496,13 @@ dri3_flush_front_buffer(__DRIdrawable *driDrawable, void *loaderPrivate)
     loader_dri3_wait_gl(draw);
  }
  
@@ -75,7 +75,7 @@ index 4472a0bed2..5c28c5fb3a 100644
  /* The image loader extension record for DRI3
   */
  static const __DRIimageLoaderExtension imageLoaderExtension = {
-@@ -503,10 +510,16 @@ const __DRIuseInvalidateExtension dri3UseInvalidate = {
+@@ -509,10 +516,16 @@ const __DRIuseInvalidateExtension dri3UseInvalidate = {
     .base = { __DRI_USE_INVALIDATE, 1 }
  };
  
@@ -93,5 +93,5 @@ index 4472a0bed2..5c28c5fb3a 100644
  };
  
 -- 
-2.11.0
+2.11.1
 

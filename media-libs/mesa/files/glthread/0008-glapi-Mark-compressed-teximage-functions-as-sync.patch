@@ -1,7 +1,7 @@
-From ca5267a26d5038bff0e117234582572d648fa8ae Mon Sep 17 00:00:00 2001
+From 6d77e8432dd15dc5d44f41fa5621517483c26118 Mon Sep 17 00:00:00 2001
 From: Eric Anholt <eric@anholt.net>
 Date: Tue, 5 Mar 2013 11:51:18 -0800
-Subject: [PATCH 08/30] glapi: Mark compressed teximage functions as sync.
+Subject: [PATCH 08/33] glapi: Mark compressed teximage functions as sync.
 
 Without doing some additional tracking, we won't know whether the data
 will be immediate user data, or will be loaded from a PBO.  The normal
@@ -13,7 +13,7 @@ we have the count information, so they would end up async by default.
  1 file changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/src/mapi/glapi/gen/gl_API.xml b/src/mapi/glapi/gen/gl_API.xml
-index 493b0b01fe..e2e27195ed 100644
+index 493b0b01fe7..e2e27195ed7 100644
 --- a/src/mapi/glapi/gen/gl_API.xml
 +++ b/src/mapi/glapi/gen/gl_API.xml
 @@ -4494,7 +4494,7 @@
@@ -62,5 +62,5 @@ index 493b0b01fe..e2e27195ed 100644
          <param name="level" type="GLint"/>
          <param name="xoffset" type="GLint"/>
 -- 
-2.11.0
+2.11.1
 

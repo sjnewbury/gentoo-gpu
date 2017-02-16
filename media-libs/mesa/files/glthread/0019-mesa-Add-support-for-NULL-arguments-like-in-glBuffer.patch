@@ -1,7 +1,7 @@
-From f9c93a2aea2a4dce69157e51074b5bb51fdbeae4 Mon Sep 17 00:00:00 2001
+From c68a5cd4603990f42824b1da6f37831bd7d22262 Mon Sep 17 00:00:00 2001
 From: Eric Anholt <eric@anholt.net>
 Date: Wed, 27 Feb 2013 13:37:14 -0800
-Subject: [PATCH 19/30] mesa: Add support for NULL arguments like in
+Subject: [PATCH 19/33] mesa: Add support for NULL arguments like in
  glBufferData() in marshalling.
 
 This will let us support things like glBufferData() that should be
@@ -12,7 +12,7 @@ asynchronous.
  2 files changed, 34 insertions(+), 9 deletions(-)
 
 diff --git a/src/mapi/glapi/gen/gl_marshal.py b/src/mapi/glapi/gen/gl_marshal.py
-index e4137f46ab..3b9868f9a1 100644
+index e4137f46abe..3b9868f9a1f 100644
 --- a/src/mapi/glapi/gen/gl_marshal.py
 +++ b/src/mapi/glapi/gen/gl_marshal.py
 @@ -118,10 +118,21 @@ class PrintCode(gl_XML.gl_print_base):
@@ -84,7 +84,7 @@ index e4137f46ab..3b9868f9a1 100644
              out('{0} *cmd;'.format(struct))
  
 diff --git a/src/mapi/glapi/gen/marshal_XML.py b/src/mapi/glapi/gen/marshal_XML.py
-index e8ddb7ff8f..9d5688deca 100644
+index e8ddb7ff8f6..9d5688decac 100644
 --- a/src/mapi/glapi/gen/marshal_XML.py
 +++ b/src/mapi/glapi/gen/marshal_XML.py
 @@ -88,9 +88,4 @@ class marshal_function(gl_XML.gl_function):
@@ -98,5 +98,5 @@ index e8ddb7ff8f..9d5688deca 100644
 -                return 'sync'
          return 'async'
 -- 
-2.11.0
+2.11.1
 

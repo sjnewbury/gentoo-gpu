@@ -1,7 +1,7 @@
-From 9b65370497e2a2a334ac65c8577449ca6e427e64 Mon Sep 17 00:00:00 2001
+From 19e3e06b3ba32b8e10f080d64ba046217f51575e Mon Sep 17 00:00:00 2001
 From: Paul Berry <stereotype441@gmail.com>
 Date: Wed, 7 Nov 2012 13:04:40 -0800
-Subject: [PATCH 07/30] glapi: Annotate functions with "marshal" attribute.
+Subject: [PATCH 07/33] glapi: Annotate functions with "marshal" attribute.
 
 Several API functions require special treatment in order to be marshalled
 to a background thread.  Others can't be safely executed in a background
@@ -26,7 +26,7 @@ v2: Move description of attribute types to a comment in the dtd file.
  6 files changed, 44 insertions(+), 27 deletions(-)
 
 diff --git a/src/mapi/glapi/gen/ARB_base_instance.xml b/src/mapi/glapi/gen/ARB_base_instance.xml
-index 56de639e90..5bd6cabf9c 100644
+index 56de639e907..5bd6cabf9c1 100644
 --- a/src/mapi/glapi/gen/ARB_base_instance.xml
 +++ b/src/mapi/glapi/gen/ARB_base_instance.xml
 @@ -8,7 +8,7 @@
@@ -57,7 +57,7 @@ index 56de639e90..5bd6cabf9c 100644
      <param name="count" type="GLsizei"/>
      <param name="type" type="GLenum"/>
 diff --git a/src/mapi/glapi/gen/ARB_draw_elements_base_vertex.xml b/src/mapi/glapi/gen/ARB_draw_elements_base_vertex.xml
-index 72aa62c775..7c7a6a4958 100644
+index 72aa62c7751..7c7a6a49588 100644
 --- a/src/mapi/glapi/gen/ARB_draw_elements_base_vertex.xml
 +++ b/src/mapi/glapi/gen/ARB_draw_elements_base_vertex.xml
 @@ -8,7 +8,7 @@
@@ -97,7 +97,7 @@ index 72aa62c775..7c7a6a4958 100644
          <param name="count" type="GLsizei"/>
          <param name="type" type="GLenum"/>
 diff --git a/src/mapi/glapi/gen/ARB_draw_instanced.xml b/src/mapi/glapi/gen/ARB_draw_instanced.xml
-index b1c8221444..52dba3cf3c 100644
+index b1c8221444a..52dba3cf3c3 100644
 --- a/src/mapi/glapi/gen/ARB_draw_instanced.xml
 +++ b/src/mapi/glapi/gen/ARB_draw_instanced.xml
 @@ -8,14 +8,14 @@
@@ -118,7 +118,7 @@ index b1c8221444..52dba3cf3c 100644
      <param name="count" type="GLsizei"/>
      <param name="type" type="GLenum"/>
 diff --git a/src/mapi/glapi/gen/EXT_transform_feedback.xml b/src/mapi/glapi/gen/EXT_transform_feedback.xml
-index 2aa26ad725..bbb44866f9 100644
+index 2aa26ad7251..bbb44866f91 100644
 --- a/src/mapi/glapi/gen/EXT_transform_feedback.xml
 +++ b/src/mapi/glapi/gen/EXT_transform_feedback.xml
 @@ -108,7 +108,7 @@
@@ -131,7 +131,7 @@ index 2aa26ad725..bbb44866f9 100644
      <param name="id" type="GLuint"/>
    </function>
 diff --git a/src/mapi/glapi/gen/gl_API.dtd b/src/mapi/glapi/gen/gl_API.dtd
-index 78226513c4..133bc042aa 100644
+index 78226513c46..133bc042aa9 100644
 --- a/src/mapi/glapi/gen/gl_API.dtd
 +++ b/src/mapi/glapi/gen/gl_API.dtd
 @@ -38,7 +38,8 @@
@@ -160,7 +160,7 @@ index 78226513c4..133bc042aa 100644
  glx:
       rop - Opcode value for "render" commands
 diff --git a/src/mapi/glapi/gen/gl_API.xml b/src/mapi/glapi/gen/gl_API.xml
-index 2f421f5a57..493b0b01fe 100644
+index 2f421f5a57d..493b0b01fe7 100644
 --- a/src/mapi/glapi/gen/gl_API.xml
 +++ b/src/mapi/glapi/gen/gl_API.xml
 @@ -2366,11 +2366,19 @@
@@ -307,5 +307,5 @@ index 2f421f5a57..493b0b01fe 100644
          <param name="count" type="const GLsizei *"/>
          <param name="type" type="GLenum"/>
 -- 
-2.11.0
+2.11.1
 

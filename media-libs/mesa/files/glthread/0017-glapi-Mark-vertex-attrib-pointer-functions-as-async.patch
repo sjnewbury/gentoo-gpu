@@ -1,7 +1,7 @@
-From dc36488723edf902ae536b051cc78ea94dd78826 Mon Sep 17 00:00:00 2001
+From 8ba496a75b3a37be4ccc3aca05bca99725e5bbc6 Mon Sep 17 00:00:00 2001
 From: Eric Anholt <eric@anholt.net>
 Date: Thu, 27 Dec 2012 12:11:57 -0800
-Subject: [PATCH 17/30] glapi: Mark vertex attrib pointer functions as async.
+Subject: [PATCH 17/33] glapi: Mark vertex attrib pointer functions as async.
 
 These don't actually read data out of the pointers, they set the
 pointers (or offsets in a VBO) to be used in a later draw call.
@@ -14,7 +14,7 @@ v2: Don't forget glVertexAttribIPointer, and don't bother with annotations
  2 files changed, 16 insertions(+), 16 deletions(-)
 
 diff --git a/src/mapi/glapi/gen/GL3x.xml b/src/mapi/glapi/gen/GL3x.xml
-index 6b91945c83..65f12a4258 100644
+index 6b91945c837..65f12a42587 100644
 --- a/src/mapi/glapi/gen/GL3x.xml
 +++ b/src/mapi/glapi/gen/GL3x.xml
 @@ -256,7 +256,7 @@
@@ -27,7 +27,7 @@ index 6b91945c83..65f12a4258 100644
      <param name="size" type="GLint"/>
      <param name="type" type="GLenum"/>
 diff --git a/src/mapi/glapi/gen/gl_API.xml b/src/mapi/glapi/gen/gl_API.xml
-index 306dc52867..d412c49205 100644
+index 306dc52867a..d412c492057 100644
 --- a/src/mapi/glapi/gen/gl_API.xml
 +++ b/src/mapi/glapi/gen/gl_API.xml
 @@ -3153,7 +3153,7 @@
@@ -165,5 +165,5 @@ index 306dc52867..d412c49205 100644
          <param name="type" type="GLenum"/>
          <param name="stride" type="GLsizei"/>
 -- 
-2.11.0
+2.11.1
 

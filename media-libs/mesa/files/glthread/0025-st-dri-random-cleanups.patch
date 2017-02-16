@@ -1,7 +1,7 @@
-From d7c8d38282e87311fc452635839fcc76d3e05f53 Mon Sep 17 00:00:00 2001
+From e8c591d7fce4b4ace7bfda264bed1e8c1143216e Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Marek=20Ol=C5=A1=C3=A1k?= <marek.olsak@amd.com>
 Date: Sun, 5 Feb 2017 01:12:59 +0100
-Subject: [PATCH 25/30] st/dri: random cleanups
+Subject: [PATCH 25/33] st/dri: random cleanups
 
 ---
  src/gallium/state_trackers/dri/dri_drawable.c | 11 +++++++----
@@ -9,7 +9,7 @@ Subject: [PATCH 25/30] st/dri: random cleanups
  2 files changed, 12 insertions(+), 7 deletions(-)
 
 diff --git a/src/gallium/state_trackers/dri/dri_drawable.c b/src/gallium/state_trackers/dri/dri_drawable.c
-index edcd0e6843..fd3b458de6 100644
+index edcd0e68439..fd3b458de6c 100644
 --- a/src/gallium/state_trackers/dri/dri_drawable.c
 +++ b/src/gallium/state_trackers/dri/dri_drawable.c
 @@ -443,6 +443,7 @@ dri_flush(__DRIcontext *cPriv,
@@ -63,10 +63,10 @@ index edcd0e6843..fd3b458de6 100644
  
     if (drawable) {
 diff --git a/src/gallium/state_trackers/dri/dri_screen.c b/src/gallium/state_trackers/dri/dri_screen.c
-index a950f5241d..9a8a0f9881 100644
+index 1e278c3d1c2..9573de87639 100644
 --- a/src/gallium/state_trackers/dri/dri_screen.c
 +++ b/src/gallium/state_trackers/dri/dri_screen.c
-@@ -82,9 +82,11 @@ const __DRIconfigOptionsExtension gallium_config_options = {
+@@ -83,9 +83,11 @@ const __DRIconfigOptionsExtension gallium_config_options = {
  #define false 0
  
  static void
@@ -80,7 +80,7 @@ index a950f5241d..9a8a0f9881 100644
     options->disable_blend_func_extended =
        driQueryOptionb(optionCache, "disable_blend_func_extended");
     options->disable_glsl_line_continuations =
-@@ -450,7 +452,7 @@ dri_init_screen_helper(struct dri_screen *screen,
+@@ -453,7 +455,7 @@ dri_init_screen_helper(struct dri_screen *screen,
                         screen->sPriv->myNum,
                         driver_name);
  
@@ -90,5 +90,5 @@ index a950f5241d..9a8a0f9881 100644
     /* Handle force_s3tc_enable. */
     if (!util_format_s3tc_enabled && screen->options.force_s3tc_enable) {
 -- 
-2.11.0
+2.11.1
 

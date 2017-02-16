@@ -1,7 +1,7 @@
-From 7225355cc228595059bea9775aeb574d19e2f6e0 Mon Sep 17 00:00:00 2001
+From 483549102fd37eac607c48366910794d3eb334b8 Mon Sep 17 00:00:00 2001
 From: Eric Anholt <eric@anholt.net>
 Date: Mon, 4 Mar 2013 10:30:15 -0800
-Subject: [PATCH 23/30] mesa: Track the current vertex/element array buffers
+Subject: [PATCH 23/33] mesa: Track the current vertex/element array buffers
  for glthread.
 
 We want to support glthread on GLES contexts with reasonable apps, and on
@@ -22,7 +22,7 @@ pointers to draw calls" problem.
  10 files changed, 231 insertions(+), 34 deletions(-)
 
 diff --git a/src/mapi/glapi/gen/ARB_base_instance.xml b/src/mapi/glapi/gen/ARB_base_instance.xml
-index 5bd6cabf9c..e3bbcd198e 100644
+index 5bd6cabf9c1..e3bbcd198e8 100644
 --- a/src/mapi/glapi/gen/ARB_base_instance.xml
 +++ b/src/mapi/glapi/gen/ARB_base_instance.xml
 @@ -8,7 +8,8 @@
@@ -56,7 +56,7 @@ index 5bd6cabf9c..e3bbcd198e 100644
      <param name="count" type="GLsizei"/>
      <param name="type" type="GLenum"/>
 diff --git a/src/mapi/glapi/gen/ARB_draw_elements_base_vertex.xml b/src/mapi/glapi/gen/ARB_draw_elements_base_vertex.xml
-index 7c7a6a4958..2f1a93dc8a 100644
+index 7c7a6a49588..2f1a93dc8a7 100644
 --- a/src/mapi/glapi/gen/ARB_draw_elements_base_vertex.xml
 +++ b/src/mapi/glapi/gen/ARB_draw_elements_base_vertex.xml
 @@ -8,7 +8,8 @@
@@ -100,7 +100,7 @@ index 7c7a6a4958..2f1a93dc8a 100644
          <param name="count" type="GLsizei"/>
          <param name="type" type="GLenum"/>
 diff --git a/src/mapi/glapi/gen/ARB_draw_instanced.xml b/src/mapi/glapi/gen/ARB_draw_instanced.xml
-index 52dba3cf3c..8d7fd6301b 100644
+index 52dba3cf3c3..8d7fd6301b3 100644
 --- a/src/mapi/glapi/gen/ARB_draw_instanced.xml
 +++ b/src/mapi/glapi/gen/ARB_draw_instanced.xml
 @@ -15,7 +15,8 @@
@@ -114,7 +114,7 @@ index 52dba3cf3c..8d7fd6301b 100644
      <param name="count" type="GLsizei"/>
      <param name="type" type="GLenum"/>
 diff --git a/src/mapi/glapi/gen/ARB_vertex_array_object.xml b/src/mapi/glapi/gen/ARB_vertex_array_object.xml
-index 4a392dbb42..4f21137ab0 100644
+index 4a392dbb427..4f21137ab03 100644
 --- a/src/mapi/glapi/gen/ARB_vertex_array_object.xml
 +++ b/src/mapi/glapi/gen/ARB_vertex_array_object.xml
 @@ -10,7 +10,8 @@
@@ -128,7 +128,7 @@ index 4a392dbb42..4f21137ab0 100644
      </function>
  
 diff --git a/src/mapi/glapi/gen/GL3x.xml b/src/mapi/glapi/gen/GL3x.xml
-index 65f12a4258..b603e1f82f 100644
+index 65f12a42587..b603e1f82f6 100644
 --- a/src/mapi/glapi/gen/GL3x.xml
 +++ b/src/mapi/glapi/gen/GL3x.xml
 @@ -256,7 +256,8 @@
@@ -142,7 +142,7 @@ index 65f12a4258..b603e1f82f 100644
      <param name="size" type="GLint"/>
      <param name="type" type="GLenum"/>
 diff --git a/src/mapi/glapi/gen/gl_API.xml b/src/mapi/glapi/gen/gl_API.xml
-index 79dda8467c..f81ad1dc77 100644
+index 79dda8467c4..f81ad1dc772 100644
 --- a/src/mapi/glapi/gen/gl_API.xml
 +++ b/src/mapi/glapi/gen/gl_API.xml
 @@ -3153,7 +3153,8 @@
@@ -344,7 +344,7 @@ index 79dda8467c..f81ad1dc77 100644
          <param name="count" type="const GLsizei *"/>
          <param name="type" type="GLenum"/>
 diff --git a/src/mapi/glapi/gen/gl_marshal.py b/src/mapi/glapi/gen/gl_marshal.py
-index a50d773e27..165275904f 100644
+index a50d773e27e..165275904ff 100644
 --- a/src/mapi/glapi/gen/gl_marshal.py
 +++ b/src/mapi/glapi/gen/gl_marshal.py
 @@ -252,10 +252,6 @@ class PrintCode(gl_XML.gl_print_base):
@@ -359,7 +359,7 @@ index a50d773e27..165275904f 100644
  
      def print_async_body(self, func):
 diff --git a/src/mesa/main/glthread.h b/src/mesa/main/glthread.h
-index 98ae11509a..04eb5ffabc 100644
+index 98ae11509a6..04eb5ffabc4 100644
 --- a/src/mesa/main/glthread.h
 +++ b/src/mesa/main/glthread.h
 @@ -79,6 +79,18 @@ struct glthread_state
@@ -382,7 +382,7 @@ index 98ae11509a..04eb5ffabc 100644
  
  /**
 diff --git a/src/mesa/main/marshal.c b/src/mesa/main/marshal.c
-index 14577dd4cb..37c7b1b3dd 100644
+index 14577dd4cb4..37c7b1b3dde 100644
 --- a/src/mesa/main/marshal.c
 +++ b/src/mesa/main/marshal.c
 @@ -154,3 +154,106 @@ _mesa_marshal_ShaderSource(GLuint shader, GLsizei count,
@@ -493,7 +493,7 @@ index 14577dd4cb..37c7b1b3dd 100644
 +}
 +
 diff --git a/src/mesa/main/marshal.h b/src/mesa/main/marshal.h
-index 0e0e9b280c..23b33002e4 100644
+index 0e0e9b280c6..23b33002e42 100644
 --- a/src/mesa/main/marshal.h
 +++ b/src/mesa/main/marshal.h
 @@ -109,8 +109,58 @@ _mesa_post_marshal_hook(struct gl_context *ctx)
@@ -568,5 +568,5 @@ index 0e0e9b280c..23b33002e4 100644
 +
  #endif /* MARSHAL_H */
 -- 
-2.11.0
+2.11.1
 

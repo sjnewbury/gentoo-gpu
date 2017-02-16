@@ -1,7 +1,7 @@
-From 5c6ed8e8885abbd186a65760aef4f74efb06b076 Mon Sep 17 00:00:00 2001
+From d6ca89e88b6bbcf7b5c7645ba37f0db8f5ad9496 Mon Sep 17 00:00:00 2001
 From: Paul Berry <stereotype441@gmail.com>
 Date: Wed, 3 Oct 2012 15:39:52 -0700
-Subject: [PATCH 12/30] mesa: Create pointers for multithread marshalling
+Subject: [PATCH 12/33] mesa: Create pointers for multithread marshalling
  dispatch table.
 
 This patch splits the context's CurrentDispatch pointer into two
@@ -22,7 +22,7 @@ the server (to execute the GL calls).
  8 files changed, 69 insertions(+), 34 deletions(-)
 
 diff --git a/src/mapi/glapi/gen/gl_apitemp.py b/src/mapi/glapi/gen/gl_apitemp.py
-index 5e985a2eca..4951692aad 100644
+index 5e985a2ecac..4951692aadb 100644
 --- a/src/mapi/glapi/gen/gl_apitemp.py
 +++ b/src/mapi/glapi/gen/gl_apitemp.py
 @@ -134,11 +134,11 @@ class PrintGlOffsets(gl_XML.gl_print_base):
@@ -42,7 +42,7 @@ index 5e985a2eca..4951692aad 100644
   *
   */
 diff --git a/src/mesa/main/context.c b/src/mesa/main/context.c
-index 837b3898e9..c00cced4c2 100644
+index 837b3898e9a..c00cced4c25 100644
 --- a/src/mesa/main/context.c
 +++ b/src/mesa/main/context.c
 @@ -1211,7 +1211,7 @@ _mesa_initialize_context(struct gl_context *ctx,
@@ -96,7 +96,7 @@ index 837b3898e9..c00cced4c2 100644
  
  /*@}*/
 diff --git a/src/mesa/main/dlist.c b/src/mesa/main/dlist.c
-index 2976f62a59..7e440549e5 100644
+index 2976f62a591..7e440549e5b 100644
 --- a/src/mesa/main/dlist.c
 +++ b/src/mesa/main/dlist.c
 @@ -9340,8 +9340,11 @@ _mesa_NewList(GLuint name, GLenum mode)
@@ -156,7 +156,7 @@ index 2976f62a59..7e440549e5 100644
  }
  
 diff --git a/src/mesa/main/glthread.c b/src/mesa/main/glthread.c
-index 76eb0cf7da..8877a695f0 100644
+index 76eb0cf7dac..8877a695f0c 100644
 --- a/src/mesa/main/glthread.c
 +++ b/src/mesa/main/glthread.c
 @@ -54,6 +54,8 @@ glthread_allocate_batch(struct gl_context *ctx)
@@ -188,10 +188,10 @@ index 76eb0cf7da..8877a695f0 100644
     }
  
 diff --git a/src/mesa/main/mtypes.h b/src/mesa/main/mtypes.h
-index 72d8b9d231..0a8cbd178b 100644
+index e3a068f714e..9169a573156 100644
 --- a/src/mesa/main/mtypes.h
 +++ b/src/mesa/main/mtypes.h
-@@ -4335,6 +4335,7 @@ struct gl_context
+@@ -4355,6 +4355,7 @@ struct gl_context
     /** \name API function pointer tables */
     /*@{*/
     gl_api API;
@@ -199,7 +199,7 @@ index 72d8b9d231..0a8cbd178b 100644
     /**
      * The current dispatch table for non-displaylist-saving execution, either
      * BeginEnd or OutsideBeginEnd
-@@ -4357,10 +4358,24 @@ struct gl_context
+@@ -4377,10 +4378,24 @@ struct gl_context
      */
     struct _glapi_table *ContextLost;
     /**
@@ -228,7 +228,7 @@ index 72d8b9d231..0a8cbd178b 100644
  
     struct glthread_state *GLThread;
 diff --git a/src/mesa/main/robustness.c b/src/mesa/main/robustness.c
-index f54d9f3eb1..47402a2930 100644
+index f54d9f3eb1e..47402a29304 100644
 --- a/src/mesa/main/robustness.c
 +++ b/src/mesa/main/robustness.c
 @@ -101,8 +101,8 @@ _mesa_set_context_lost_dispatch(struct gl_context *ctx)
@@ -243,7 +243,7 @@ index f54d9f3eb1..47402a2930 100644
  
  /**
 diff --git a/src/mesa/main/varray.c b/src/mesa/main/varray.c
-index c428355188..92e3f4d1f8 100644
+index c4283551882..92e3f4d1f8a 100644
 --- a/src/mesa/main/varray.c
 +++ b/src/mesa/main/varray.c
 @@ -1558,7 +1558,7 @@ _mesa_MultiDrawArrays( GLenum mode, const GLint *first,
@@ -276,7 +276,7 @@ index c428355188..92e3f4d1f8 100644
     }
  }
 diff --git a/src/mesa/vbo/vbo_exec_api.c b/src/mesa/vbo/vbo_exec_api.c
-index fffff0b3bf..f08fd4c32c 100644
+index fffff0b3bf0..f08fd4c32c6 100644
 --- a/src/mesa/vbo/vbo_exec_api.c
 +++ b/src/mesa/vbo/vbo_exec_api.c
 @@ -797,11 +797,11 @@ vbo_exec_Begin(GLenum mode)
@@ -309,5 +309,5 @@ index fffff0b3bf..f08fd4c32c 100644
  
     if (exec->vtx.prim_count > 0) {
 -- 
-2.11.0
+2.11.1
 

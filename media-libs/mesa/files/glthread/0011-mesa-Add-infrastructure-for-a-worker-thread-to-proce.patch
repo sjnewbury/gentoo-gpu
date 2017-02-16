@@ -1,7 +1,7 @@
-From 9b5ba9abd2dcb50741e5727d34e6567fc8def2fb Mon Sep 17 00:00:00 2001
+From 0ce267a51e96df5b43d0d8a1e5dde9fb1fef0d3f Mon Sep 17 00:00:00 2001
 From: Eric Anholt <eric@anholt.net>
 Date: Fri, 28 Dec 2012 15:05:34 -0800
-Subject: [PATCH 11/30] mesa: Add infrastructure for a worker thread to process
+Subject: [PATCH 11/33] mesa: Add infrastructure for a worker thread to process
  GL commands.
 
 v2: Keep an allocated buffer around instead of checking for one at the
@@ -23,7 +23,7 @@ v4: Fix leaks on destroy.
  create mode 100644 src/mesa/main/marshal.h
 
 diff --git a/src/mesa/Makefile.sources b/src/mesa/Makefile.sources
-index ee737b0d7f..87d675d86b 100644
+index ee737b0d7f9..87d675d86bc 100644
 --- a/src/mesa/Makefile.sources
 +++ b/src/mesa/Makefile.sources
 @@ -116,6 +116,7 @@ MAIN_FILES = \
@@ -35,7 +35,7 @@ index ee737b0d7f..87d675d86b 100644
  	main/hash.h \
  	main/hint.c \
 diff --git a/src/mesa/main/context.c b/src/mesa/main/context.c
-index 16e25a9bc2..837b3898e9 100644
+index 16e25a9bc25..837b3898e9a 100644
 --- a/src/mesa/main/context.c
 +++ b/src/mesa/main/context.c
 @@ -100,6 +100,7 @@
@@ -57,7 +57,7 @@ index 16e25a9bc2..837b3898e9 100644
     _mesa_reference_framebuffer(&ctx->WinSysReadBuffer, NULL);
 diff --git a/src/mesa/main/glthread.c b/src/mesa/main/glthread.c
 new file mode 100644
-index 0000000000..76eb0cf7da
+index 00000000000..76eb0cf7dac
 --- /dev/null
 +++ b/src/mesa/main/glthread.c
 @@ -0,0 +1,228 @@
@@ -291,7 +291,7 @@ index 0000000000..76eb0cf7da
 +#endif
 diff --git a/src/mesa/main/glthread.h b/src/mesa/main/glthread.h
 new file mode 100644
-index 0000000000..c38fef32fa
+index 00000000000..c38fef32fa0
 --- /dev/null
 +++ b/src/mesa/main/glthread.h
 @@ -0,0 +1,130 @@
@@ -427,7 +427,7 @@ index 0000000000..c38fef32fa
 +#endif /* _GLTHREAD_H*/
 diff --git a/src/mesa/main/marshal.h b/src/mesa/main/marshal.h
 new file mode 100644
-index 0000000000..ad32b6b3f4
+index 00000000000..ad32b6b3f4d
 --- /dev/null
 +++ b/src/mesa/main/marshal.h
 @@ -0,0 +1,112 @@
@@ -544,10 +544,10 @@ index 0000000000..ad32b6b3f4
 +
 +#endif /* MARSHAL_H */
 diff --git a/src/mesa/main/mtypes.h b/src/mesa/main/mtypes.h
-index a2280e2539..72d8b9d231 100644
+index efe0cbcad75..e3a068f714e 100644
 --- a/src/mesa/main/mtypes.h
 +++ b/src/mesa/main/mtypes.h
-@@ -4363,6 +4363,8 @@ struct gl_context
+@@ -4383,6 +4383,8 @@ struct gl_context
     struct _glapi_table *CurrentDispatch;
     /*@}*/
  
@@ -557,5 +557,5 @@ index a2280e2539..72d8b9d231 100644
     struct gl_framebuffer *DrawBuffer;	/**< buffer for writing */
     struct gl_framebuffer *ReadBuffer;	/**< buffer for reading */
 -- 
-2.11.0
+2.11.1
 

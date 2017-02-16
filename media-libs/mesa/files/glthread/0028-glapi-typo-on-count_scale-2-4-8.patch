@@ -1,0 +1,26 @@
+From 9beb0d5584fbaf3469f9ff639b57301cca320fb1 Mon Sep 17 00:00:00 2001
+From: Gregory Hainaut <gregory.hainaut@gmail.com>
+Date: Fri, 10 Feb 2017 19:29:33 +0100
+Subject: [PATCH 28/33] glapi: typo on count_scale 2*4=8
+
+Signed-off-by: Gregory Hainaut <gregory.hainaut@gmail.com>
+---
+ src/mapi/glapi/gen/gl_API.xml | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/mapi/glapi/gen/gl_API.xml b/src/mapi/glapi/gen/gl_API.xml
+index f81ad1dc772..c94cccc08c7 100644
+--- a/src/mapi/glapi/gen/gl_API.xml
++++ b/src/mapi/glapi/gen/gl_API.xml
+@@ -5876,7 +5876,7 @@
+         <param name="location" type="GLint"/>
+         <param name="count" type="GLsizei" counter="true"/>
+         <param name="transpose" type="GLboolean"/>
+-        <param name="value" type="const GLfloat *" count="count" count_scale="6"/>
++        <param name="value" type="const GLfloat *" count="count" count_scale="8"/>
+         <glx ignore="true"/>
+     </function>
+     <function name="UniformMatrix4x2fv" es2="3.0">
+-- 
+2.11.1
+

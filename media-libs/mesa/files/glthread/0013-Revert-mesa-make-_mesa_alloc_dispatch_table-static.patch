@@ -1,7 +1,7 @@
-From 3684aa7f136dd569e1f60fd9be8f81b0a79817ce Mon Sep 17 00:00:00 2001
+From f89483050658d745e8c451280d967e372a133c1e Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Marek=20Ol=C5=A1=C3=A1k?= <marek.olsak@amd.com>
 Date: Thu, 29 Sep 2016 01:00:39 +0200
-Subject: [PATCH 13/30] Revert "mesa: make _mesa_alloc_dispatch_table() static"
+Subject: [PATCH 13/33] Revert "mesa: make _mesa_alloc_dispatch_table() static"
 
 This reverts commit 4009d22b61e76850b1b725f4e491da05c2406fa4.
 
@@ -12,7 +12,7 @@ glthread needs it.
  2 files changed, 9 insertions(+), 5 deletions(-)
 
 diff --git a/src/mesa/main/api_exec.h b/src/mesa/main/api_exec.h
-index 655cb32d0a..f55f56bda4 100644
+index 655cb32d0a4..f55f56bda4a 100644
 --- a/src/mesa/main/api_exec.h
 +++ b/src/mesa/main/api_exec.h
 @@ -30,8 +30,12 @@
@@ -29,7 +29,7 @@ index 655cb32d0a..f55f56bda4 100644
  _mesa_initialize_exec_table(struct gl_context *ctx);
  
 diff --git a/src/mesa/main/context.c b/src/mesa/main/context.c
-index c00cced4c2..fabb63fe82 100644
+index c00cced4c25..fabb63fe82d 100644
 --- a/src/mesa/main/context.c
 +++ b/src/mesa/main/context.c
 @@ -997,8 +997,8 @@ _mesa_new_nop_table(unsigned numEntries)
@@ -71,5 +71,5 @@ index c00cced4c2..fabb63fe82 100644
           goto fail;
  
 -- 
-2.11.0
+2.11.1
 

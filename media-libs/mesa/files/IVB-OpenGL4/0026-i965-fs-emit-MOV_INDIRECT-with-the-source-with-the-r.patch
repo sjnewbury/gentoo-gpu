@@ -1,0 +1,33 @@
+From 6aee2e9a07abd2c9bc5ccdfc9cbb29db8741527e Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
+Date: Mon, 13 Feb 2017 12:09:53 +0100
+Subject: [PATCH 26/31] i965/fs: emit MOV_INDIRECT with the source with the
+ right register type
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+This was hiding bugs as it retyped the source to destination's type.
+
+Signed-off-by: Samuel Iglesias Gonsálvez <siglesias@igalia.com>
+Cc: "17.0" <mesa-stable@lists.freedesktop.org>
+---
+ src/mesa/drivers/dri/i965/brw_fs_generator.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/mesa/drivers/dri/i965/brw_fs_generator.cpp b/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
+index e4b5097e8bf..c1b63c78aa4 100644
+--- a/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
++++ b/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
+@@ -504,7 +504,7 @@ fs_generator::generate_mov_indirect(fs_inst *inst,
+ 
+       struct brw_reg ind_src = brw_VxH_indirect(0, 0);
+ 
+-      brw_inst *mov = brw_MOV(p, dst, retype(ind_src, dst.type));
++      brw_inst *mov = brw_MOV(p, dst, retype(ind_src, reg.type));
+ 
+       if (devinfo->gen == 6 && dst.file == BRW_MESSAGE_REGISTER_FILE &&
+           !inst->get_next()->is_tail_sentinel() &&
+-- 
+2.11.1
+

@@ -1,0 +1,80 @@
+From b80fcf132f1b850148fa1336cb5d4a389f2fb718 Mon Sep 17 00:00:00 2001
+From: Gregory Hainaut <gregory.hainaut@gmail.com>
+Date: Sun, 12 Feb 2017 15:21:47 +0100
+Subject: [PATCH 30/33] mesa glthread: only restore the dispatch table when
+ incompatible gl calls are detected
+
+You have a single glthread by context. However the context can be
+attached to several threads. Therefore the dispatch table must be
+updated in all threads before the thread destruction. In others word,
+glthread can only be destroyed safely when the context is deleted.
+
+Fix remaining crashes of glx-multithread-makecurrent* tests.
+
+Signed-off-by: Gregory Hainaut <gregory.hainaut@gmail.com>
+---
+ src/mapi/glapi/gen/gl_marshal.py | 3 ++-
+ src/mesa/main/glthread.c         | 8 ++++++++
+ src/mesa/main/glthread.h         | 7 +++++++
+ 3 files changed, 17 insertions(+), 1 deletion(-)
+
+diff --git a/src/mapi/glapi/gen/gl_marshal.py b/src/mapi/glapi/gen/gl_marshal.py
+index 165275904ff..d73f08b6684 100644
+--- a/src/mapi/glapi/gen/gl_marshal.py
++++ b/src/mapi/glapi/gen/gl_marshal.py
+@@ -239,7 +239,8 @@ class PrintCode(gl_XML.gl_print_base):
+             if func.marshal_fail:
+                 out('if ({0}) {{'.format(func.marshal_fail))
+                 with indent():
+-                    out('_mesa_glthread_destroy(ctx);')
++                    out('_mesa_glthread_finish(ctx);')
++                    out('_mesa_glthread_restore_dispatch(ctx);')
+                     self.print_sync_dispatch(func)
+                     out('return;')
+                 out('}')
+diff --git a/src/mesa/main/glthread.c b/src/mesa/main/glthread.c
+index 51c7f506cf8..4c92adf9590 100644
+--- a/src/mesa/main/glthread.c
++++ b/src/mesa/main/glthread.c
+@@ -175,6 +175,14 @@ _mesa_glthread_destroy(struct gl_context *ctx)
+    free(glthread);
+    ctx->GLThread = NULL;
+ 
++   _mesa_glthread_restore_dispatch(ctx);
++
++   puts(__func__);
++}
++
++void
++_mesa_glthread_restore_dispatch(struct gl_context *ctx)
++{
+    /* Remove ourselves from the dispatch table except if another ctx/thread
+     * already installed a new dispatch table.
+     *
+diff --git a/src/mesa/main/glthread.h b/src/mesa/main/glthread.h
+index 04eb5ffabc4..327c549858c 100644
+--- a/src/mesa/main/glthread.h
++++ b/src/mesa/main/glthread.h
+@@ -119,6 +119,7 @@ struct glthread_batch
+ void _mesa_glthread_init(struct gl_context *ctx);
+ void _mesa_glthread_destroy(struct gl_context *ctx);
+ 
++void _mesa_glthread_restore_dispatch(struct gl_context *ctx);
+ void _mesa_glthread_flush_batch(struct gl_context *ctx);
+ void _mesa_glthread_finish(struct gl_context *ctx);
+ 
+@@ -138,5 +139,11 @@ static inline void
+ _mesa_glthread_finish(struct gl_context *ctx)
+ {
+ }
++
++static inline void
++_mesa_glthread_restore_dispatch(struct gl_context *ctx);
++{
++}
++
+ #endif /* !HAVE_PTHREAD */
+ #endif /* _GLTHREAD_H*/
+-- 
+2.11.1
+

@@ -1,14 +1,14 @@
-From 6f7f076fee6c70f0573d362b635be21b57b068c5 Mon Sep 17 00:00:00 2001
+From d69684aaca12438484a1e1c080f8eaf3dcb6ce0f Mon Sep 17 00:00:00 2001
 From: Eric Anholt <eric@anholt.net>
 Date: Wed, 27 Feb 2013 12:58:58 -0800
-Subject: [PATCH 01/30] glapi: Fix a comment typo
+Subject: [PATCH 01/33] glapi: Fix a comment typo
 
 ---
  src/mapi/glapi/gen/gl_API.dtd | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/src/mapi/glapi/gen/gl_API.dtd b/src/mapi/glapi/gen/gl_API.dtd
-index bdc62f1c83..78226513c4 100644
+index bdc62f1c835..78226513c46 100644
 --- a/src/mapi/glapi/gen/gl_API.dtd
 +++ b/src/mapi/glapi/gen/gl_API.dtd
 @@ -90,7 +90,7 @@ param:
@@ -21,5 +21,5 @@ index bdc62f1c83..78226513c4 100644
       counter - this parameter is a counter that will be referenced by the
           'count' attribute in another parameter.
 -- 
-2.11.0
+2.11.1
 

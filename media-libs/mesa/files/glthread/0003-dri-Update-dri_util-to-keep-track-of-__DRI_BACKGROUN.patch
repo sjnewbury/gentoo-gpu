@@ -1,7 +1,7 @@
-From 7bca007f079538f9b81c76992e5c59a8d3c39778 Mon Sep 17 00:00:00 2001
+From 77855e5fc8d5cb8419350f62a3871e2d18a431ca Mon Sep 17 00:00:00 2001
 From: Paul Berry <stereotype441@gmail.com>
 Date: Wed, 14 Nov 2012 14:39:21 -0800
-Subject: [PATCH 03/30] dri: Update dri_util to keep track of
+Subject: [PATCH 03/33] dri: Update dri_util to keep track of
  __DRI_BACKGROUND_CALLABLE
 
 ---
@@ -10,7 +10,7 @@ Subject: [PATCH 03/30] dri: Update dri_util to keep track of
  2 files changed, 3 insertions(+)
 
 diff --git a/src/mesa/drivers/dri/common/dri_util.c b/src/mesa/drivers/dri/common/dri_util.c
-index f92eee9081..366c5b9f2b 100644
+index d18c458d186..f6df48802f3 100644
 --- a/src/mesa/drivers/dri/common/dri_util.c
 +++ b/src/mesa/drivers/dri/common/dri_util.c
 @@ -75,6 +75,8 @@ setupLoaderExtensions(__DRIscreen *psp,
@@ -23,7 +23,7 @@ index f92eee9081..366c5b9f2b 100644
  	    psp->swrast_loader = (__DRIswrastLoaderExtension *) extensions[i];
          if (strcmp(extensions[i]->name, __DRI_IMAGE_LOADER) == 0)
 diff --git a/src/mesa/drivers/dri/common/dri_util.h b/src/mesa/drivers/dri/common/dri_util.h
-index 6987f555e6..8fcd6322d0 100644
+index 6987f555e66..8fcd6322d04 100644
 --- a/src/mesa/drivers/dri/common/dri_util.h
 +++ b/src/mesa/drivers/dri/common/dri_util.h
 @@ -172,6 +172,7 @@ struct __DRIscreenRec {
@@ -35,5 +35,5 @@ index 6987f555e6..8fcd6322d0 100644
  
      struct {
 -- 
-2.11.0
+2.11.1
 

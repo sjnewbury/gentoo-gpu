@@ -1,7 +1,7 @@
-From 0b1a69f13377322a015a626ba7648c757fc990ca Mon Sep 17 00:00:00 2001
+From 4ce82dfc164cddf254852999aec8dfbe3450d431 Mon Sep 17 00:00:00 2001
 From: Paul Berry <stereotype441@gmail.com>
 Date: Wed, 14 Nov 2012 11:13:02 -0800
-Subject: [PATCH 02/30] dri_interface: Add new marshalling interfaces to
+Subject: [PATCH 02/33] dri_interface: Add new marshalling interfaces to
  dri_interface.h
 
 ---
@@ -9,7 +9,7 @@ Subject: [PATCH 02/30] dri_interface: Add new marshalling interfaces to
  1 file changed, 39 insertions(+)
 
 diff --git a/include/GL/internal/dri_interface.h b/include/GL/internal/dri_interface.h
-index 598d111f33..f419ec7d30 100644
+index 598d111f33a..f419ec7d309 100644
 --- a/include/GL/internal/dri_interface.h
 +++ b/include/GL/internal/dri_interface.h
 @@ -1658,4 +1658,43 @@ struct __DRIimageDriverExtensionRec {
@@ -57,5 +57,5 @@ index 598d111f33..f419ec7d30 100644
 +
  #endif
 -- 
-2.11.0
+2.11.1
 

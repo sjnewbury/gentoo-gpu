@@ -1,7 +1,7 @@
-From 6c6c64f1ab07ab662ad4a0ef313098955c2a3918 Mon Sep 17 00:00:00 2001
+From 4108b6e51b713c35300fd92d8706d9531e99b263 Mon Sep 17 00:00:00 2001
 From: Eric Anholt <eric@anholt.net>
 Date: Thu, 28 Feb 2013 18:15:58 -0800
-Subject: [PATCH 21/30] mesa: Add an attribute for conditions to turn off
+Subject: [PATCH 21/33] mesa: Add an attribute for conditions to turn off
  threading.
 
 The threading for GL core is in place, but there are so few applications
@@ -16,7 +16,7 @@ able to disable threading when we discover that the app is using them.
  3 files changed, 15 insertions(+), 1 deletion(-)
 
 diff --git a/src/mapi/glapi/gen/gl_API.dtd b/src/mapi/glapi/gen/gl_API.dtd
-index 133bc042aa..dc4a199bb9 100644
+index 133bc042aa9..dc4a199bb99 100644
 --- a/src/mapi/glapi/gen/gl_API.dtd
 +++ b/src/mapi/glapi/gen/gl_API.dtd
 @@ -39,7 +39,8 @@
@@ -41,7 +41,7 @@ index 133bc042aa..dc4a199bb9 100644
  glx:
       rop - Opcode value for "render" commands
 diff --git a/src/mapi/glapi/gen/gl_marshal.py b/src/mapi/glapi/gen/gl_marshal.py
-index 1a63343500..a50d773e27 100644
+index 1a633435001..a50d773e27e 100644
 --- a/src/mapi/glapi/gen/gl_marshal.py
 +++ b/src/mapi/glapi/gen/gl_marshal.py
 @@ -236,6 +236,14 @@ class PrintCode(gl_XML.gl_print_base):
@@ -60,7 +60,7 @@ index 1a63343500..a50d773e27 100644
              with indent():
                  self.print_async_dispatch(func)
 diff --git a/src/mapi/glapi/gen/marshal_XML.py b/src/mapi/glapi/gen/marshal_XML.py
-index d56e4dda4a..80f7f542e4 100644
+index d56e4dda4af..80f7f542e43 100644
 --- a/src/mapi/glapi/gen/marshal_XML.py
 +++ b/src/mapi/glapi/gen/marshal_XML.py
 @@ -58,6 +58,7 @@ class marshal_function(gl_XML.gl_function):
@@ -72,5 +72,5 @@ index d56e4dda4a..80f7f542e4 100644
      def marshal_flavor(self):
          """Find out how this function should be marshalled between
 -- 
-2.11.0
+2.11.1
 
