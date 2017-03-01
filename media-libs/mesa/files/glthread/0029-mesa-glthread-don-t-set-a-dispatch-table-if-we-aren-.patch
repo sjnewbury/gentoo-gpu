@@ -33,9 +33,9 @@ index b17d9c64ca5..51c7f506cf8 100644
 +       _glapi_set_dispatch(ctx->CurrentClientDispatch);
 +   }
 +
-    puts(__func__);
  }
  
+ void
 -- 
 2.11.1
 
