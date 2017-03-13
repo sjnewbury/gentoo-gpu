@@ -1,0 +1,172 @@
+From 346bcf77d3ba6c173dcb58f4a6db6c2ddb0b0a54 Mon Sep 17 00:00:00 2001
+From: Gregory Hainaut <gregory.hainaut@gmail.com>
+Date: Mon, 13 Feb 2017 19:14:30 +0100
+Subject: [PATCH 26/29] mesa/glthread: allow asynchronous pixel transfer
+ operation when a buffer is bound
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+In order to reduce the number of change XML files, a regex on the func name was done.
+
+Provide a nice speed boost on PCSX2
+
+Signed-off-by: Gregory Hainaut <gregory.hainaut@gmail.com>
+Signed-off-by: Marek Olšák <marek.olsak@amd.com>
+---
+ src/mapi/glapi/gen/gl_marshal.py  | 19 +++++++++++++++++++
+ src/mapi/glapi/gen/marshal_XML.py | 14 ++++++++++++++
+ src/mesa/main/glthread.h          | 10 ++++++++++
+ src/mesa/main/marshal.c           | 16 +++++++++++++---
+ 4 files changed, 56 insertions(+), 3 deletions(-)
+
+diff --git a/src/mapi/glapi/gen/gl_marshal.py b/src/mapi/glapi/gen/gl_marshal.py
+index d73f08b6684..9b57d851930 100644
+--- a/src/mapi/glapi/gen/gl_marshal.py
++++ b/src/mapi/glapi/gen/gl_marshal.py
+@@ -177,6 +177,11 @@ class PrintCode(gl_XML.gl_print_base):
+                 if p.count:
+                     out('const {0} * {1} = cmd->{1};'.format(
+                             p.get_base_type_string(), p.name))
++                elif p.is_pointer() and func.marshal_ppbo:
++                    # Data is written to destination user pointer (if no PBO
++                    # are bound) therefore the pointer must be non-const
++                    out('{0} * {1} = cmd->{1};'.format(
++                            p.get_base_type_string(), p.name))
+                 else:
+                     out('const {0} {1} = cmd->{1};'.format(
+                             p.type_string(), p.name))
+@@ -245,6 +250,20 @@ class PrintCode(gl_XML.gl_print_base):
+                     out('return;')
+                 out('}')
+ 
++            if func.marshal_upbo:
++                out('if (!ctx->GLThread->pixel_unpack_buffer_bound) {')
++                with indent():
++                    self.print_sync_dispatch(func)
++                    out('return;')
++                out('}')
++
++            if func.marshal_ppbo:
++                out('if (!ctx->GLThread->pixel_pack_buffer_bound) {')
++                with indent():
++                    self.print_sync_dispatch(func)
++                    out('return;')
++                out('}')
++
+             out('if (cmd_size <= MARSHAL_MAX_CMD_SIZE) {')
+             with indent():
+                 self.print_async_dispatch(func)
+diff --git a/src/mapi/glapi/gen/marshal_XML.py b/src/mapi/glapi/gen/marshal_XML.py
+index 80f7f542e43..de2a2f8794b 100644
+--- a/src/mapi/glapi/gen/marshal_XML.py
++++ b/src/mapi/glapi/gen/marshal_XML.py
+@@ -25,6 +25,7 @@
+ # building thread marshalling code.
+ 
+ import gl_XML
++import re
+ 
+ 
+ class marshal_item_factory(gl_XML.gl_item_factory):
+@@ -60,6 +61,9 @@ class marshal_function(gl_XML.gl_function):
+         self.marshal = element.get('marshal')
+         self.marshal_fail = element.get('marshal_fail')
+ 
++        self.marshal_upbo = False
++        self.marshal_ppbo = False
++
+     def marshal_flavor(self):
+         """Find out how this function should be marshalled between
+         client and server threads."""
+@@ -68,6 +72,16 @@ class marshal_function(gl_XML.gl_function):
+         if self.marshal not in (None, 'draw'):
+             return self.marshal
+ 
++        ptr_can_be_upbo_offset = re.compile('^(Compressed|)Tex(ture|)(Sub|)Image[1-3]D$')
++        if ptr_can_be_upbo_offset.match(self.name):
++            self.marshal_upbo = True;
++            return 'async'
++
++        ptr_can_be_ppbo_offset = re.compile('^(Getn?(Compressed|)Tex(ture|)Image|Readn?Pixels)(ARB|)$')
++        if ptr_can_be_ppbo_offset.match(self.name):
++            self.marshal_ppbo = True;
++            return 'async'
++
+         if self.exec_flavor == 'skip':
+             # Functions marked exec="skip" are not yet implemented in
+             # Mesa, so don't bother trying to marshal them.
+diff --git a/src/mesa/main/glthread.h b/src/mesa/main/glthread.h
+index 327c549858c..33824a2e077 100644
+--- a/src/mesa/main/glthread.h
++++ b/src/mesa/main/glthread.h
+@@ -91,6 +91,16 @@ struct glthread_state
+     * buffer) binding is in a VBO.
+     */
+    bool element_array_is_vbo;
++
++   /**
++    * Tracks on the main thread side whether an unpack pixel buffer is bound
++    */
++   bool pixel_unpack_buffer_bound;
++
++   /**
++    * Tracks on the main thread side whether a pack pixel buffer is bound
++    */
++   bool pixel_pack_buffer_bound;
+ };
+ 
+ /**
+diff --git a/src/mesa/main/marshal.c b/src/mesa/main/marshal.c
+index 37c7b1b3dde..c27f1ea9239 100644
+--- a/src/mesa/main/marshal.c
++++ b/src/mesa/main/marshal.c
+@@ -173,7 +173,7 @@ _mesa_unmarshal_BindBufferBase(struct gl_context *ctx, const struct marshal_cmd_
+    CALL_BindBufferBase(ctx->CurrentServerDispatch, (target, index, buffer));
+ }
+ 
+-/** Tracks the current bindings for the vertex array and index array buffers.
++/** Tracks the current bindings of GL buffer targets
+  *
+  * This is part of what we need to enable glthread on compat-GL contexts that
+  * happen to use VBOs, without also supporting the full tracking of VBO vs
+@@ -195,9 +195,13 @@ _mesa_unmarshal_BindBufferBase(struct gl_context *ctx, const struct marshal_cmd_
+  * instead of updating the binding.  However, compat GL has the ridiculous
+  * feature that if you pass a bad name, it just gens a buffer object for you,
+  * so we escape without having to know if things are valid or not.
++ *
++ * Code was extended to track pixel buffers so you know if pixel transfer
++ * goes to an user pointer (must be synchronous) or an GL buffer (could
++ * be asynchronous)
+  */
+ static void
+-track_vbo_binding(struct gl_context *ctx, GLenum target, GLuint buffer)
++track_buffers_binding(struct gl_context *ctx, GLenum target, GLuint buffer)
+ {
+    struct glthread_state *glthread = ctx->GLThread;
+ 
+@@ -212,6 +216,12 @@ track_vbo_binding(struct gl_context *ctx, GLenum target, GLuint buffer)
+        */
+       glthread->element_array_is_vbo = (buffer != 0);
+       break;
++   case GL_PIXEL_UNPACK_BUFFER:
++      glthread->pixel_unpack_buffer_bound = (buffer != 0);
++      break;
++   case GL_PIXEL_PACK_BUFFER:
++      glthread->pixel_pack_buffer_bound = (buffer != 0);
++      break;
+    }
+ }
+ 
+@@ -243,7 +253,7 @@ _mesa_marshal_BindBuffer(GLenum target, GLuint buffer)
+    struct marshal_cmd_BindBuffer *cmd;
+    debug_print_marshal("BindBuffer");
+ 
+-   track_vbo_binding(ctx, target, buffer);
++   track_buffers_binding(ctx, target, buffer);
+ 
+    if (cmd_size <= MARSHAL_MAX_CMD_SIZE) {
+       cmd = _mesa_glthread_allocate_command(ctx, DISPATCH_CMD_BindBuffer,
+-- 
+2.11.1
+

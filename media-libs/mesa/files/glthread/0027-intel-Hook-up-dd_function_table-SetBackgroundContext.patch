@@ -1,0 +1,48 @@
+From bcd239f7b06713ceba4ef93cb03da0deac4ef9fe Mon Sep 17 00:00:00 2001
+From: Paul Berry <stereotype441@gmail.com>
+Date: Wed, 14 Nov 2012 14:54:32 -0800
+Subject: [PATCH 27/29] intel: Hook up dd_function_table::SetBackgroundContext
+
+---
+ src/mesa/drivers/dri/i965/brw_context.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/src/mesa/drivers/dri/i965/brw_context.c b/src/mesa/drivers/dri/i965/brw_context.c
+index 0e882cac84c..53e29d87ef2 100644
+--- a/src/mesa/drivers/dri/i965/brw_context.c
++++ b/src/mesa/drivers/dri/i965/brw_context.c
+@@ -123,6 +123,22 @@ brw_get_renderer_string(const struct intel_screen *screen)
+    return buffer;
+ }
+ 
++static void brw_set_background_context(struct gl_context *ctx)
++{
++   struct brw_context *brw = brw_context(ctx);
++   __DRIcontext *driContext = brw->driContext;
++   __DRIscreen *driScreen = driContext->driScreenPriv;
++   const __DRIbackgroundCallableExtension *backgroundCallable
++      = driScreen->dri2.backgroundCallable;
++
++   /* Note: Mesa will only call this function if we've called
++    * _mesa_enable_multithreading().  We only do that if the loader exposed
++    * the __DRI_BACKGROUND_CALLABLE extension.  So we know that
++    * backgroundCallable is not NULL.
++    */
++   backgroundCallable->setBackgroundContext(driContext->loaderPrivate);
++}
++
+ static const GLubyte *
+ intel_get_string(struct gl_context * ctx, GLenum name)
+ {
+@@ -488,6 +504,8 @@ brw_init_driver_functions(struct brw_context *brw,
+ 
+    if (brw->gen >= 6)
+       functions->GetSamplePosition = gen6_get_sample_position;
++
++   functions->SetBackgroundContext = brw_set_background_context;
+ }
+ 
+ static void
+-- 
+2.11.1
+

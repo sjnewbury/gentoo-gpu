@@ -1,4 +1,4 @@
-From b9d4c8a4651fddc4e2c071ec5b2be5fda404a15b Mon Sep 17 00:00:00 2001
+From 03431a8ae1e3065158c3c923de655cccc44b4fac Mon Sep 17 00:00:00 2001
 From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
 Date: Tue, 11 Oct 2016 15:28:59 +0000
 Subject: [PATCH 31/31] docs: mark GL_ARB_vertex_attrib_64bit and OpenGL 4.2 as
@@ -9,7 +9,7 @@ Subject: [PATCH 31/31] docs: mark GL_ARB_vertex_attrib_64bit and OpenGL 4.2 as
  1 file changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/docs/features.txt b/docs/features.txt
-index bb2bf884626..186c29c6c50 100644
+index d34bef157c8..9e038c3ce3e 100644
 --- a/docs/features.txt
 +++ b/docs/features.txt
 @@ -136,17 +136,17 @@ GL 4.0, GLSL 4.00 --- all DONE: i965/gen7+, nvc0, r600, radeonsi

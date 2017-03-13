@@ -1,0 +1,65 @@
+From cbf61fb0b3a16abefedac4600f45f596fbf37e7c Mon Sep 17 00:00:00 2001
+From: Matt Turner <mattst88@gmail.com>
+Date: Fri, 20 Jan 2017 13:35:32 -0800
+Subject: [PATCH 23/31] i965/vec4: Fix exec size for MOVs
+ {SET,PICK}_{HIGH,LOW}_32BIT.
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Otherwise for a pack_double_2x32_split opcode, we emit:
+
+   vec1 64 ssa_135 = pack_double_2x32_split ssa_133, ssa_134
+mov(8)          g5<1>UD         g5<4>.xUD                       { align16 1Q compacted };
+mov(8)          g7<2>UD         g5<4,4,1>UD                     { align1 1Q };
+        ERROR: When the destination spans two registers, the source must span two registers
+               (exceptions for scalar source and packed-word to packed-dword expansion)
+mov(8)          g8<2>UD         g5.4<4,4,1>UD                   { align1 2N };
+        ERROR: The offset from the two source registers must be the same
+mov(8)          g5<1>UD         g6<4>.xUD                       { align16 1Q compacted };
+mov(8)          g7.1<2>UD       g5<4,4,1>UD                     { align1 1Q };
+        ERROR: When the destination spans two registers, the source must span two registers
+               (exceptions for scalar source and packed-word to packed-dword expansion)
+mov(8)          g8.1<2>UD       g5.4<4,4,1>UD                   { align1 2N };
+        ERROR: The offset from the two source registers must be the same
+
+The intention was to emit mov(4)s for the instructions that have ERROR
+annotations.
+
+See tests/spec/arb_gpu_shader_fp64/execution/vs-isinf-dvec.shader_test
+for example.
+
+v2 (Samuel):
+- Instead of setting the exec size to a fixed value, don't double it
+(Curro).
+- Add PICK_{HIGH,LOW}_32BIT to the condition.
+
+Signed-off-by: Samuel Iglesias Gonsálvez <siglesias@igalia.com>
+---
+ src/intel/compiler/brw_vec4_generator.cpp | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/src/intel/compiler/brw_vec4_generator.cpp b/src/intel/compiler/brw_vec4_generator.cpp
+index eab039093d0..e36c057816f 100644
+--- a/src/intel/compiler/brw_vec4_generator.cpp
++++ b/src/intel/compiler/brw_vec4_generator.cpp
+@@ -1539,7 +1539,15 @@ generate_code(struct brw_codegen *p,
+              inst->src[2].type == BRW_REGISTER_TYPE_DF);
+ 
+       unsigned exec_size = inst->exec_size;
+-      if (is_ivb_df && inst->exec_size < 8)
++      /* There are some instructions where the destination is 64-bit
++       * but we retype it to a smaller type. In that case, we cannot
++       * double the exec_size.
++       */
++      if (is_ivb_df && inst->exec_size < 8 &&
++          inst->opcode != VEC4_OPCODE_PICK_LOW_32BIT &&
++          inst->opcode != VEC4_OPCODE_PICK_HIGH_32BIT &&
++          inst->opcode != VEC4_OPCODE_SET_LOW_32BIT &&
++          inst->opcode != VEC4_OPCODE_SET_HIGH_32BIT)
+          exec_size *= 2;
+ 
+       brw_set_default_exec_size(p, cvt(exec_size) - 1);
+-- 
+2.11.1
+

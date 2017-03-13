@@ -166,23 +166,23 @@ diff --git a/src/util/Makefile.am b/src/util/Makefile.am
 index 32316b038f..093589163b 100644
 --- a/src/util/Makefile.am
 +++ b/src/util/Makefile.am
-@@ -36,6 +36,7 @@ libmesautil_la_CPPFLAGS = \
+@@ -36,6 +36,7 @@
  	-I$(top_srcdir)/src/mesa \
  	-I$(top_srcdir)/src/gallium/include \
  	-I$(top_srcdir)/src/gallium/auxiliary \
 +	$(SHA1_CFLAGS) \
  	$(VISIBILITY_CFLAGS) \
- 	$(MSVC2013_COMPAT_CFLAGS)
- 
-@@ -43,6 +44,8 @@ libmesautil_la_SOURCES = \
+ 	$(MSVC2013_COMPAT_CFLAGS) \
+ 	$(ZLIB_CFLAGS)
+@@ -44,7 +45,7 @@
  	$(MESA_UTIL_FILES) \
  	$(MESA_UTIL_GENERATED_FILES)
  
-+libmesautil_la_LIBADD = $(SHA1_LIBS)
-+
+-libmesautil_la_LIBADD = $(ZLIB_LIBS)
++libmesautil_la_LIBADD = $(ZLIB_LIBS) $(SHA1_LIBS)
+ 
  roundeven_test_LDADD = -lm
  
- check_PROGRAMS = u_atomic_test roundeven_test
 diff --git a/src/util/Makefile.sources b/src/util/Makefile.sources
 index a68a5fe22f..1a1581c841 100644
 --- a/src/util/Makefile.sources
@@ -479,4 +479,3 @@ index e8f1bad22f..42ed4e6511 100644
 +#endif
 -- 
 2.11.0
-

@@ -1,4 +1,4 @@
-From 39e1045afac9b9e19852550335d3ecfeedd8deb4 Mon Sep 17 00:00:00 2001
+From aa7e68714ba2c75f9238340f4844b2f73530debd Mon Sep 17 00:00:00 2001
 From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
 Date: Mon, 18 Jul 2016 07:27:56 +0000
 Subject: [PATCH 04/31] i965/fs: double regioning parameters and execsize for
@@ -31,16 +31,20 @@ v3:
 - Change hstride doubling by an assert and fix commit log (Curro).
 - Substitute remaining compiler->devinfo by devinfo (Curro).
 
-Signed-off-by: Samuel Iglesias Gonsálvez <siglesias@igalia.com>
----
- src/mesa/drivers/dri/i965/brw_fs_generator.cpp | 51 ++++++++++++++++++++++----
- 1 file changed, 44 insertions(+), 7 deletions(-)
+v4:
+- Fix comment (Curro).
 
-diff --git a/src/mesa/drivers/dri/i965/brw_fs_generator.cpp b/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
-index 26ffbb169d2..b0d5732ac5c 100644
---- a/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
-+++ b/src/mesa/drivers/dri/i965/brw_fs_generator.cpp
-@@ -54,13 +54,14 @@ brw_file_from_reg(fs_reg *reg)
+Signed-off-by: Samuel Iglesias Gonsálvez <siglesias@igalia.com>
+Reviewed-by: Francisco Jerez <currojerez@riseup.net>
+---
+ src/intel/compiler/brw_fs_generator.cpp | 50 ++++++++++++++++++++++++++++-----
+ 1 file changed, 43 insertions(+), 7 deletions(-)
+
+diff --git a/src/intel/compiler/brw_fs_generator.cpp b/src/intel/compiler/brw_fs_generator.cpp
+index aeed6a11977..bcb6608d3ae 100644
+--- a/src/intel/compiler/brw_fs_generator.cpp
++++ b/src/intel/compiler/brw_fs_generator.cpp
+@@ -53,13 +53,14 @@ brw_file_from_reg(fs_reg *reg)
  }
  
  static struct brw_reg
@@ -57,7 +61,7 @@ index 26ffbb169d2..b0d5732ac5c 100644
        /* Fallthrough */
     case VGRF:
        if (reg->stride == 0) {
-@@ -93,6 +94,35 @@ brw_reg_from_fs_reg(fs_inst *inst, fs_reg *reg, unsigned gen, bool compressed)
+@@ -92,6 +93,34 @@ brw_reg_from_fs_reg(fs_inst *inst, fs_reg *reg, unsigned gen, bool compressed)
           const unsigned width = MIN2(reg_width, phys_width);
           brw_reg = brw_vecn_reg(width, brw_file_from_reg(reg), reg->nr, 0);
           brw_reg = stride(brw_reg, width * reg->stride, width, reg->stride);
@@ -78,8 +82,7 @@ index 26ffbb169d2..b0d5732ac5c 100644
 +          *   of floats."
 +          *
 +          * Summarized: when handling DF-typed arguments, ExecSize,
-+          * VertStride, and Width must be doubled, and HorzStride must be
-+          * doubled when the region is not scalar.
++          * VertStride, and Width must be doubled.
 +          *
 +          * It applies to BayTrail too.
 +          */
@@ -93,7 +96,7 @@ index 26ffbb169d2..b0d5732ac5c 100644
        }
  
        brw_reg = retype(brw_reg, reg->type);
-@@ -1586,9 +1616,8 @@ fs_generator::generate_code(const cfg_t *cfg, int dispatch_width)
+@@ -1585,9 +1614,8 @@ fs_generator::generate_code(const cfg_t *cfg, int dispatch_width)
        brw_set_default_group(p, inst->group);
  
        for (unsigned int i = 0; i < inst->sources; i++) {
@@ -105,7 +108,7 @@ index 26ffbb169d2..b0d5732ac5c 100644
  	 /* The accumulator result appears to get used for the
  	  * conditional modifier generation.  When negating a UD
  	  * value, there is a 33rd bit generated for the sign in the
-@@ -1599,7 +1628,8 @@ fs_generator::generate_code(const cfg_t *cfg, int dispatch_width)
+@@ -1598,7 +1626,8 @@ fs_generator::generate_code(const cfg_t *cfg, int dispatch_width)
  		inst->src[i].type != BRW_REGISTER_TYPE_UD ||
  		!inst->src[i].negate);
        }
@@ -115,7 +118,7 @@ index 26ffbb169d2..b0d5732ac5c 100644
  
        brw_set_default_access_mode(p, BRW_ALIGN_1);
        brw_set_default_predicate_control(p, inst->predicate);
-@@ -1608,7 +1638,14 @@ fs_generator::generate_code(const cfg_t *cfg, int dispatch_width)
+@@ -1607,7 +1636,14 @@ fs_generator::generate_code(const cfg_t *cfg, int dispatch_width)
        brw_set_default_saturate(p, inst->saturate);
        brw_set_default_mask_control(p, inst->force_writemask_all);
        brw_set_default_acc_write_control(p, inst->writes_accumulator);

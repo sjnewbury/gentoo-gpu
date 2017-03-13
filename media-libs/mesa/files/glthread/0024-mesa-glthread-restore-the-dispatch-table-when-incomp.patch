@@ -1,0 +1,98 @@
+From 23a61a8bcc37890f98ee582292fa348a713e9f2d Mon Sep 17 00:00:00 2001
+From: Gregory Hainaut <gregory.hainaut@gmail.com>
+Date: Sun, 12 Feb 2017 15:21:47 +0100
+Subject: [PATCH 24/29] mesa/glthread: restore the dispatch table when
+ incompatible gl calls are detected
+
+While a context only has a single glthread, the context itself can be
+attached to several threads. Therefore the dispatch table must be
+updated in all threads before the destruction of glthread. In others
+words, glthread can only be destroyed safely when the context is deleted.
+
+Fixes remaining crashes in the glx-multithread-makecurrent* tests.
+
+V2: (Timothy Arceri) updated gl_API.dtd marshal_fail description.
+
+Signed-off-by: Gregory Hainaut <gregory.hainaut@gmail.com>
+---
+ src/mapi/glapi/gen/gl_API.dtd    | 6 +++---
+ src/mapi/glapi/gen/gl_marshal.py | 3 ++-
+ src/mesa/main/glthread.c         | 6 ++++++
+ src/mesa/main/glthread.h         | 7 +++++++
+ 4 files changed, 18 insertions(+), 4 deletions(-)
+
+diff --git a/src/mapi/glapi/gen/gl_API.dtd b/src/mapi/glapi/gen/gl_API.dtd
+index dc4a199bb99..b464250777c 100644
+--- a/src/mapi/glapi/gen/gl_API.dtd
++++ b/src/mapi/glapi/gen/gl_API.dtd
+@@ -131,9 +131,9 @@ param:
+         If "draw", it will follow the "async" rules except that "indices" are
+         ignored (since they may come from a VBO).
+      marshal_fail - an expression that, if it evaluates true, causes glthread
+-        to finish and tear down before the Mesa implementation is called
+-        directly.  Used to disable glthread for GL compatibility interactions
+-        that we don't want to track state for.
++        to switch back to the Mesa implementation and call it directly.  Used
++        to disable glthread for GL compatibility interactions that we don't
++        want to track state for.
+ 
+ glx:
+      rop - Opcode value for "render" commands
+diff --git a/src/mapi/glapi/gen/gl_marshal.py b/src/mapi/glapi/gen/gl_marshal.py
+index 165275904ff..d73f08b6684 100644
+--- a/src/mapi/glapi/gen/gl_marshal.py
++++ b/src/mapi/glapi/gen/gl_marshal.py
+@@ -239,7 +239,8 @@ class PrintCode(gl_XML.gl_print_base):
+             if func.marshal_fail:
+                 out('if ({0}) {{'.format(func.marshal_fail))
+                 with indent():
+-                    out('_mesa_glthread_destroy(ctx);')
++                    out('_mesa_glthread_finish(ctx);')
++                    out('_mesa_glthread_restore_dispatch(ctx);')
+                     self.print_sync_dispatch(func)
+                     out('return;')
+                 out('}')
+diff --git a/src/mesa/main/glthread.c b/src/mesa/main/glthread.c
+index 8ee7d8dadac..623266f484b 100644
+--- a/src/mesa/main/glthread.c
++++ b/src/mesa/main/glthread.c
+@@ -173,6 +173,12 @@ _mesa_glthread_destroy(struct gl_context *ctx)
+    free(glthread);
+    ctx->GLThread = NULL;
+ 
++   _mesa_glthread_restore_dispatch(ctx);
++}
++
++void
++_mesa_glthread_restore_dispatch(struct gl_context *ctx)
++{
+    /* Remove ourselves from the dispatch table except if another ctx/thread
+     * already installed a new dispatch table.
+     *
+diff --git a/src/mesa/main/glthread.h b/src/mesa/main/glthread.h
+index 04eb5ffabc4..327c549858c 100644
+--- a/src/mesa/main/glthread.h
++++ b/src/mesa/main/glthread.h
+@@ -119,6 +119,7 @@ struct glthread_batch
+ void _mesa_glthread_init(struct gl_context *ctx);
+ void _mesa_glthread_destroy(struct gl_context *ctx);
+ 
++void _mesa_glthread_restore_dispatch(struct gl_context *ctx);
+ void _mesa_glthread_flush_batch(struct gl_context *ctx);
+ void _mesa_glthread_finish(struct gl_context *ctx);
+ 
+@@ -138,5 +139,11 @@ static inline void
+ _mesa_glthread_finish(struct gl_context *ctx)
+ {
+ }
++
++static inline void
++_mesa_glthread_restore_dispatch(struct gl_context *ctx);
++{
++}
++
+ #endif /* !HAVE_PTHREAD */
+ #endif /* _GLTHREAD_H*/
+-- 
+2.11.1
+

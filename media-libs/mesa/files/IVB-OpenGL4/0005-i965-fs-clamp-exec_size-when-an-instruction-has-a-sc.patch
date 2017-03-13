@@ -1,4 +1,4 @@
-From 84d98cb6cf09d736ab9a0806e784d25d2b4d4c2c Mon Sep 17 00:00:00 2001
+From fc83b99275f366a86c12169a81c6b68b1aecdc9d Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
 Date: Wed, 11 Jan 2017 08:17:57 +0100
 Subject: [PATCH 05/31] i965/fs: clamp exec_size when an instruction has a
@@ -15,14 +15,14 @@ Signed-off-by: Samuel Iglesias Gonsálvez <siglesias@igalia.com>
 Suggested-by: Francisco Jerez <currojerez@riseup.net>
 Reviewed-by: Francisco Jerez <currojerez@riseup.net>
 ---
- src/mesa/drivers/dri/i965/brw_fs.cpp | 11 ++++++++---
+ src/intel/compiler/brw_fs.cpp | 11 ++++++++---
  1 file changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/src/mesa/drivers/dri/i965/brw_fs.cpp b/src/mesa/drivers/dri/i965/brw_fs.cpp
-index 9fb5dabe6f3..8d5b381f4a1 100644
---- a/src/mesa/drivers/dri/i965/brw_fs.cpp
-+++ b/src/mesa/drivers/dri/i965/brw_fs.cpp
-@@ -4510,11 +4510,16 @@ get_fpu_lowered_simd_width(const struct gen_device_info *devinfo,
+diff --git a/src/intel/compiler/brw_fs.cpp b/src/intel/compiler/brw_fs.cpp
+index b009ce41bc1..6da23b17107 100644
+--- a/src/intel/compiler/brw_fs.cpp
++++ b/src/intel/compiler/brw_fs.cpp
+@@ -4529,11 +4529,16 @@ get_fpu_lowered_simd_width(const struct gen_device_info *devinfo,
      */
     if (devinfo->gen < 8) {
        for (unsigned i = 0; i < inst->sources; i++) {

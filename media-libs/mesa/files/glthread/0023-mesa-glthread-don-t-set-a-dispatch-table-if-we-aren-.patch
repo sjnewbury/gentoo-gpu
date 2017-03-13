@@ -1,0 +1,44 @@
+From ebc09cc24f79d43df79452d93137451f27ec9162 Mon Sep 17 00:00:00 2001
+From: Gregory Hainaut <gregory.hainaut@gmail.com>
+Date: Mon, 13 Feb 2017 19:14:28 +0100
+Subject: [PATCH 23/29] mesa/glthread: don't set a dispatch table if we aren't
+ the owner
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Fix crashes when glxMakeCurrent is called.
+
+Signed-off-by: Gregory Hainaut <gregory.hainaut@gmail.com>
+Signed-off-by: Marek Olšák <marek.olsak@amd.com>
+---
+ src/mesa/main/glthread.c | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/src/mesa/main/glthread.c b/src/mesa/main/glthread.c
+index 8f300d46344..8ee7d8dadac 100644
+--- a/src/mesa/main/glthread.c
++++ b/src/mesa/main/glthread.c
+@@ -173,9 +173,16 @@ _mesa_glthread_destroy(struct gl_context *ctx)
+    free(glthread);
+    ctx->GLThread = NULL;
+ 
+-   /* Remove ourselves from the dispatch table. */
+-   ctx->CurrentClientDispatch = ctx->CurrentServerDispatch;
+-   _glapi_set_dispatch(ctx->CurrentClientDispatch);
++   /* Remove ourselves from the dispatch table except if another ctx/thread
++    * already installed a new dispatch table.
++    *
++    * Typically glxMakeCurrent will bind a new context (install new table) then
++    * old context might be deleted.
++    */
++   if (_glapi_get_dispatch() == ctx->MarshalExec) {
++       ctx->CurrentClientDispatch = ctx->CurrentServerDispatch;
++       _glapi_set_dispatch(ctx->CurrentClientDispatch);
++   }
+ }
+ 
+ void
+-- 
+2.11.1
+

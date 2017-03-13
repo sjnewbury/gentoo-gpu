@@ -1,4 +1,4 @@
-From c8273e0de961b1e153d817b1646cdf4929a47603 Mon Sep 17 00:00:00 2001
+From 6bdbd9665c10ba274b53e1882504351dab47ae8b Mon Sep 17 00:00:00 2001
 From: Matt Turner <mattst88@gmail.com>
 Date: Fri, 20 Jan 2017 13:35:31 -0800
 Subject: [PATCH 02/31] i965: Handle IVB DF differences in the validator.
@@ -15,13 +15,13 @@ v2 (Sam):
 
 Reviewed-by: Samuel Iglesias Gonsálvez <siglesias@igalia.com>
 ---
- src/mesa/drivers/dri/i965/brw_eu_validate.c | 24 ++++++++++++++++++++++++
+ src/intel/compiler/brw_eu_validate.c | 24 ++++++++++++++++++++++++
  1 file changed, 24 insertions(+)
 
-diff --git a/src/mesa/drivers/dri/i965/brw_eu_validate.c b/src/mesa/drivers/dri/i965/brw_eu_validate.c
+diff --git a/src/intel/compiler/brw_eu_validate.c b/src/intel/compiler/brw_eu_validate.c
 index 64615af44ac..f231ea038b4 100644
---- a/src/mesa/drivers/dri/i965/brw_eu_validate.c
-+++ b/src/mesa/drivers/dri/i965/brw_eu_validate.c
+--- a/src/intel/compiler/brw_eu_validate.c
++++ b/src/intel/compiler/brw_eu_validate.c
 @@ -467,6 +467,14 @@ general_restrictions_based_on_operand_types(const struct gen_device_info *devinf
        brw_hw_reg_type_to_size(devinfo, exec_type, BRW_GENERAL_REGISTER_FILE);
     unsigned dst_type_size = brw_element_size(devinfo, inst, dst);

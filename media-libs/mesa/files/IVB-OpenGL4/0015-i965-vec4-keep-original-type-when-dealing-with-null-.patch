@@ -1,0 +1,46 @@
+From 0d8aa25e9b30b9dc8c19f69671b40d6b48f7e8a2 Mon Sep 17 00:00:00 2001
+From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
+Date: Mon, 12 Sep 2016 16:06:22 +0000
+Subject: [PATCH 15/31] i965/vec4: keep original type when dealing with null
+ registers
+
+Keep the original type when dealing with null registers. Especially
+because we do no want to introduce an implicit conversion between
+types that could affect the conditional flags.
+
+This affects especially when the original type is DF, and we are working
+on Ivybridge/Baytrail.
+
+v2 (Curro)
+- Fix typo.
+- Use retype() instead of applying the type directly.
+- Remove unneeded retype.
+
+Reviewed-by: Francisco Jerez <currojerez@riseup.net>
+---
+ src/intel/compiler/brw_vec4.cpp | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/src/intel/compiler/brw_vec4.cpp b/src/intel/compiler/brw_vec4.cpp
+index a213bbb4707..b26f8035811 100644
+--- a/src/intel/compiler/brw_vec4.cpp
++++ b/src/intel/compiler/brw_vec4.cpp
+@@ -1984,6 +1984,7 @@ vec4_visitor::convert_to_hw_regs()
+          case BAD_FILE:
+             /* Probably unused. */
+             reg = brw_null_reg();
++            reg = retype(reg, src.type);
+             break;
+ 
+          case MRF:
+@@ -2034,6 +2035,7 @@ vec4_visitor::convert_to_hw_regs()
+ 
+       case BAD_FILE:
+          reg = brw_null_reg();
++         reg = retype(reg, dst.type);
+          break;
+ 
+       case IMM:
+-- 
+2.11.1
+

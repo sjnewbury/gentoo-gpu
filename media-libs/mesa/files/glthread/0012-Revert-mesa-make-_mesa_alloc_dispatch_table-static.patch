@@ -1,0 +1,75 @@
+From 28b46cc8eaed07aeed3422c60050f32c38d5eb79 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Marek=20Ol=C5=A1=C3=A1k?= <marek.olsak@amd.com>
+Date: Thu, 29 Sep 2016 01:00:39 +0200
+Subject: [PATCH 12/29] Revert "mesa: make _mesa_alloc_dispatch_table() static"
+
+This reverts commit 4009d22b61e76850b1b725f4e491da05c2406fa4.
+
+glthread needs it.
+---
+ src/mesa/main/api_exec.h |  4 ++++
+ src/mesa/main/context.c  | 10 +++++-----
+ 2 files changed, 9 insertions(+), 5 deletions(-)
+
+diff --git a/src/mesa/main/api_exec.h b/src/mesa/main/api_exec.h
+index 655cb32d0a4..f55f56bda4a 100644
+--- a/src/mesa/main/api_exec.h
++++ b/src/mesa/main/api_exec.h
+@@ -30,8 +30,12 @@
+ extern "C" {
+ #endif
+ 
++struct _glapi_table;
+ struct gl_context;
+ 
++extern struct _glapi_table *
++_mesa_alloc_dispatch_table(void);
++
+ extern void
+ _mesa_initialize_exec_table(struct gl_context *ctx);
+ 
+diff --git a/src/mesa/main/context.c b/src/mesa/main/context.c
+index 4b654de4582..0a9c65c2ab2 100644
+--- a/src/mesa/main/context.c
++++ b/src/mesa/main/context.c
+@@ -999,8 +999,8 @@ _mesa_new_nop_table(unsigned numEntries)
+  * populated with pointers to "no-op" functions.  In turn, the no-op
+  * functions will call nop_handler() above.
+  */
+-static struct _glapi_table *
+-alloc_dispatch_table(void)
++struct _glapi_table *
++_mesa_alloc_dispatch_table(void)
+ {
+    /* Find the larger of Mesa's dispatch table and libGL's dispatch table.
+     * In practice, this'll be the same for stand-alone Mesa.  But for DRI
+@@ -1072,7 +1072,7 @@ create_beginend_table(const struct gl_context *ctx)
+ {
+    struct _glapi_table *table;
+ 
+-   table = alloc_dispatch_table();
++   table = _mesa_alloc_dispatch_table();
+    if (!table)
+       return NULL;
+ 
+@@ -1209,7 +1209,7 @@ _mesa_initialize_context(struct gl_context *ctx,
+       goto fail;
+ 
+    /* setup the API dispatch tables with all nop functions */
+-   ctx->OutsideBeginEnd = alloc_dispatch_table();
++   ctx->OutsideBeginEnd = _mesa_alloc_dispatch_table();
+    if (!ctx->OutsideBeginEnd)
+       goto fail;
+    ctx->Exec = ctx->OutsideBeginEnd;
+@@ -1236,7 +1236,7 @@ _mesa_initialize_context(struct gl_context *ctx,
+    switch (ctx->API) {
+    case API_OPENGL_COMPAT:
+       ctx->BeginEnd = create_beginend_table(ctx);
+-      ctx->Save = alloc_dispatch_table();
++      ctx->Save = _mesa_alloc_dispatch_table();
+       if (!ctx->BeginEnd || !ctx->Save)
+          goto fail;
+ 
+-- 
+2.11.1
+

@@ -1,4 +1,4 @@
-From 348c17c1a538d438f4c471a89bc0c033a2e3e110 Mon Sep 17 00:00:00 2001
+From 58d9a84229b9b52e22332253bc041bacc514976b Mon Sep 17 00:00:00 2001
 From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
 Date: Tue, 11 Oct 2016 15:25:52 +0000
 Subject: [PATCH 30/31] i965: enable OpenGL 4.2 in gen7+
@@ -9,7 +9,7 @@ Subject: [PATCH 30/31] i965: enable OpenGL 4.2 in gen7+
  2 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/src/mesa/drivers/dri/i965/intel_extensions.c b/src/mesa/drivers/dri/i965/intel_extensions.c
-index f4f20bf586d..58bdf0c72c6 100644
+index fc974b98607..0133fa10068 100644
 --- a/src/mesa/drivers/dri/i965/intel_extensions.c
 +++ b/src/mesa/drivers/dri/i965/intel_extensions.c
 @@ -139,7 +139,7 @@ intelInitExtensions(struct gl_context *ctx)
@@ -22,10 +22,10 @@ index f4f20bf586d..58bdf0c72c6 100644
        ctx->Const.GLSLVersion = 330;
     else
 diff --git a/src/mesa/drivers/dri/i965/intel_screen.c b/src/mesa/drivers/dri/i965/intel_screen.c
-index 5668987fa37..711ed1a0d69 100644
+index 5645d0419e4..bb7a4a734ed 100644
 --- a/src/mesa/drivers/dri/i965/intel_screen.c
 +++ b/src/mesa/drivers/dri/i965/intel_screen.c
-@@ -1547,7 +1547,7 @@ set_max_gl_versions(struct intel_screen *screen)
+@@ -1510,7 +1510,7 @@ set_max_gl_versions(struct intel_screen *screen)
        break;
     case 7:
        if (can_do_pipelined_register_writes(screen))

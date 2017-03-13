@@ -1,4 +1,4 @@
-From 76a821e0ae636aeda6e05f73babe0d2719c9f1ef Mon Sep 17 00:00:00 2001
+From 118f3469eeab687796fc733ff1b35ac78574ff41 Mon Sep 17 00:00:00 2001
 From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
 Date: Mon, 18 Jul 2016 07:17:39 +0000
 Subject: [PATCH 03/31] i965/fs: add helper to retrieve instruction data size
@@ -22,15 +22,15 @@ v2:
 Signed-off-by: Samuel Iglesias Gonsálvez <siglesias@igalia.com>
 Reviewed-by: Francisco Jerez <currojerez@riseup.net>
 ---
- src/mesa/drivers/dri/i965/brw_fs.cpp |  6 +-----
- src/mesa/drivers/dri/i965/brw_fs.h   | 14 ++++++++++++++
+ src/intel/compiler/brw_fs.cpp |  6 +-----
+ src/intel/compiler/brw_fs.h   | 14 ++++++++++++++
  2 files changed, 15 insertions(+), 5 deletions(-)
 
-diff --git a/src/mesa/drivers/dri/i965/brw_fs.cpp b/src/mesa/drivers/dri/i965/brw_fs.cpp
-index c348bc7138d..9fb5dabe6f3 100644
---- a/src/mesa/drivers/dri/i965/brw_fs.cpp
-+++ b/src/mesa/drivers/dri/i965/brw_fs.cpp
-@@ -4566,11 +4566,7 @@ get_fpu_lowered_simd_width(const struct gen_device_info *devinfo,
+diff --git a/src/intel/compiler/brw_fs.cpp b/src/intel/compiler/brw_fs.cpp
+index c410efc29d6..b009ce41bc1 100644
+--- a/src/intel/compiler/brw_fs.cpp
++++ b/src/intel/compiler/brw_fs.cpp
+@@ -4585,11 +4585,7 @@ get_fpu_lowered_simd_width(const struct gen_device_info *devinfo,
         !inst->force_writemask_all) {
        const unsigned channels_per_grf = inst->exec_size /
           DIV_ROUND_UP(inst->size_written, REG_SIZE);
@@ -43,11 +43,11 @@ index c348bc7138d..9fb5dabe6f3 100644
        assert(exec_type_size);
  
        /* The hardware shifts exactly 8 channels per compressed half of the
-diff --git a/src/mesa/drivers/dri/i965/brw_fs.h b/src/mesa/drivers/dri/i965/brw_fs.h
-index d0e272bb9ee..95b2b8eaa81 100644
---- a/src/mesa/drivers/dri/i965/brw_fs.h
-+++ b/src/mesa/drivers/dri/i965/brw_fs.h
-@@ -501,3 +501,17 @@ fs_reg setup_imm_df(const brw::fs_builder &bld,
+diff --git a/src/intel/compiler/brw_fs.h b/src/intel/compiler/brw_fs.h
+index 00861ce5dad..f3d36848e54 100644
+--- a/src/intel/compiler/brw_fs.h
++++ b/src/intel/compiler/brw_fs.h
+@@ -498,3 +498,17 @@ fs_reg setup_imm_df(const brw::fs_builder &bld,
  
  enum brw_barycentric_mode brw_barycentric_mode(enum glsl_interp_mode mode,
                                                 nir_intrinsic_op op);

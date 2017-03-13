@@ -1,4 +1,4 @@
-From bbf90871bee938c130592083aabdb3c8097c9dd8 Mon Sep 17 00:00:00 2001
+From 687f5ba110d405a1b22e7d52ca310db2d3824ebe Mon Sep 17 00:00:00 2001
 From: Iago Toral Quiroga <itoral@igalia.com>
 Date: Fri, 22 Jul 2016 13:36:25 +0200
 Subject: [PATCH 01/31] i965/disasm: also print nibctrl in IVB for execsize=8
@@ -12,14 +12,14 @@ v2:
 Reviewed-by: Matt Turner <mattst88@gmail.com>
 Reviewed-by: Francisco Jerez <currojerez@riseup.net>
 ---
- src/mesa/drivers/dri/i965/brw_disasm.c | 6 +++---
+ src/intel/compiler/brw_disasm.c | 6 +++---
  1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/src/mesa/drivers/dri/i965/brw_disasm.c b/src/mesa/drivers/dri/i965/brw_disasm.c
-index cd553b3cce0..40d589ee986 100644
---- a/src/mesa/drivers/dri/i965/brw_disasm.c
-+++ b/src/mesa/drivers/dri/i965/brw_disasm.c
-@@ -1181,10 +1181,10 @@ qtr_ctrl(FILE *file, const struct gen_device_info *devinfo, brw_inst *inst)
+diff --git a/src/intel/compiler/brw_disasm.c b/src/intel/compiler/brw_disasm.c
+index 536a003dcbe..8b44736b9b6 100644
+--- a/src/intel/compiler/brw_disasm.c
++++ b/src/intel/compiler/brw_disasm.c
+@@ -1182,10 +1182,10 @@ qtr_ctrl(FILE *file, const struct gen_device_info *devinfo, brw_inst *inst)
  {
     int qtr_ctl = brw_inst_qtr_control(devinfo, inst);
     int exec_size = 1 << brw_inst_exec_size(devinfo, inst);
