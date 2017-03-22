@@ -1,0 +1,11 @@
+--- ./src/intel/intel_driver.c~	2017-03-19 10:16:29.000000000 +0000
++++ ./src/intel/intel_driver.c	2017-03-19 10:17:49.135448513 +0000
+@@ -235,8 +235,6 @@
+     intel_driver_init_shared(intel, intel->dri_ctx);
+     Xfree(driver_name);
+   }
+-  else
+-    fprintf(stderr, "X server found. dri2 connection failed! \n");
+ }
+ #endif
+ 

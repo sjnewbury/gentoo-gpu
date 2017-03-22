@@ -45,12 +45,12 @@ DEPEND="${COMMON}
 	virtual/pkgconfig"
 
 PATCHES=(
-	"${FILESDIR}"/no-debian-multiarch.patch
+	"${FILESDIR}"/no-debian-multiarch-r2.patch
 	"${FILESDIR}"/${PN}-1.2.0_no-hardcoded-cflags.patch
 	"${FILESDIR}"/llvm-terminfo.patch
 	"${FILESDIR}"/beignet-9999-libOpenCL.patch
 	"${FILESDIR}"/beignet-9999-llvm-libs-tr.patch
-	"${FILESDIR}"/beignet-9999-silence-dri2-failure.patch
+	"${FILESDIR}"/beignet-9999-silence-dri2-failure-r2.patch
 )
 
 DOCS=(
