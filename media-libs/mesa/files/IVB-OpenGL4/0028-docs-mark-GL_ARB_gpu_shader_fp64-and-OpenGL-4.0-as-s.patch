@@ -1,7 +1,7 @@
-From bd562a1fad96942f00e57f327fe6fb8d89a21b63 Mon Sep 17 00:00:00 2001
+From 74481c211f2804403d2dae07782981f9e5782bba Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
 Date: Tue, 11 Oct 2016 10:59:52 +0200
-Subject: [PATCH 27/31] docs: mark GL_ARB_gpu_shader_fp64 and OpenGL 4.0 as
+Subject: [PATCH 28/32] docs: mark GL_ARB_gpu_shader_fp64 and OpenGL 4.0 as
  supported by i965/gen7+
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8

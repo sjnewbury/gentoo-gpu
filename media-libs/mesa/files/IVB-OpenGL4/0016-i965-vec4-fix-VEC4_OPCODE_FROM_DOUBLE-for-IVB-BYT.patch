@@ -1,7 +1,7 @@
-From a6025c9448291a579e49861ec940fc4497ebe080 Mon Sep 17 00:00:00 2001
+From de415655f9320ed813ce6c6d3f3cf9eeac40b7b7 Mon Sep 17 00:00:00 2001
 From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
 Date: Fri, 23 Sep 2016 09:57:43 +0000
-Subject: [PATCH 16/31] i965/vec4: fix VEC4_OPCODE_FROM_DOUBLE for IVB/BYT
+Subject: [PATCH 16/32] i965/vec4: fix VEC4_OPCODE_FROM_DOUBLE for IVB/BYT
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit

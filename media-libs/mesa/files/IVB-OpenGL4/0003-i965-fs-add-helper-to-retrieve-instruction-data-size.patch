@@ -1,7 +1,7 @@
-From 118f3469eeab687796fc733ff1b35ac78574ff41 Mon Sep 17 00:00:00 2001
+From 88f0050ec78a2f458f4266f4580163d0d3be7c34 Mon Sep 17 00:00:00 2001
 From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
 Date: Mon, 18 Jul 2016 07:17:39 +0000
-Subject: [PATCH 03/31] i965/fs: add helper to retrieve instruction data size
+Subject: [PATCH 03/32] i965/fs: add helper to retrieve instruction data size
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit

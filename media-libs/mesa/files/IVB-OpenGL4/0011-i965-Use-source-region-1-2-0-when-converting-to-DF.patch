@@ -1,7 +1,7 @@
-From 3866ff79dca3183f249fc2f4ee8d3d7b3548a494 Mon Sep 17 00:00:00 2001
+From 0989c9f034ef1498595da068fb0a56ee8010dd27 Mon Sep 17 00:00:00 2001
 From: Matt Turner <mattst88@gmail.com>
 Date: Thu, 12 Jan 2017 18:05:58 -0800
-Subject: [PATCH 11/31] i965: Use source region <1,2,0> when converting to DF.
+Subject: [PATCH 11/32] i965: Use source region <1,2,0> when converting to DF.
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit

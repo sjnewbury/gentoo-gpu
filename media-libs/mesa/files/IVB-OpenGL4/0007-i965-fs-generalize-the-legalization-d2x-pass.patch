@@ -1,25 +1,23 @@
-From b6eb92588aaa51869e085a639deac772c7ec34e1 Mon Sep 17 00:00:00 2001
+From 2f38b636ca22a641bef2067fb44db4a320c3ca3e Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
 Date: Fri, 20 Jan 2017 08:47:05 +0100
-Subject: [PATCH 07/31] i965/fs: generalize the legalization d2x pass
+Subject: [PATCH 07/32] i965/fs: generalize the legalization d2x pass
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
 
-Add support to SEL instruction and add an assert to detect unsupported
-instructions than do d2x conversions.
+Generalize it to lower any unsupported narrower conversion.
 
 v2 (Curro):
 - Add supports_type_conversion()
 - Reuse existing intruction instead of cloning it.
-
-Signed-off-by: Samuel Iglesias Gonsálvez <siglesias@igalia.com>
+- Generalize d2x to narrower and equal size conversions.
 
 Signed-off-by: Samuel Iglesias Gonsálvez <siglesias@igalia.com>
 ---
  src/intel/compiler/brw_fs.cpp           | 11 ++--
- src/intel/compiler/brw_fs_lower_d2x.cpp | 91 +++++++++++++++++++++++++++------
- 2 files changed, 80 insertions(+), 22 deletions(-)
+ src/intel/compiler/brw_fs_lower_d2x.cpp | 97 ++++++++++++++++++++++++---------
+ 2 files changed, 77 insertions(+), 31 deletions(-)
 
 diff --git a/src/intel/compiler/brw_fs.cpp b/src/intel/compiler/brw_fs.cpp
 index 6da23b17107..8612a83805d 100644
@@ -51,10 +49,10 @@ index 6da23b17107..8612a83805d 100644
  
     validate();
 diff --git a/src/intel/compiler/brw_fs_lower_d2x.cpp b/src/intel/compiler/brw_fs_lower_d2x.cpp
-index a2db1154615..f9e5ee57361 100644
+index a2db1154615..fa25d313dcd 100644
 --- a/src/intel/compiler/brw_fs_lower_d2x.cpp
 +++ b/src/intel/compiler/brw_fs_lower_d2x.cpp
-@@ -27,30 +27,42 @@
+@@ -27,47 +27,92 @@
  
  using namespace brw;
  
@@ -64,8 +62,13 @@ index a2db1154615..f9e5ee57361 100644
 +   case BRW_OPCODE_MOV:
 +   case SHADER_OPCODE_MOV_INDIRECT:
 +      return true;
-+   default:
++   case BRW_OPCODE_SEL:
 +      return false;
++   default:
++      /* FIXME: We assume the opcodes don't explicitly mentioned
++       * before just work fine with arbitrary conversions.
++       */
++      return true;
 +   }
 +}
 +
@@ -87,18 +90,21 @@ index a2db1154615..f9e5ee57361 100644
 -      if (inst->dst.type != BRW_REGISTER_TYPE_F &&
 -          inst->dst.type != BRW_REGISTER_TYPE_D &&
 -          inst->dst.type != BRW_REGISTER_TYPE_UD)
--         continue;
--
--      if (inst->src[0].type != BRW_REGISTER_TYPE_DF &&
--          inst->src[0].type != BRW_REGISTER_TYPE_UQ &&
--          inst->src[0].type != BRW_REGISTER_TYPE_Q)
 +      /* If the conversion is supported or there is no conversion then
 +       * do nothing.
 +       */
 +      if (supported_conversion ||
 +          (!inst_support_conversion && inst->dst.type == inst->src[0].type) ||
-+          inst->dst.file == BAD_FILE)
++          inst->dst.file == BAD_FILE || inst->src[0].file == BAD_FILE)
           continue;
+ 
+-      if (inst->src[0].type != BRW_REGISTER_TYPE_DF &&
+-          inst->src[0].type != BRW_REGISTER_TYPE_UQ &&
+-          inst->src[0].type != BRW_REGISTER_TYPE_Q)
+-         continue;
++      /* This pass only supports conversion to narrower or equal size types. */
++      if (get_exec_type_size(inst) < type_sz(inst->dst.type))
++          continue;
  
 -      assert(inst->dst.file == VGRF);
        assert(inst->saturate == false);
@@ -107,31 +113,31 @@ index a2db1154615..f9e5ee57361 100644
        const fs_builder ibld(this, block, inst);
 +      fs_reg dst = inst->dst;
  
-       /* From the Broadwell PRM, 3D Media GPGPU, "Double Precision Float to
-        * Single Precision Float":
-@@ -61,13 +73,58 @@ fs_visitor::lower_d2x()
-        * So we need to allocate a temporary that's two registers, and then do
-        * a strided MOV to get the lower DWord of every Qword that has the
-        * result.
-+       *
-+       * This pass legalizes all the DF conversions to narrower types.
-        */
+-      /* From the Broadwell PRM, 3D Media GPGPU, "Double Precision Float to
+-       * Single Precision Float":
+-       *
+-       *    The upper Dword of every Qword will be written with undefined
+-       *    value when converting DF to F.
+-       *
+-       * So we need to allocate a temporary that's two registers, and then do
+-       * a strided MOV to get the lower DWord of every Qword that has the
+-       * result.
+-       */
 -      fs_reg temp = ibld.vgrf(inst->src[0].type, 1);
 -      fs_reg strided_temp = subscript(temp, inst->dst.type, 0);
 -      ibld.MOV(strided_temp, inst->src[0]);
 -      ibld.MOV(dst, strided_temp);
-+      switch (inst->opcode) {
-+      case BRW_OPCODE_BFE:
-+      case BRW_OPCODE_BFI2:
-+         /* BFE/BFI2 emitter might have mixed D and UD types
-+          * and could want us to ignore that and use the destination type.
-+          * This is going to be fixed in brw_alu3() at brw_eu_emit.c.
++      if (inst_support_conversion && !supported_conversion) {
++         /* From the Broadwell PRM, 3D Media GPGPU, "Double Precision Float to
++          * Single Precision Float":
++          *
++          *    The upper Dword of every Qword will be written with undefined
++          *    value when converting DF to F.
++          *
++          * So we need to allocate a temporary that's two registers, and then do
++          * a strided MOV to get the lower DWord of every Qword that has the
++          * result.
 +          */
-+         assert(dst.type == BRW_REGISTER_TYPE_D || dst.type == BRW_REGISTER_TYPE_UD);
-+         assert(get_exec_type_size(inst) == 4);
-+         continue;
-+      case SHADER_OPCODE_MOV_INDIRECT:
-+      case BRW_OPCODE_MOV: {
 +         fs_reg temp = ibld.vgrf(inst->src[0].type, 1);
 +         fs_reg strided_temp = subscript(temp, dst.type, 0);
 +
@@ -145,30 +151,22 @@ index a2db1154615..f9e5ee57361 100644
 +          */
 +         inst->size_written = inst->dst.component_size(inst->exec_size);
 +         ibld.at(block, inst->next).MOV(dst, strided_temp);
-+         break;
-+      }
-+      case BRW_OPCODE_SEL: {
++      } else {
 +         fs_reg temp0 = ibld.vgrf(inst->src[0].type, 1);
 +         fs_reg temp1 = ibld.vgrf(inst->src[0].type, 1);
 +         fs_reg strided_temp1 = subscript(temp1, dst.type, 0);
- 
--      inst->remove(block);
++
 +         inst->dst = temp0;
 +         /* As it is an strided destination, we write n-times more being n the
 +          * size difference between source and destination types. Update
 +          * size_written with the new destination.
 +          */
 +         inst->size_written = inst->dst.component_size(inst->exec_size);
-+
+ 
+-      inst->remove(block);
 +         /* Now, do the conversion to original destination's type. */
 +         fs_inst *mov = ibld.at(block, inst->next).MOV(strided_temp1, temp0);
 +         ibld.at(block, mov->next).MOV(dst, strided_temp1);
-+
-+         break;
-+      }
-+      default:
-+         assert(get_exec_type_size(inst) != 8);
-+         continue;
 +      }
        progress = true;
     }

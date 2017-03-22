@@ -1,7 +1,7 @@
-From 270e86763007351ac4baaa1d1c19e515ae456a74 Mon Sep 17 00:00:00 2001
+From 0032a06d768aa43b16818cf232bda98ffed730bf Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
 Date: Mon, 17 Oct 2016 14:40:06 +0000
-Subject: [PATCH 29/31] i965: enable ARB_shader_precision in gen7+
+Subject: [PATCH 30/32] i965: enable ARB_shader_precision in gen7+
 
 ---
  src/mesa/drivers/dri/i965/intel_extensions.c | 2 +-

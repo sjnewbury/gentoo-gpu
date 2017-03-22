@@ -209,10 +209,10 @@ index a68a5fe22f..1a1581c841 100644
  MESA_UTIL_GENERATED_FILES = \
  	format_srgb.c
 diff --git a/src/util/mesa-sha1.c b/src/util/mesa-sha1.c
-index e8f1bad22f..42ed4e6511 100644
+index a14fec97e7..35f2f628a8 100644
 --- a/src/util/mesa-sha1.c
 +++ b/src/util/mesa-sha1.c
-@@ -24,9 +24,19 @@
+@@ -24,15 +24,285 @@
   * DEALINGS IN THE SOFTWARE.
   */
  
@@ -229,13 +229,36 @@ index e8f1bad22f..42ed4e6511 100644
 +
 +#include <sha1.h>
 +
- struct mesa_sha1 *
- _mesa_sha1_init(void)
- {
-@@ -58,6 +68,238 @@ _mesa_sha1_final(struct mesa_sha1 *ctx, unsigned char result[20])
-    return 1;
- }
- 
++struct mesa_sha1 *
++_mesa_sha1_init(void)
++{
++   SHA1_CTX *ctx = malloc(sizeof(*ctx));
++
++   if (!ctx)
++      return NULL;
++
++   SHA1Init(ctx);
++   return (struct mesa_sha1 *) ctx;
++}
++
++void
++_mesa_sha1_update(struct mesa_sha1 *ctx, const void *data, int size)
++{
++   SHA1_CTX *sha1_ctx = (SHA1_CTX *) ctx;
++
++   SHA1Update(sha1_ctx, data, size);
++}
++
++int
++_mesa_sha1_final(struct mesa_sha1 *ctx, unsigned char result[20])
++{
++   SHA1_CTX *sha1_ctx = (SHA1_CTX *) ctx;
++
++   SHA1Final(result, sha1_ctx);
++   free(sha1_ctx);
++   return 1;
++}
++
 +#elif defined(HAVE_SHA1_IN_COMMONCRYPTO)        /* Use CommonCrypto for SHA1 */
 +
 +#include <CommonCrypto/CommonDigest.h>
@@ -252,13 +275,12 @@ index e8f1bad22f..42ed4e6511 100644
 +   return (struct mesa_sha1 *) ctx;
 +}
 +
-+int
++void
 +_mesa_sha1_update(struct mesa_sha1 *ctx, const void *data, int size)
 +{
 +   CC_SHA1_CTX *sha1_ctx = (CC_SHA1_CTX *) ctx;
 +
 +   CC_SHA1_Update(sha1_ctx, data, size);
-+   return 1;
 +}
 +
 +int
@@ -292,13 +314,12 @@ index e8f1bad22f..42ed4e6511 100644
 +   return (struct mesa_sha1 *) ctx;
 +}
 +
-+int
++void
 +_mesa_sha1_update(struct mesa_sha1 *ctx, const void *data, int size)
 +{
 +   HCRYPTHASH *hHash = (HCRYPTHASH *) ctx;
 +
 +   CryptHashData(*hHash, data, size, 0);
-+   return 1;
 +}
 +
 +int
@@ -329,11 +350,10 @@ index e8f1bad22f..42ed4e6511 100644
 +   return (struct mesa_sha1 *) ctx;
 +}
 +
-+int
++void
 +_mesa_sha1_update(struct mesa_sha1 *ctx, const void *data, int size)
 +{
 +   sha1_update((struct sha1_ctx *) ctx, size, data);
-+   return 1;
 +}
 +
 +int
@@ -373,13 +393,12 @@ index e8f1bad22f..42ed4e6511 100644
 +   return (struct mesa_sha1 *) h;
 +}
 +
-+int
++void
 +_mesa_sha1_update(struct mesa_sha1 *ctx, const void *data, int size)
 +{
 +   gcry_md_hd_t h = (gcry_md_hd_t) ctx;
 +
 +   gcry_md_write(h, data, size);
-+   return 1;
 +}
 +
 +int
@@ -407,11 +426,10 @@ index e8f1bad22f..42ed4e6511 100644
 +   return (struct mesa_sha1 *) ctx;
 +}
 +
-+int
++void
 +_mesa_sha1_update(struct mesa_sha1 *ctx, const void *data, int size)
 +{
 +   sha1_hash(data, size, (sha1_ctx *) ctx);
-+   return 1;
 +}
 +
 +int
@@ -443,7 +461,7 @@ index e8f1bad22f..42ed4e6511 100644
 +   return (struct mesa_sha1 *) ctx;
 +}
 +
-+int
++void
 +_mesa_sha1_update(struct mesa_sha1 *ctx, const void *data, int size)
 +{
 +   int ret;
@@ -452,7 +470,6 @@ index e8f1bad22f..42ed4e6511 100644
 +   ret = SHA1_Update(sha_ctx, data, size);
 +   if (!ret)
 +      free(sha_ctx);
-+   return ret;
 +}
 +
 +int
@@ -468,14 +485,18 @@ index e8f1bad22f..42ed4e6511 100644
 +
 +#endif
 +
++#else
++
+ void
+ _mesa_sha1_update(struct mesa_sha1 *ctx, const void *data, int size)
+ {
+    SHA1Update(ctx, data, size);
+ }
+ 
++#endif
++
  void
  _mesa_sha1_compute(const void *data, size_t size, unsigned char result[20])
  {
-@@ -82,3 +324,5 @@ _mesa_sha1_format(char *buf, const unsigned char *sha1)
- 
-    return buf;
- }
-+
-+#endif
 -- 
 2.11.0

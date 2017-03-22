@@ -1,7 +1,7 @@
-From fc83b99275f366a86c12169a81c6b68b1aecdc9d Mon Sep 17 00:00:00 2001
+From b074725bea77425e32fb2ca1c4e9a16c428bd9eb Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
 Date: Wed, 11 Jan 2017 08:17:57 +0100
-Subject: [PATCH 05/31] i965/fs: clamp exec_size when an instruction has a
+Subject: [PATCH 05/32] i965/fs: clamp exec_size when an instruction has a
  scalar DF source
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8

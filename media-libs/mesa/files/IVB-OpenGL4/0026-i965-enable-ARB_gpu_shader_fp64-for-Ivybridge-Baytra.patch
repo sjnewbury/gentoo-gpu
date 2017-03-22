@@ -1,7 +1,7 @@
-From 2ea49c25503772398148e9ea64f310a3245c0828 Mon Sep 17 00:00:00 2001
+From 9d46b68bf682a465e6bb8f487332612a2ab4da64 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
 Date: Fri, 26 Aug 2016 07:37:42 +0200
-Subject: [PATCH 25/31] i965: enable ARB_gpu_shader_fp64 for Ivybridge/Baytrail
+Subject: [PATCH 26/32] i965: enable ARB_gpu_shader_fp64 for Ivybridge/Baytrail
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit

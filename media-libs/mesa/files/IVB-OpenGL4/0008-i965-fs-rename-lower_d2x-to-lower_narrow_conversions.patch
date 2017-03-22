@@ -1,0 +1,75 @@
+From 7356d96ee170a7805aaba5069d84ceb8a0b208d6 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
+Date: Tue, 14 Mar 2017 08:17:36 +0100
+Subject: [PATCH 08/32] i965/fs: rename lower_d2x to lower_narrow_conversions
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Signed-off-by: Samuel Iglesias Gonsálvez <siglesias@igalia.com>
+---
+ src/intel/Makefile.sources                                              | 2 +-
+ src/intel/compiler/brw_fs.cpp                                           | 2 +-
+ src/intel/compiler/brw_fs.h                                             | 2 +-
+ .../{brw_fs_lower_d2x.cpp => brw_fs_lower_narrow_conversions.cpp}       | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
+ rename src/intel/compiler/{brw_fs_lower_d2x.cpp => brw_fs_lower_narrow_conversions.cpp} (99%)
+
+diff --git a/src/intel/Makefile.sources b/src/intel/Makefile.sources
+index 839ea47d752..8cbb05301d8 100644
+--- a/src/intel/Makefile.sources
++++ b/src/intel/Makefile.sources
+@@ -44,7 +44,7 @@ COMPILER_FILES = \
+ 	compiler/brw_fs.h \
+ 	compiler/brw_fs_live_variables.cpp \
+ 	compiler/brw_fs_live_variables.h \
+-	compiler/brw_fs_lower_d2x.cpp \
++	compiler/brw_fs_lower_narrow_conversions.cpp \
+ 	compiler/brw_fs_lower_pack.cpp \
+ 	compiler/brw_fs_nir.cpp \
+ 	compiler/brw_fs_reg_allocate.cpp \
+diff --git a/src/intel/compiler/brw_fs.cpp b/src/intel/compiler/brw_fs.cpp
+index 8612a83805d..61ac981842e 100644
+--- a/src/intel/compiler/brw_fs.cpp
++++ b/src/intel/compiler/brw_fs.cpp
+@@ -5740,7 +5740,7 @@ fs_visitor::optimize()
+       OPT(dead_code_eliminate);
+    }
+ 
+-   if (OPT(lower_d2x)) {
++   if (OPT(lower_narrow_conversions)) {
+       OPT(opt_copy_propagation);
+       OPT(dead_code_eliminate);
+       OPT(lower_simd_width);
+diff --git a/src/intel/compiler/brw_fs.h b/src/intel/compiler/brw_fs.h
+index f3d36848e54..416397fabcd 100644
+--- a/src/intel/compiler/brw_fs.h
++++ b/src/intel/compiler/brw_fs.h
+@@ -160,7 +160,7 @@ public:
+    void lower_uniform_pull_constant_loads();
+    bool lower_load_payload();
+    bool lower_pack();
+-   bool lower_d2x();
++   bool lower_narrow_conversions();
+    bool lower_logical_sends();
+    bool lower_integer_multiplication();
+    bool lower_minmax();
+diff --git a/src/intel/compiler/brw_fs_lower_d2x.cpp b/src/intel/compiler/brw_fs_lower_narrow_conversions.cpp
+similarity index 99%
+rename from src/intel/compiler/brw_fs_lower_d2x.cpp
+rename to src/intel/compiler/brw_fs_lower_narrow_conversions.cpp
+index fa25d313dcd..02a60b07eec 100644
+--- a/src/intel/compiler/brw_fs_lower_d2x.cpp
++++ b/src/intel/compiler/brw_fs_lower_narrow_conversions.cpp
+@@ -44,7 +44,7 @@ supports_type_conversion(fs_inst *inst) {
+ }
+ 
+ bool
+-fs_visitor::lower_d2x()
++fs_visitor::lower_narrow_conversions()
+ {
+    bool progress = false;
+ 
+-- 
+2.11.1
+

@@ -1,0 +1,54 @@
+From 29b9311a7b23f6114d83b74e6daea51357a5fb6c Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
+Date: Fri, 17 Mar 2017 11:55:49 +0100
+Subject: [PATCH 23/32] i965/vec4: don't do horizontal stride on some register
+ file types
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+horiz_offset() doesn't make sense to destination registers on some
+cases like null registers.
+
+Signed-off-by: Samuel Iglesias Gonsálvez <siglesias@igalia.com>
+---
+ src/intel/compiler/brw_ir_vec4.h | 23 ++++++++++++++++++++++-
+ 1 file changed, 22 insertions(+), 1 deletion(-)
+
+diff --git a/src/intel/compiler/brw_ir_vec4.h b/src/intel/compiler/brw_ir_vec4.h
+index 6130950c72f..06142deffc9 100644
+--- a/src/intel/compiler/brw_ir_vec4.h
++++ b/src/intel/compiler/brw_ir_vec4.h
+@@ -194,7 +194,28 @@ offset(dst_reg reg, unsigned width, unsigned delta)
+ static inline dst_reg
+ horiz_offset(dst_reg reg, unsigned delta)
+ {
+-   return byte_offset(reg, delta * type_sz(reg.type));
++   switch (reg.file) {
++   case BAD_FILE:
++   case UNIFORM:
++   case IMM:
++      /* These only have a single component that is implicitly splatted.  A
++       * horizontal offset should be a harmless no-op.
++       * XXX - Handle vector immediates correctly.
++       */
++      return reg;
++   case VGRF:
++   case MRF:
++   case ATTR:
++      return byte_offset(reg, delta * type_sz(reg.type));
++   case ARF:
++   case FIXED_GRF:
++      if (reg.is_null()) {
++         return reg;
++      } else {
++         return byte_offset(reg, delta * type_sz(reg.type));
++      }
++   }
++   unreachable("Invalid register file");
+ }
+ 
+ static inline dst_reg
+-- 
+2.11.1
+

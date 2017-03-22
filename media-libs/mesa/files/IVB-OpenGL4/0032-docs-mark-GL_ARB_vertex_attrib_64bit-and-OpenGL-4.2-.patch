@@ -1,30 +1,22 @@
-From 03431a8ae1e3065158c3c923de655cccc44b4fac Mon Sep 17 00:00:00 2001
+From 447d6fd9a7b9db44d54a13678da857de654c8178 Mon Sep 17 00:00:00 2001
 From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
 Date: Tue, 11 Oct 2016 15:28:59 +0000
-Subject: [PATCH 31/31] docs: mark GL_ARB_vertex_attrib_64bit and OpenGL 4.2 as
+Subject: [PATCH 32/32] docs: mark GL_ARB_vertex_attrib_64bit and OpenGL 4.2 as
  supported by i965/gen7+
 
 ---
- docs/features.txt | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ docs/features.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/docs/features.txt b/docs/features.txt
-index d34bef157c8..9e038c3ce3e 100644
+index d34bef157c8..5c22acfb17c 100644
 --- a/docs/features.txt
 +++ b/docs/features.txt
-@@ -136,17 +136,17 @@ GL 4.0, GLSL 4.00 --- all DONE: i965/gen7+, nvc0, r600, radeonsi
-   GL_ARB_transform_feedback3                            DONE (i965/gen7+, llvmpipe, softpipe, swr)
- 
- 
--GL 4.1, GLSL 4.10 --- all DONE: i965/hsw+, nvc0, r600, radeonsi
-+GL 4.1, GLSL 4.10 --- all DONE: i965/gen7+, nvc0, r600, radeonsi
- 
-   GL_ARB_ES2_compatibility                              DONE (i965, nv50, llvmpipe, softpipe, swr)
+@@ -142,11 +142,11 @@ GL 4.1, GLSL 4.10 --- all DONE: i965/hsw+, nvc0, r600, radeonsi
    GL_ARB_get_program_binary                             DONE (0 binary formats)
    GL_ARB_separate_shader_objects                        DONE (all drivers)
--  GL_ARB_shader_precision                               DONE (i965/hsw+, all drivers that support GLSL 4.10)
+   GL_ARB_shader_precision                               DONE (i965/hsw+, all drivers that support GLSL 4.10)
 -  GL_ARB_vertex_attrib_64bit                            DONE (i965/hsw+, llvmpipe, softpipe)
-+  GL_ARB_shader_precision                               DONE (all drivers that support GLSL 4.10)
 +  GL_ARB_vertex_attrib_64bit                            DONE (i965/gen7+, llvmpipe, softpipe)
    GL_ARB_viewport_array                                 DONE (i965, nv50, llvmpipe, softpipe)
  

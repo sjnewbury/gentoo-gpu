@@ -1,7 +1,7 @@
-From 1c00ba984dbf249a47cd19f976ba0ed0879a3099 Mon Sep 17 00:00:00 2001
+From 2a6fd075939130474e84b008f4c4a9b2793581c3 Mon Sep 17 00:00:00 2001
 From: Matt Turner <mattst88@gmail.com>
 Date: Fri, 20 Jan 2017 13:35:33 -0800
-Subject: [PATCH 24/31] i965: Use correct VertStride on align16 instructions.
+Subject: [PATCH 25/32] i965: Use correct VertStride on align16 instructions.
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit

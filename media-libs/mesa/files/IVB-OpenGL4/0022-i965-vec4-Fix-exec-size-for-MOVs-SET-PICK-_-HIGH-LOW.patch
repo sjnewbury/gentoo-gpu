@@ -1,7 +1,7 @@
-From cbf61fb0b3a16abefedac4600f45f596fbf37e7c Mon Sep 17 00:00:00 2001
+From 8a7702614e5970a40ea8b67506eff4776a123941 Mon Sep 17 00:00:00 2001
 From: Matt Turner <mattst88@gmail.com>
 Date: Fri, 20 Jan 2017 13:35:32 -0800
-Subject: [PATCH 23/31] i965/vec4: Fix exec size for MOVs
+Subject: [PATCH 22/32] i965/vec4: Fix exec size for MOVs
  {SET,PICK}_{HIGH,LOW}_32BIT.
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8

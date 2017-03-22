@@ -1,0 +1,54 @@
+From 66c98ccbb7724b215f3bca6eb0311c162b6accbb Mon Sep 17 00:00:00 2001
+From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
+Date: Tue, 11 Oct 2016 15:25:52 +0000
+Subject: [PATCH 31/32] i965: enable OpenGL 4.2 in Ivybridge
+
+---
+ src/mesa/drivers/dri/i965/intel_extensions.c |  2 +-
+ src/mesa/drivers/dri/i965/intel_screen.c     | 15 +++++++--------
+ 2 files changed, 8 insertions(+), 9 deletions(-)
+
+diff --git a/src/mesa/drivers/dri/i965/intel_extensions.c b/src/mesa/drivers/dri/i965/intel_extensions.c
+index fc974b98607..0133fa10068 100644
+--- a/src/mesa/drivers/dri/i965/intel_extensions.c
++++ b/src/mesa/drivers/dri/i965/intel_extensions.c
+@@ -139,7 +139,7 @@ intelInitExtensions(struct gl_context *ctx)
+    else if (brw->is_haswell && can_do_pipelined_register_writes(brw->screen))
+       ctx->Const.GLSLVersion = 450;
+    else if (brw->gen >= 7 && can_do_pipelined_register_writes(brw->screen))
+-      ctx->Const.GLSLVersion = 400;
++      ctx->Const.GLSLVersion = 420;
+    else if (brw->gen >= 6)
+       ctx->Const.GLSLVersion = 330;
+    else
+diff --git a/src/mesa/drivers/dri/i965/intel_screen.c b/src/mesa/drivers/dri/i965/intel_screen.c
+index 0f3e8275c81..c19834b2ae9 100644
+--- a/src/mesa/drivers/dri/i965/intel_screen.c
++++ b/src/mesa/drivers/dri/i965/intel_screen.c
+@@ -1623,16 +1623,15 @@ set_max_gl_versions(struct intel_screen *screen)
+       break;
+    case 7:
+       if (can_do_pipelined_register_writes(screen)) {
++         dri_screen->max_gl_core_version = 42;
+          if (screen->devinfo.is_haswell) {
+-            dri_screen->max_gl_core_version = 42;
+-            if (can_do_compute_dispatch(screen))
+-               dri_screen->max_gl_core_version = 43;
+-            if (can_do_mi_math_and_lrr(screen))
+-               dri_screen->max_gl_core_version = 45;
+-         } else
+-            dri_screen->max_gl_core_version = 40;
++            if (can_do_compute_dispatch(screen))
++               dri_screen->max_gl_core_version = 43;
++            if (can_do_mi_math_and_lrr(screen))
++               dri_screen->max_gl_core_version = 45;
++         }
+       } else
+-         dri_screen->max_gl_core_version = 33;
++         dri_screen->max_gl_core_version = 33;
+       dri_screen->max_gl_compat_version = 30;
+       dri_screen->max_gl_es1_version = 11;
+       dri_screen->max_gl_es2_version = screen->devinfo.is_haswell ? 31 : 30;
+-- 
+2.11.1
+

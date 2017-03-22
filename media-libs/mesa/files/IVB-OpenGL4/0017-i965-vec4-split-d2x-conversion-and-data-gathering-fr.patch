@@ -1,7 +1,7 @@
-From 43381781a7b45624a4c44fbbd6fbeb45cac92640 Mon Sep 17 00:00:00 2001
+From 645f8239977fa85a1a3c4eca172f8bc01e81bfae Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
 Date: Wed, 8 Mar 2017 09:27:49 +0100
-Subject: [PATCH 17/31] i965/vec4: split d2x conversion and data gathering from
+Subject: [PATCH 17/32] i965/vec4: split d2x conversion and data gathering from
  one opcode to two explicit ones
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
@@ -15,8 +15,6 @@ Until now, these two operations were done by VEC4_OPCODE_FROM_DOUBLE but
 now we split them explicitely in two different instructions:
 VEC4_OPCODE_FROM_DOUBLE just do the conversion and
 VEC4_OPCODE_PICK_LOW_32BIT will gather the data.
-
-Emitters of VEC4_OPCODE_FROM_DOUBLE opcode need to take this into account.
 
 Signed-off-by: Samuel Iglesias Gonsálvez <siglesias@igalia.com>
 ---
@@ -44,10 +42,10 @@ index 34bcd32c958..d0fd694901f 100644
           break;
        }
 diff --git a/src/intel/compiler/brw_vec4_nir.cpp b/src/intel/compiler/brw_vec4_nir.cpp
-index 4e88b795049..f10d1a914c1 100644
+index 23842653997..45d2c9f4a93 100644
 --- a/src/intel/compiler/brw_vec4_nir.cpp
 +++ b/src/intel/compiler/brw_vec4_nir.cpp
-@@ -1192,6 +1192,7 @@ vec4_visitor::emit_conversion_from_double(dst_reg dst, src_reg src,
+@@ -1191,6 +1191,7 @@ vec4_visitor::emit_conversion_from_double(dst_reg dst, src_reg src,
     emit(VEC4_OPCODE_FROM_DOUBLE, temp2, src_reg(temp))
        ->size_written = 2 * REG_SIZE;
  

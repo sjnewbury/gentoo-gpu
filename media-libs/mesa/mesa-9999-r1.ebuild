@@ -271,7 +271,7 @@ apply_mesa_patches() {
 	epatch "${FILESDIR}/${P}-fix-missing-openmp-include.patch"
 	epatch "${FILESDIR}"/IVB-OpenGL4/*
 	epatch "${FILESDIR}"/glthread/*
-	epatch "${FILESDIR}"/${P}-with-sha1.patch
+#	epatch "${FILESDIR}"/${P}-with-sha1.patch
 }
 
 src_prepare() {
@@ -298,7 +298,6 @@ glvnd_src_configure() {
 		--enable-dri \
 		--enable-glx \
 		--enable-shared-glapi \
-		$(use_with gcrypt sha1=libgcrypt) \
 		$(use_enable gles1) \
 		$(use_enable gles2) \
 		$(use_enable gbm) \
@@ -316,6 +315,8 @@ glvnd_src_configure() {
 #		--without-gallium-drivers \
 #		--disable-osmesa \
 #		--disable-gallium-osmesa \
+# FIXME
+#		$(use_with gcrypt sha1=libgcrypt) \
 	popd
 
 
@@ -446,7 +447,6 @@ multilib_src_configure() {
 		--enable-dri \
 		--enable-glx \
 		--enable-shared-glapi \
-		$(use_with gcrypt sha1=libgcrypt) \
 		$(use_enable !bindist texture-float) \
 		$(use_enable debug) \
 		$(use_enable dri3) \
@@ -468,6 +468,8 @@ multilib_src_configure() {
 }
 
 #		$(use_enable !pic asm) \
+# FIXME
+#		$(use_with gcrypt sha1=libgcrypt) \
 
 multilib_src_compile() {
 	default

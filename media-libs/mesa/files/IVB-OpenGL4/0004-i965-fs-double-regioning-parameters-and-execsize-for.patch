@@ -1,7 +1,7 @@
-From aa7e68714ba2c75f9238340f4844b2f73530debd Mon Sep 17 00:00:00 2001
+From a96e25a1e523c481db01e65889e0e37cd051a078 Mon Sep 17 00:00:00 2001
 From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
 Date: Mon, 18 Jul 2016 07:27:56 +0000
-Subject: [PATCH 04/31] i965/fs: double regioning parameters and execsize for
+Subject: [PATCH 04/32] i965/fs: double regioning parameters and execsize for
  DF in IVB/BYT
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8

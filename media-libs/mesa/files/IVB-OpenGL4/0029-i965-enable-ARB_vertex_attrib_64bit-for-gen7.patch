@@ -1,7 +1,7 @@
-From 784ddcb12721a5f8cb64a5fbe9b9a7b153a9386d Mon Sep 17 00:00:00 2001
+From 961ea438b93bf36759061160f3cf1cec28909733 Mon Sep 17 00:00:00 2001
 From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
 Date: Fri, 21 Oct 2016 16:57:25 +0200
-Subject: [PATCH 28/31] i965: enable ARB_vertex_attrib_64bit for gen7+
+Subject: [PATCH 29/32] i965: enable ARB_vertex_attrib_64bit for gen7+
 
 ---
  src/mesa/drivers/dri/i965/intel_extensions.c | 2 +-
