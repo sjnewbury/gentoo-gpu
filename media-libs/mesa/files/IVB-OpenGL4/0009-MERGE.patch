@@ -1,0 +1,137 @@
+From 4d77cd34055bbd5090edfb22b61823c5f3367f95 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
+Date: Thu, 23 Mar 2017 07:28:26 +0100
+Subject: [PATCH 09/37] MERGE
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+* Use foreach_block_and_inst to process added instructions
+* Simplify code
+* Add assert and improve comments
+* Remove redundant mov.
+* Remove comment.
+
+Signed-off-by: Samuel Iglesias Gonsálvez <siglesias@igalia.com>
+---
+ src/intel/compiler/brw_fs_lower_d2x.cpp | 92 ++++++++++++++-------------------
+ 1 file changed, 38 insertions(+), 54 deletions(-)
+
+diff --git a/src/intel/compiler/brw_fs_lower_d2x.cpp b/src/intel/compiler/brw_fs_lower_d2x.cpp
+index 514cd837d9a..727e45dfdd1 100644
+--- a/src/intel/compiler/brw_fs_lower_d2x.cpp
++++ b/src/intel/compiler/brw_fs_lower_d2x.cpp
+@@ -48,72 +48,56 @@ fs_visitor::lower_d2x()
+ {
+    bool progress = false;
+ 
+-   foreach_block_and_inst_safe(block, fs_inst, inst, cfg) {
+-      bool inst_support_conversion = supports_type_conversion(inst);
+-      bool supported_conversion =
+-         inst_support_conversion &&
+-         (get_exec_type_size(inst) != 8 ||
+-          type_sz(inst->dst.type) > 4 ||
+-          type_sz(inst->dst.type) >= get_exec_type_size(inst));
+-
+-      /* If the conversion is supported or there is no conversion then
+-       * do nothing.
+-       */
+-      if (supported_conversion ||
+-          (!inst_support_conversion && inst->dst.type == inst->src[0].type) ||
+-          inst->dst.file == BAD_FILE || inst->src[0].file == BAD_FILE)
+-         continue;
+-
+-      /* This pass only supports conversion to narrower or equal size types. */
+-      if (get_exec_type_size(inst) < type_sz(inst->dst.type))
+-          continue;
+-
++   foreach_block_and_inst(block, fs_inst, inst, cfg) {
+       assert(inst->saturate == false);
+ 
+       const fs_builder ibld(this, block, inst);
+       fs_reg dst = inst->dst;
+ 
+-      if (inst_support_conversion && !supported_conversion) {
+-         /* From the Broadwell PRM, 3D Media GPGPU, "Double Precision Float to
+-          * Single Precision Float":
+-          *
+-          *    The upper Dword of every Qword will be written with undefined
+-          *    value when converting DF to F.
+-          *
+-          * So we need to allocate a temporary that's two registers, and then do
+-          * a strided MOV to get the lower DWord of every Qword that has the
+-          * result.
+-          */
+-         fs_reg temp = ibld.vgrf(inst->src[0].type, 1);
+-         fs_reg strided_temp = subscript(temp, dst.type, 0);
++      if (supports_type_conversion(inst)) {
++          if (get_exec_type_size(inst) == 8 && type_sz(inst->dst.type) < 8) {
++             /* From the Broadwell PRM, 3D Media GPGPU, "Double Precision Float to
++              * Single Precision Float":
++              *
++              *    The upper Dword of every Qword will be written with undefined
++              *    value when converting DF to F.
++              *
++              * So we need to allocate a temporary that's two registers, and then do
++              * a strided MOV to get the lower DWord of every Qword that has the
++              * result.
++              */
++             fs_reg temp = ibld.vgrf(inst->src[0].type);
++             fs_reg strided_temp = subscript(temp, dst.type, 0);
+ 
+-         /* We clone the original instruction as we are going to modify it
+-          * and emit another one after it.
+-          */
+-         inst->dst = strided_temp;
+-         /* As it is an strided destination, we write n-times more being n the
+-          * size difference between source and destination types. Update
+-          * size_written with the new destination.
+-          */
+-         inst->size_written = inst->dst.component_size(inst->exec_size);
+-         ibld.at(block, inst->next).MOV(dst, strided_temp);
+-      } else {
+-         fs_reg temp0 = ibld.vgrf(inst->src[0].type, 1);
+-         fs_reg temp1 = ibld.vgrf(inst->src[0].type, 1);
+-         fs_reg strided_temp1 = subscript(temp1, dst.type, 0);
++             assert(inst->size_written == inst->dst.component_size(inst->exec_size));
++             inst->dst = strided_temp;
++             /* As it is an strided destination, we write n-times more being n the
++              * size ratio between source and destination types. Update
++              * size_written accordingly.
++              */
++             inst->size_written = inst->dst.component_size(inst->exec_size);
++             ibld.at(block, inst->next).MOV(dst, strided_temp);
+ 
++             progress = true;
++          }
++       } else {
++         fs_reg temp0 = ibld.vgrf(inst->src[0].type);
++
++         assert(inst->size_written == inst->dst.component_size(inst->exec_size));
+          inst->dst = temp0;
+          /* As it is an strided destination, we write n-times more being n the
+-          * size difference between source and destination types. Update
+-          * size_written with the new destination.
++          * size ratio between source and destination types. Update
++          * size_written accordingly.
+           */
+          inst->size_written = inst->dst.component_size(inst->exec_size);
+ 
+-         /* Now, do the conversion to original destination's type. */
+-         fs_inst *mov = ibld.at(block, inst->next).MOV(strided_temp1, temp0);
+-         ibld.at(block, mov->next).MOV(dst, strided_temp1);
+-      }
+-      progress = true;
++         /* Now, do the conversion to original destination's type. In next iteration,
++          * we will lower it if it is a d2f conversion.
++          */
++         ibld.at(block, inst->next).MOV(dst, temp0);
++
++         progress = true;
++       }
+    }
+ 
+    if (progress)
+-- 
+2.11.1
+

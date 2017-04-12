@@ -1,7 +1,7 @@
-From 29b9311a7b23f6114d83b74e6daea51357a5fb6c Mon Sep 17 00:00:00 2001
+From a9668a51279b440be0201e88a0fb056d8faabbcc Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
 Date: Fri, 17 Mar 2017 11:55:49 +0100
-Subject: [PATCH 23/32] i965/vec4: don't do horizontal stride on some register
+Subject: [PATCH 28/37] i965/vec4: don't do horizontal stride on some register
  file types
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8

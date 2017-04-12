@@ -1,7 +1,7 @@
-From 98a10b327eb1b7be8ff4908f4f3d172c65ae7972 Mon Sep 17 00:00:00 2001
+From f55f65c98660ef80677cff5f672192dca651f447 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
 Date: Wed, 8 Mar 2017 09:54:18 +0100
-Subject: [PATCH 19/32] i965/vec4: fix SIMD-width lowering for
+Subject: [PATCH 24/37] i965/vec4: fix SIMD-width lowering for
  VEC4_OPCODE_FROM_DOUBLE
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8

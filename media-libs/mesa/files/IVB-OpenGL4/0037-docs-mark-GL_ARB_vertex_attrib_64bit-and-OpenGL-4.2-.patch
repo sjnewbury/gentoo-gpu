@@ -1,7 +1,7 @@
-From 447d6fd9a7b9db44d54a13678da857de654c8178 Mon Sep 17 00:00:00 2001
+From 579e577f6932a8eea91d62ae3ebe1cbd8bc77351 Mon Sep 17 00:00:00 2001
 From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
 Date: Tue, 11 Oct 2016 15:28:59 +0000
-Subject: [PATCH 32/32] docs: mark GL_ARB_vertex_attrib_64bit and OpenGL 4.2 as
+Subject: [PATCH 37/37] docs: mark GL_ARB_vertex_attrib_64bit and OpenGL 4.2 as
  supported by i965/gen7+
 
 ---

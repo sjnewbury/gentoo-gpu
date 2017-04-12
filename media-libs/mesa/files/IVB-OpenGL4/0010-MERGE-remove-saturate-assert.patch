@@ -1,0 +1,29 @@
+From b8da096a03c206926899624490e892c39aab6341 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
+Date: Thu, 23 Mar 2017 08:20:18 +0100
+Subject: [PATCH 10/37] MERGE remove saturate assert
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Signed-off-by: Samuel Iglesias Gonsálvez <siglesias@igalia.com>
+---
+ src/intel/compiler/brw_fs_lower_d2x.cpp | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/src/intel/compiler/brw_fs_lower_d2x.cpp b/src/intel/compiler/brw_fs_lower_d2x.cpp
+index 727e45dfdd1..45e087caa05 100644
+--- a/src/intel/compiler/brw_fs_lower_d2x.cpp
++++ b/src/intel/compiler/brw_fs_lower_d2x.cpp
+@@ -49,8 +49,6 @@ fs_visitor::lower_d2x()
+    bool progress = false;
+ 
+    foreach_block_and_inst(block, fs_inst, inst, cfg) {
+-      assert(inst->saturate == false);
+-
+       const fs_builder ibld(this, block, inst);
+       fs_reg dst = inst->dst;
+ 
+-- 
+2.11.1
+

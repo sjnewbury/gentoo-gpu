@@ -1,7 +1,7 @@
-From 41711426119da7a32a39853115de29f02650708d Mon Sep 17 00:00:00 2001
+From b3ea30f325a109699e4b840ea5433f2c6129b8dc Mon Sep 17 00:00:00 2001
 From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
 Date: Fri, 23 Sep 2016 15:57:39 +0000
-Subject: [PATCH 20/32] i965/vec4: consider subregister offset in live
+Subject: [PATCH 25/37] i965/vec4: consider subregister offset in live
  variables
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
@@ -26,10 +26,10 @@ Signed-off-by: Samuel Iglesias Gonsálvez <siglesias@igalia.com>
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/src/intel/compiler/brw_vec4_live_variables.h b/src/intel/compiler/brw_vec4_live_variables.h
-index 8807c453743..04bdf8cc26f 100644
+index 2946b98aacc..92f79550fd4 100644
 --- a/src/intel/compiler/brw_vec4_live_variables.h
 +++ b/src/intel/compiler/brw_vec4_live_variables.h
-@@ -88,7 +88,7 @@ var_from_reg(const simple_allocator &alloc, const src_reg &reg,
+@@ -91,7 +91,7 @@ var_from_reg(const simple_allocator &alloc, const src_reg &reg,
     assert(reg.file == VGRF && reg.nr < alloc.count && c < 4);
     const unsigned csize = DIV_ROUND_UP(type_sz(reg.type), 4);
     unsigned result =
@@ -38,7 +38,7 @@ index 8807c453743..04bdf8cc26f 100644
        (BRW_GET_SWZ(reg.swizzle, c) + k / csize * 4) * csize + k % csize;
     /* Do not exceed the limit for this register */
     assert(result < 8 * (alloc.offsets[reg.nr] + alloc.sizes[reg.nr]));
-@@ -102,7 +102,7 @@ var_from_reg(const simple_allocator &alloc, const dst_reg &reg,
+@@ -105,7 +105,7 @@ var_from_reg(const simple_allocator &alloc, const dst_reg &reg,
     assert(reg.file == VGRF && reg.nr < alloc.count && c < 4);
     const unsigned csize = DIV_ROUND_UP(type_sz(reg.type), 4);
     unsigned result =

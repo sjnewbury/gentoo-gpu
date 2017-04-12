@@ -1,7 +1,7 @@
-From c43074aaf64be8aa04db21e3461baf871a42e33b Mon Sep 17 00:00:00 2001
+From 4f407d058e5965a141f9454fb44f8ca683cd2225 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
 Date: Fri, 17 Mar 2017 11:57:25 +0100
-Subject: [PATCH 24/32] i965/vec4/dce: improve track of partial flag register
+Subject: [PATCH 29/37] i965/vec4/dce: improve track of partial flag register
  writes
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8

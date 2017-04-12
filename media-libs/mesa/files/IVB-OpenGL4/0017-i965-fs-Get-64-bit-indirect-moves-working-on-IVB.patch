@@ -1,7 +1,7 @@
-From 03160ee79942f7921d0450e34e231910ea206180 Mon Sep 17 00:00:00 2001
+From 64904eed6911b08a24d13522845f5515c98d80a2 Mon Sep 17 00:00:00 2001
 From: Francisco Jerez <currojerez@riseup.net>
 Date: Thu, 9 Feb 2017 10:16:58 -0800
-Subject: [PATCH 12/32] i965/fs: Get 64-bit indirect moves working on IVB.
+Subject: [PATCH 17/37] i965/fs: Get 64-bit indirect moves working on IVB.
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit

@@ -1,7 +1,7 @@
-From cb08fce6f74db175b5b9924ed3f47b816e1afdd2 Mon Sep 17 00:00:00 2001
+From e890c181e10c01dd0b6fff4e9f2f57dd9fdfaf21 Mon Sep 17 00:00:00 2001
 From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
 Date: Wed, 3 Aug 2016 11:51:44 +0000
-Subject: [PATCH 10/32] i965/fs: fix lower SIMD width for IVB/BYT's
+Subject: [PATCH 15/37] i965/fs: fix lower SIMD width for IVB/BYT's
  MOV_INDIRECT
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
@@ -33,7 +33,7 @@ Reviewed-by: Francisco Jerez <currojerez@riseup.net>
  1 file changed, 14 insertions(+), 3 deletions(-)
 
 diff --git a/src/intel/compiler/brw_fs.cpp b/src/intel/compiler/brw_fs.cpp
-index 61ac981842e..b0e4e720121 100644
+index 00a68abe95a..4edad232baa 100644
 --- a/src/intel/compiler/brw_fs.cpp
 +++ b/src/intel/compiler/brw_fs.cpp
 @@ -4891,11 +4891,22 @@ get_lowered_simd_width(const struct gen_device_info *devinfo,

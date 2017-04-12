@@ -1,7 +1,7 @@
-From d0d7dced3bb9b67d994107a564e05dac9221384e Mon Sep 17 00:00:00 2001
+From d4fd54a9f7084db741c4d3fdb77f8dbcb1201250 Mon Sep 17 00:00:00 2001
 From: Iago Toral Quiroga <itoral@igalia.com>
 Date: Fri, 22 Jul 2016 13:36:25 +0200
-Subject: [PATCH 01/32] i965/disasm: also print nibctrl in IVB for execsize=8
+Subject: [PATCH 01/37] i965/disasm: also print nibctrl in IVB for execsize=8
 
 4-wide DF operations where NibCtrl applies require and execsize of 8
 in IvyBridge/BayTrail.

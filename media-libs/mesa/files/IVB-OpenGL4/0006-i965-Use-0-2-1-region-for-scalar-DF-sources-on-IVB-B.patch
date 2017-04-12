@@ -1,7 +1,7 @@
-From dd2a6a30c4234c1170c7a9f2867b08d7865409ca Mon Sep 17 00:00:00 2001
+From aa518483de75d94b8b2125b9c85275fbecf79038 Mon Sep 17 00:00:00 2001
 From: Matt Turner <mattst88@gmail.com>
 Date: Tue, 10 Jan 2017 19:33:22 -0800
-Subject: [PATCH 06/32] i965: Use <0,2,1> region for scalar DF sources on
+Subject: [PATCH 06/37] i965: Use <0,2,1> region for scalar DF sources on
  IVB/BYT.
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8

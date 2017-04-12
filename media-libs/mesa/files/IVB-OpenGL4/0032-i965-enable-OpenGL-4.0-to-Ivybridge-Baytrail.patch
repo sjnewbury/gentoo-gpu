@@ -1,7 +1,7 @@
-From 1a36adc70b81c81bf12b9c7036935d065ae56256 Mon Sep 17 00:00:00 2001
+From e4088e476bea929b41d239eb1a8f608fbf230477 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
 Date: Fri, 26 Aug 2016 07:39:04 +0200
-Subject: [PATCH 27/32] i965: enable OpenGL 4.0 to Ivybridge/Baytrail
+Subject: [PATCH 32/37] i965: enable OpenGL 4.0 to Ivybridge/Baytrail
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
@@ -9,9 +9,9 @@ Content-Transfer-Encoding: 8bit
 Signed-off-by: Samuel Iglesias Gonsálvez <siglesias@igalia.com>
 Reviewed-by: Francisco Jerez <currojerez@riseup.net>
 ---
- src/mesa/drivers/dri/i965/intel_extensions.c |  2 ++
- src/mesa/drivers/dri/i965/intel_screen.c     | 20 +++++++++++---------
- 2 files changed, 13 insertions(+), 9 deletions(-)
+ src/mesa/drivers/dri/i965/intel_extensions.c | 2 ++
+ src/mesa/drivers/dri/i965/intel_screen.c     | 9 ++++-----
+ 2 files changed, 6 insertions(+), 5 deletions(-)
 
 diff --git a/src/mesa/drivers/dri/i965/intel_extensions.c b/src/mesa/drivers/dri/i965/intel_extensions.c
 index c6323f96da0..467a0d3e842 100644
@@ -27,36 +27,26 @@ index c6323f96da0..467a0d3e842 100644
        ctx->Const.GLSLVersion = 330;
     else
 diff --git a/src/mesa/drivers/dri/i965/intel_screen.c b/src/mesa/drivers/dri/i965/intel_screen.c
-index a35cf69eede..0f3e8275c81 100644
+index c7f111d04af..0d3f46e6e81 100644
 --- a/src/mesa/drivers/dri/i965/intel_screen.c
 +++ b/src/mesa/drivers/dri/i965/intel_screen.c
-@@ -1622,15 +1622,17 @@ set_max_gl_versions(struct intel_screen *screen)
-       dri_screen->max_gl_es2_version = has_astc ? 32 : 31;
+@@ -1624,12 +1624,11 @@ set_max_gl_versions(struct intel_screen *screen)
        break;
     case 7:
--      dri_screen->max_gl_core_version = 33;
+       dri_screen->max_gl_core_version = 33;
 -      if (screen->devinfo.is_haswell &&
 -          can_do_pipelined_register_writes(screen)) {
 -         dri_screen->max_gl_core_version = 42;
 -         if (can_do_compute_dispatch(screen))
--            dri_screen->max_gl_core_version = 43;
--         if (can_do_mi_math_and_lrr(screen))
--            dri_screen->max_gl_core_version = 45;
--      }
 +      if (can_do_pipelined_register_writes(screen)) {
-+         if (screen->devinfo.is_haswell) {
-+            dri_screen->max_gl_core_version = 42;
-+            if (can_do_compute_dispatch(screen))
-+               dri_screen->max_gl_core_version = 43;
-+            if (can_do_mi_math_and_lrr(screen))
-+               dri_screen->max_gl_core_version = 45;
-+         } else
-+            dri_screen->max_gl_core_version = 40;
-+      } else
-+         dri_screen->max_gl_core_version = 33;
++         dri_screen->max_gl_core_version = screen->devinfo.is_haswell ? 42 : 40;
++         if (screen->devinfo.is_haswell && can_do_compute_dispatch(screen))
+             dri_screen->max_gl_core_version = 43;
+-         if (can_do_mi_math_and_lrr(screen))
++         if (screen->devinfo.is_haswell && can_do_mi_math_and_lrr(screen))
+             dri_screen->max_gl_core_version = 45;
+       }
        dri_screen->max_gl_compat_version = 30;
-       dri_screen->max_gl_es1_version = 11;
-       dri_screen->max_gl_es2_version = screen->devinfo.is_haswell ? 31 : 30;
 -- 
 2.11.1
 

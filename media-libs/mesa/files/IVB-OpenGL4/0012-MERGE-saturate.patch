@@ -1,0 +1,57 @@
+From 5e8c8d4c0fc40d56f70a8a43febb62a2893e2611 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
+Date: Thu, 23 Mar 2017 08:55:16 +0100
+Subject: [PATCH 12/37] MERGE saturate
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Signed-off-by: Samuel Iglesias Gonsálvez <siglesias@igalia.com>
+---
+ src/intel/compiler/brw_fs_lower_d2x.cpp | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/src/intel/compiler/brw_fs_lower_d2x.cpp b/src/intel/compiler/brw_fs_lower_d2x.cpp
+index e541abde0c6..3b24758e139 100644
+--- a/src/intel/compiler/brw_fs_lower_d2x.cpp
++++ b/src/intel/compiler/brw_fs_lower_d2x.cpp
+@@ -51,6 +51,7 @@ fs_visitor::lower_d2x()
+    foreach_block_and_inst(block, fs_inst, inst, cfg) {
+       const fs_builder ibld(this, block, inst);
+       fs_reg dst = inst->dst;
++      bool saturate = inst->saturate;
+ 
+       if (supports_type_conversion(inst)) {
+           if (get_exec_type_size(inst) == 8 && type_sz(inst->dst.type) < 8) {
+@@ -69,12 +70,13 @@ fs_visitor::lower_d2x()
+ 
+              assert(inst->size_written == inst->dst.component_size(inst->exec_size));
+              inst->dst = strided_temp;
++             inst->saturate = false;
+              /* As it is an strided destination, we write n-times more being n the
+               * size ratio between source and destination types. Update
+               * size_written accordingly.
+               */
+              inst->size_written = inst->dst.component_size(inst->exec_size);
+-             ibld.at(block, inst->next).MOV(dst, strided_temp);
++             ibld.at(block, inst->next).MOV(dst, strided_temp)->saturate = saturate;
+ 
+              progress = true;
+           }
+@@ -88,11 +90,11 @@ fs_visitor::lower_d2x()
+           * size_written accordingly.
+           */
+          inst->size_written = inst->dst.component_size(inst->exec_size);
+-
++         inst->saturate = false;
+          /* Now, do the conversion to original destination's type. In next iteration,
+           * we will lower it if it is a d2f conversion.
+           */
+-         ibld.at(block, inst->next).MOV(dst, temp0);
++         ibld.at(block, inst->next).MOV(dst, temp0)->saturate = saturate;
+ 
+          progress = true;
+        }
+-- 
+2.11.1
+

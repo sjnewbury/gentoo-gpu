@@ -1,7 +1,7 @@
-From fec6814ccaacfe7f814eda1adf22dffa29361ff6 Mon Sep 17 00:00:00 2001
+From 2782d5957a68658dbbc88be50f91f3050d5db12d Mon Sep 17 00:00:00 2001
 From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
 Date: Fri, 20 Jan 2017 08:50:50 +0100
-Subject: [PATCH 09/32] i965/fs: fix dst stride in IVB/BYT type conversions
+Subject: [PATCH 14/37] i965/fs: fix dst stride in IVB/BYT type conversions
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit

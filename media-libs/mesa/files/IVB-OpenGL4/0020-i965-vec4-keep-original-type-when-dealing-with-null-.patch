@@ -1,7 +1,7 @@
-From 69adb2a024ed6068ad5a1a8174d3ba71634ee472 Mon Sep 17 00:00:00 2001
+From 9b8a9f2b38b21a108bc3fa5858826867777b568c Mon Sep 17 00:00:00 2001
 From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
 Date: Mon, 12 Sep 2016 16:06:22 +0000
-Subject: [PATCH 15/32] i965/vec4: keep original type when dealing with null
+Subject: [PATCH 20/37] i965/vec4: keep original type when dealing with null
  registers
 
 Keep the original type when dealing with null registers. Especially

@@ -1,7 +1,7 @@
-From 4c1cb655e1115451185df8abd07aed9285f7a086 Mon Sep 17 00:00:00 2001
+From 196dffef44856a68e81815cd1ffe8b0eea57d990 Mon Sep 17 00:00:00 2001
 From: Matt Turner <mattst88@gmail.com>
 Date: Fri, 20 Jan 2017 13:35:31 -0800
-Subject: [PATCH 02/32] i965: Handle IVB DF differences in the validator.
+Subject: [PATCH 02/37] i965: Handle IVB DF differences in the validator.
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit

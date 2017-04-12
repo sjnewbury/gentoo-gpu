@@ -1,7 +1,7 @@
-From 250b939680522523c8b4bc4f9deb7a4a42f4c826 Mon Sep 17 00:00:00 2001
+From 5d1f1e6ea9a0184ce2ad7dcef3363bc8708032ed Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
 Date: Thu, 25 Aug 2016 16:05:24 +0200
-Subject: [PATCH 13/32] i965/fs: lower all non-force_writemask_all DF
+Subject: [PATCH 18/37] i965/fs: lower all non-force_writemask_all DF
  instructions to SIMD4 on IVB/BYT
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
@@ -18,7 +18,7 @@ Reviewed-by: Francisco Jerez <currojerez@riseup.net>
  1 file changed, 9 insertions(+)
 
 diff --git a/src/intel/compiler/brw_fs.cpp b/src/intel/compiler/brw_fs.cpp
-index b0e4e720121..e3600c517c7 100644
+index 4edad232baa..04f2303a2d4 100644
 --- a/src/intel/compiler/brw_fs.cpp
 +++ b/src/intel/compiler/brw_fs.cpp
 @@ -4598,6 +4598,15 @@ get_fpu_lowered_simd_width(const struct gen_device_info *devinfo,

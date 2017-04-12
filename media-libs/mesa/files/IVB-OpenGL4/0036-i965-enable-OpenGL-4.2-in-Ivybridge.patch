@@ -1,0 +1,39 @@
+From 7ad0ee750e839c61f196a8230ec351928920d2a3 Mon Sep 17 00:00:00 2001
+From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
+Date: Tue, 11 Oct 2016 15:25:52 +0000
+Subject: [PATCH 36/37] i965: enable OpenGL 4.2 in Ivybridge
+
+---
+ src/mesa/drivers/dri/i965/intel_extensions.c | 2 +-
+ src/mesa/drivers/dri/i965/intel_screen.c     | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/mesa/drivers/dri/i965/intel_extensions.c b/src/mesa/drivers/dri/i965/intel_extensions.c
+index fc974b98607..0133fa10068 100644
+--- a/src/mesa/drivers/dri/i965/intel_extensions.c
++++ b/src/mesa/drivers/dri/i965/intel_extensions.c
+@@ -139,7 +139,7 @@ intelInitExtensions(struct gl_context *ctx)
+    else if (brw->is_haswell && can_do_pipelined_register_writes(brw->screen))
+       ctx->Const.GLSLVersion = 450;
+    else if (brw->gen >= 7 && can_do_pipelined_register_writes(brw->screen))
+-      ctx->Const.GLSLVersion = 400;
++      ctx->Const.GLSLVersion = 420;
+    else if (brw->gen >= 6)
+       ctx->Const.GLSLVersion = 330;
+    else
+diff --git a/src/mesa/drivers/dri/i965/intel_screen.c b/src/mesa/drivers/dri/i965/intel_screen.c
+index 0d3f46e6e81..8187778e4d1 100644
+--- a/src/mesa/drivers/dri/i965/intel_screen.c
++++ b/src/mesa/drivers/dri/i965/intel_screen.c
+@@ -1625,7 +1625,7 @@ set_max_gl_versions(struct intel_screen *screen)
+    case 7:
+       dri_screen->max_gl_core_version = 33;
+       if (can_do_pipelined_register_writes(screen)) {
+-         dri_screen->max_gl_core_version = screen->devinfo.is_haswell ? 42 : 40;
++         dri_screen->max_gl_core_version = 42;
+          if (screen->devinfo.is_haswell && can_do_compute_dispatch(screen))
+             dri_screen->max_gl_core_version = 43;
+          if (screen->devinfo.is_haswell && can_do_mi_math_and_lrr(screen))
+-- 
+2.11.1
+

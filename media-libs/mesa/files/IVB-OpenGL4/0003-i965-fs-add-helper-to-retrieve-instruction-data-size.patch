@@ -1,7 +1,7 @@
-From 88f0050ec78a2f458f4266f4580163d0d3be7c34 Mon Sep 17 00:00:00 2001
+From 7c39951866be67b88ff5211e209c76b99be96753 Mon Sep 17 00:00:00 2001
 From: "Juan A. Suarez Romero" <jasuarez@igalia.com>
 Date: Mon, 18 Jul 2016 07:17:39 +0000
-Subject: [PATCH 03/32] i965/fs: add helper to retrieve instruction data size
+Subject: [PATCH 03/37] i965/fs: add helper to retrieve instruction data size
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
@@ -44,14 +44,13 @@ index c410efc29d6..b009ce41bc1 100644
  
        /* The hardware shifts exactly 8 channels per compressed half of the
 diff --git a/src/intel/compiler/brw_fs.h b/src/intel/compiler/brw_fs.h
-index 00861ce5dad..f3d36848e54 100644
+index 8a5525b786e..91de4756964 100644
 --- a/src/intel/compiler/brw_fs.h
 +++ b/src/intel/compiler/brw_fs.h
-@@ -498,3 +498,17 @@ fs_reg setup_imm_df(const brw::fs_builder &bld,
- 
+@@ -500,4 +500,18 @@ fs_reg setup_imm_df(const brw::fs_builder &bld,
  enum brw_barycentric_mode brw_barycentric_mode(enum glsl_interp_mode mode,
                                                 nir_intrinsic_op op);
-+
+ 
 +static inline unsigned
 +get_exec_type_size(const fs_inst *inst)
 +{
@@ -65,6 +64,8 @@ index 00861ce5dad..f3d36848e54 100644
 +
 +   return exec_type_size;
 +}
++
+ #endif /* BRW_FS_H */
 -- 
 2.11.1
 

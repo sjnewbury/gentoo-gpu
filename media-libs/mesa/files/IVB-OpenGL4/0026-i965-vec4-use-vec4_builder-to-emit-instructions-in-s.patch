@@ -1,7 +1,7 @@
-From 27e54035e185f5dbb09886ee1c4b9e08e0c0d1b7 Mon Sep 17 00:00:00 2001
+From 1ef5dcd5fb97e8b1ec2d67b72f4c0eff4d7fe4e4 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
 Date: Tue, 7 Mar 2017 10:29:53 +0100
-Subject: [PATCH 21/32] i965/vec4: use vec4_builder to emit instructions in
+Subject: [PATCH 26/37] i965/vec4: use vec4_builder to emit instructions in
  setup_imm_df()
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8

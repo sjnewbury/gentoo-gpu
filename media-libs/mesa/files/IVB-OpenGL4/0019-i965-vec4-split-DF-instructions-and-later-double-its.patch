@@ -1,7 +1,7 @@
-From 60e98bc33dffd20fd3f625e08cbc80dadabdb8c4 Mon Sep 17 00:00:00 2001
+From b66330e67caa0d0ddaa979734b2f055e6dbb3922 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Samuel=20Iglesias=20Gons=C3=A1lvez?= <siglesias@igalia.com>
 Date: Mon, 29 Aug 2016 10:10:30 +0200
-Subject: [PATCH 14/32] i965/vec4: split DF instructions and later double its
+Subject: [PATCH 19/37] i965/vec4: split DF instructions and later double its
  execsize in IVB/BYT
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
