@@ -1,0 +1,371 @@
+From beignet-bounces@lists.freedesktop.org Fri Mar 17 06:10:26 2017
+Return-Path: <beignet-bounces@lists.freedesktop.org>
+Received: from mail.snewbury.org.uk ([unix socket])
+	 by mail.snewbury.org.uk (Cyrus 2.5.10) with LMTPA;
+	 Fri, 17 Mar 2017 06:10:26 +0000
+X-Sieve: CMU Sieve 2.4
+X-Virus-Scanned: amavisd-new at snewbury.org.uk
+Authentication-Results: mail.snewbury.org.uk (amavisd-new); dkim=neutral
+	reason="invalid (public key: not available)" header.d=intel.com
+Received: from gabe.freedesktop.org (gabe.freedesktop.org
+ [131.252.210.177]) by mail.snewbury.org.uk (8.14.9/8.14.9) with ESMTP id
+ v2H6AMo7031490 (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384
+ bits=256 verify=NO) for <steve@snewbury.org.uk>; Fri, 17 Mar 2017 06:10:23
+ GMT
+Received: from gabe.freedesktop.org (localhost [127.0.0.1])
+	by gabe.freedesktop.org (Postfix) with ESMTP id 187FC6EC9D;
+	Fri, 17 Mar 2017 06:14:27 +0000 (UTC)
+X-Original-To: beignet@lists.freedesktop.org
+Delivered-To: beignet@lists.freedesktop.org
+Received: from mga09.intel.com (mga09.intel.com [134.134.136.24])
+ by gabe.freedesktop.org (Postfix) with ESMTPS id 09F5E6EC9E
+ for <beignet@lists.freedesktop.org>; Fri, 17 Mar 2017 06:14:26 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple;
+ d=intel.com; i=@intel.com; q=dns/txt; s=intel;
+ t=1489731265; x=1521267265;
+ h=from:to:cc:subject:date:message-id:in-reply-to: references;
+ bh=xwcZkjq9ZmcFlzrbvbUHNK62YhNCkChnfYodeo8glsA=;
+ b=aI3PKaTrcP7Ul9j2Sh3K5Oqfop285SlflKkyDwoPtIt1EpSubf/pGtTb
+ i80+mqNlP2BLCXfxhKsvbKIFm50iiQ==;
+Received: from orsmga004.jf.intel.com ([10.7.209.38])
+ by orsmga102.jf.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
+ 16 Mar 2017 23:14:25 -0700
+X-ExtLoop1: 1
+X-IronPort-AV: E=Sophos;i="5.36,175,1486454400"; d="scan'208";a="68271836"
+Received: from pxl-ivb.sh.intel.com ([10.239.160.26])
+ by orsmga004.jf.intel.com with ESMTP; 16 Mar 2017 23:14:24 -0700
+From: Xiuli Pan <xiuli.pan@intel.com>
+To: beignet@lists.freedesktop.org
+Date: Fri, 17 Mar 2017 14:15:58 +0800
+Message-Id: <1489731364-30284-2-git-send-email-xiuli.pan@intel.com>
+X-Mailer: git-send-email 2.7.4
+In-Reply-To: <1489731364-30284-1-git-send-email-xiuli.pan@intel.com>
+References: <1489731364-30284-1-git-send-email-xiuli.pan@intel.com>
+Cc: Pan Xiuli <xiuli.pan@intel.com>
+Subject: [Beignet] [PATCH 2/7] Backend: Remove old llvm support code.
+X-BeenThere: beignet@lists.freedesktop.org
+X-Mailman-Version: 2.1.18
+Precedence: list
+List-Id: An open source open CL implemenation for Intel platform
+ <beignet.lists.freedesktop.org>
+List-Unsubscribe: <https://lists.freedesktop.org/mailman/options/beignet>,
+ <mailto:beignet-request@lists.freedesktop.org?subject=unsubscribe>
+List-Archive: <https://lists.freedesktop.org/archives/beignet>
+List-Post: <mailto:beignet@lists.freedesktop.org>
+List-Help: <mailto:beignet-request@lists.freedesktop.org?subject=help>
+List-Subscribe: <https://lists.freedesktop.org/mailman/listinfo/beignet>,
+ <mailto:beignet-request@lists.freedesktop.org?subject=subscribe>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+Errors-To: beignet-bounces@lists.freedesktop.org
+Sender: "Beignet" <beignet-bounces@lists.freedesktop.org>
+X-Evolution-Source: 1389266509.29991.2@artifact
+Content-Transfer-Encoding: 8bit
+
+From: Pan Xiuli <xiuli.pan@intel.com>
+
+LLVM 3.3 or older is not supportted by Beignet now, and we need delete
+these codes.
+
+Signed-off-by: Pan Xiuli <xiuli.pan@intel.com>
+---
+ backend/src/backend/gen_program.cpp     |  6 ------
+ backend/src/backend/program.cpp         | 30 ------------------------------
+ backend/src/llvm/llvm_gen_backend.cpp   | 22 ----------------------
+ backend/src/llvm/llvm_printf_parser.cpp |  6 ------
+ backend/src/llvm/llvm_profiling.cpp     | 20 --------------------
+ backend/src/llvm/llvm_scalarize.cpp     |  6 ------
+ 6 files changed, 90 deletions(-)
+
+diff --git a/backend/src/backend/gen_program.cpp b/backend/src/backend/gen_program.cpp
+index 073ede6..376342b 100644
+--- a/backend/src/backend/gen_program.cpp
++++ b/backend/src/backend/gen_program.cpp
+@@ -24,15 +24,9 @@
+ 
+ #ifdef GBE_COMPILER_AVAILABLE
+ #include "llvm/Config/llvm-config.h"
+-#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR <= 2
+-#include "llvm/LLVMContext.h"
+-#include "llvm/Module.h"
+-#include "llvm/DataLayout.h"
+-#else
+ #include "llvm/IR/LLVMContext.h"
+ #include "llvm/IR/Module.h"
+ #include "llvm/IR/DataLayout.h"
+-#endif  /* LLVM_VERSION_MINOR <= 2 */
+ #include "llvm-c/Linker.h"
+ #include "llvm/Transforms/Utils/Cloning.h"
+ #include "llvm/Bitcode/ReaderWriter.h"
+diff --git a/backend/src/backend/program.cpp b/backend/src/backend/program.cpp
+index 8a4ad83..a8834f2 100644
+--- a/backend/src/backend/program.cpp
++++ b/backend/src/backend/program.cpp
+@@ -52,33 +52,16 @@
+ #include <mutex>
+ 
+ #ifdef GBE_COMPILER_AVAILABLE
+-/* Not defined for LLVM 3.0 */
+-#if !defined(LLVM_VERSION_MAJOR)
+-#define LLVM_VERSION_MAJOR 3
+-#endif /* !defined(LLVM_VERSION_MAJOR) */
+-
+-/* Not defined for LLVM 3.0 */
+-#if !defined(LLVM_VERSION_MINOR)
+-#define LLVM_VERSION_MINOR 0
+-#endif /* !defined(LLVM_VERSION_MINOR) */
+ 
+ #include <clang/CodeGen/CodeGenAction.h>
+ #include <clang/Frontend/CompilerInstance.h>
+ #include <clang/Frontend/CompilerInvocation.h>
+-#if LLVM_VERSION_MINOR <= 1
+-#include <clang/Frontend/DiagnosticOptions.h>
+-#else
+ #include <clang/Basic/DiagnosticOptions.h>
+-#endif  /* LLVM_VERSION_MINOR <= 1 */
+ #include <clang/Frontend/TextDiagnosticPrinter.h>
+ #include <clang/Basic/TargetInfo.h>
+ #include <clang/Basic/TargetOptions.h>
+ #include <llvm/ADT/IntrusiveRefCntPtr.h>
+-#if LLVM_VERSION_MINOR <= 2
+-#include <llvm/Module.h>
+-#else
+ #include <llvm/IR/Module.h>
+-#endif  /* LLVM_VERSION_MINOR <= 2 */
+ #include <llvm/Bitcode/ReaderWriter.h>
+ #include <llvm/Support/raw_ostream.h>
+ #endif
+@@ -686,10 +669,6 @@ namespace gbe {
+     args.push_back("-disable-llvm-optzns");
+     if(bFastMath)
+       args.push_back("-D __FAST_RELAXED_MATH__=1");
+-#if LLVM_VERSION_MINOR <= 2
+-    args.push_back("-triple");
+-    args.push_back("nvptx");
+-#else
+     args.push_back("-x");
+     args.push_back("cl");
+     args.push_back("-triple");
+@@ -698,7 +677,6 @@ namespace gbe {
+       args.push_back("-fblocks");
+     } else
+       args.push_back("spir");
+-#endif /* LLVM_VERSION_MINOR <= 2 */
+     args.push_back("stringInput.cl");
+     args.push_back("-ffp-contract=on");
+     if(OCL_DEBUGINFO) args.push_back("-g");
+@@ -791,11 +769,7 @@ namespace gbe {
+       std::string err;
+       llvm::raw_fd_ostream ostream (dumpLLVMFileName.c_str(),
+                                     err,
+-      #if LLVM_VERSION_MINOR == 3
+-                                    0
+-      #else
+                                     llvm::sys::fs::F_None
+-      #endif
+                                     );
+ 
+       if (err.empty()) {
+@@ -807,11 +781,7 @@ namespace gbe {
+       std::string err;
+       llvm::raw_fd_ostream ostream (dumpSPIRBinaryName.c_str(),
+                                     err,
+-      #if LLVM_VERSION_MINOR == 3
+-                                    0
+-      #else
+                                     llvm::sys::fs::F_None
+-      #endif
+                                     );
+       if (err.empty())
+         llvm::WriteBitcodeToFile(*out_module, ostream);
+diff --git a/backend/src/llvm/llvm_gen_backend.cpp b/backend/src/llvm/llvm_gen_backend.cpp
+index d7dabe3..6fa1ae0 100644
+--- a/backend/src/llvm/llvm_gen_backend.cpp
++++ b/backend/src/llvm/llvm_gen_backend.cpp
+@@ -746,9 +746,6 @@ namespace gbe
+     void visitVAArgInst(VAArgInst &I) {NOT_SUPPORTED;}
+     void visitSwitchInst(SwitchInst &I) {NOT_SUPPORTED;}
+     void visitInvokeInst(InvokeInst &I) {NOT_SUPPORTED;}
+-#if LLVM_VERSION_MINOR == 0
+-    void visitUnwindInst(UnwindInst &I) {NOT_SUPPORTED;}
+-#endif /* __LLVM_30__ */
+     void visitResumeInst(ResumeInst &I) {NOT_SUPPORTED;}
+     void visitInlineAsm(CallInst &I) {NOT_SUPPORTED;}
+     void visitIndirectBrInst(IndirectBrInst &I) {NOT_SUPPORTED;}
+@@ -1750,7 +1747,6 @@ namespace gbe
+   {
+     GBE_ASSERT(dyn_cast<ConstantExpr>(CPV) == NULL);
+ 
+-#if LLVM_VERSION_MINOR > 0
+     ConstantDataSequential *seq = dyn_cast<ConstantDataSequential>(CPV);
+ 
+     if (seq) {
+@@ -1773,7 +1769,6 @@ namespace gbe
+         GBE_ASSERTM(0, "Const data array never be half float\n");
+       }
+     } else
+-#endif /* LLVM_VERSION_MINOR > 0 */
+ 
+     if (dyn_cast<ConstantAggregateZero>(CPV)) {
+       Type* Ty = CPV->getType();
+@@ -2344,9 +2339,6 @@ namespace gbe
+       Function::arg_iterator I = F.arg_begin(), E = F.arg_end();
+ 
+       // Insert a new register for each function argument
+-#if LLVM_VERSION_MINOR <= 1
+-      const AttrListPtr &PAL = F.getAttributes();
+-#endif /* LLVM_VERSION_MINOR <= 1 */
+       for (; I != E; ++I, ++argID) {
+         uint32_t opID = argID;
+ #if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR < 9
+@@ -2436,11 +2428,7 @@ namespace gbe
+             continue;
+           Type *pointed = pointerType->getElementType();
+           // By value structure
+-#if LLVM_VERSION_MINOR <= 1
+-          if (PAL.paramHasAttr(argID+1, Attribute::ByVal)) {
+-#else
+           if (I->hasByValAttr()) {
+-#endif /* LLVM_VERSION_MINOR <= 1 */
+             const size_t structSize = getTypeByteSize(unit, pointed);
+             ctx.input(argName, ir::FunctionArgument::STRUCTURE, reg, llvmInfo, structSize, getAlignmentByte(unit, type), 0);
+           }
+@@ -3164,15 +3152,9 @@ namespace gbe
+   void GenWriter::emitFunction(Function &F)
+   {
+     switch (F.getCallingConv()) {
+-#if LLVM_VERSION_MINOR <= 2
+-      case CallingConv::PTX_Device: // we do not emit device function
+-        return;
+-      case CallingConv::PTX_Kernel:
+-#else
+       case CallingConv::C:
+       case CallingConv::Fast:
+       case CallingConv::SPIR_KERNEL:
+-#endif
+         break;
+       default:
+         GBE_ASSERTM(false, "Unsupported calling convention");
+@@ -3789,14 +3771,12 @@ namespace gbe
+           break;
+           case Intrinsic::stackrestore:
+           break;
+-#if LLVM_VERSION_MINOR >= 2
+           case Intrinsic::lifetime_start:
+           case Intrinsic::lifetime_end:
+           break;
+           case Intrinsic::fmuladd:
+             this->newRegister(&I);
+           break;
+-#endif /* LLVM_VERSION_MINOR >= 2 */
+           case Intrinsic::debugtrap:
+           case Intrinsic::trap:
+           case Intrinsic::dbg_value:
+@@ -4644,11 +4624,9 @@ namespace gbe
+             ctx.MOV(ir::getType(family), dst, src);
+           }
+           break;
+-#if LLVM_VERSION_MINOR >= 2
+           case Intrinsic::lifetime_start:
+           case Intrinsic::lifetime_end:
+           break;
+-#endif /* LLVM_VERSION_MINOR >= 2 */
+           case Intrinsic::debugtrap:
+           case Intrinsic::trap:
+           case Intrinsic::dbg_value:
+diff --git a/backend/src/llvm/llvm_printf_parser.cpp b/backend/src/llvm/llvm_printf_parser.cpp
+index 800f343..d64fc60 100644
+--- a/backend/src/llvm/llvm_printf_parser.cpp
++++ b/backend/src/llvm/llvm_printf_parser.cpp
+@@ -389,15 +389,9 @@ error:
+   {
+     bool hasPrintf = false;
+     switch (F.getCallingConv()) {
+-#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR <= 2
+-      case CallingConv::PTX_Device:
+-        return false;
+-      case CallingConv::PTX_Kernel:
+-#else
+       case CallingConv::C:
+       case CallingConv::Fast:
+       case CallingConv::SPIR_KERNEL:
+-#endif
+         break;
+       default:
+         GBE_ASSERTM(false, "Unsupported calling convention");
+diff --git a/backend/src/llvm/llvm_profiling.cpp b/backend/src/llvm/llvm_profiling.cpp
+index 96c95ee..734c69d 100644
+--- a/backend/src/llvm/llvm_profiling.cpp
++++ b/backend/src/llvm/llvm_profiling.cpp
+@@ -26,27 +26,13 @@
+ #include <stdlib.h>
+ 
+ #include "llvm/Config/llvm-config.h"
+-#if LLVM_VERSION_MINOR <= 2
+-#include "llvm/Function.h"
+-#include "llvm/InstrTypes.h"
+-#include "llvm/Instructions.h"
+-#include "llvm/IntrinsicInst.h"
+-#include "llvm/Module.h"
+-#else
+ #include "llvm/IR/Function.h"
+ #include "llvm/IR/InstrTypes.h"
+ #include "llvm/IR/Instructions.h"
+ #include "llvm/IR/IntrinsicInst.h"
+ #include "llvm/IR/Module.h"
+-#endif  /* LLVM_VERSION_MINOR <= 2 */
+ #include "llvm/Pass.h"
+-#if LLVM_VERSION_MINOR <= 1
+-#include "llvm/Support/IRBuilder.h"
+-#elif LLVM_VERSION_MINOR == 2
+-#include "llvm/IRBuilder.h"
+-#else
+ #include "llvm/IR/IRBuilder.h"
+-#endif /* LLVM_VERSION_MINOR <= 1 */
+ 
+ #if LLVM_VERSION_MINOR >= 5
+ #include "llvm/IR/CallSite.h"
+@@ -111,15 +97,9 @@ namespace gbe
+     int pointNum = 0;
+ 
+     switch (F.getCallingConv()) {
+-#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR <= 2
+-      case CallingConv::PTX_Device:
+-        return false;
+-      case CallingConv::PTX_Kernel:
+-#else
+       case CallingConv::C:
+       case CallingConv::Fast:
+       case CallingConv::SPIR_KERNEL:
+-#endif
+         break;
+       default:
+         GBE_ASSERTM(false, "Unsupported calling convention");
+diff --git a/backend/src/llvm/llvm_scalarize.cpp b/backend/src/llvm/llvm_scalarize.cpp
+index 6f46c9d..329e3a9 100644
+--- a/backend/src/llvm/llvm_scalarize.cpp
++++ b/backend/src/llvm/llvm_scalarize.cpp
+@@ -884,15 +884,9 @@ namespace gbe {
+   bool Scalarize::runOnFunction(Function& F)
+   {
+     switch (F.getCallingConv()) {
+-#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR <= 2
+-    case CallingConv::PTX_Device:
+-      return false;
+-    case CallingConv::PTX_Kernel:
+-#else
+     case CallingConv::C:
+     case CallingConv::Fast:
+     case CallingConv::SPIR_KERNEL:
+-#endif
+       break;
+     default:
+       GBE_ASSERTM(false, "Unsupported calling convention");
+-- 
+2.7.4
+
+_______________________________________________
+Beignet mailing list
+Beignet@lists.freedesktop.org
+https://lists.freedesktop.org/mailman/listinfo/beignet
+

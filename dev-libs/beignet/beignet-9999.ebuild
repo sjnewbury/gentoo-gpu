@@ -21,6 +21,7 @@ SLOT="0"
 if [[ "${PV}" == "9999" ]]; then
 	inherit git-r3
 	EGIT_REPO_URI="git://anongit.freedesktop.org/beignet"
+#	EGIT_BRANCH=newRT
 	KEYWORDS=""
 else
 	KEYWORDS="~amd64"
@@ -32,7 +33,6 @@ COMMON="${PYTHON_DEPS}
 	media-libs/mesa
 	sys-devel/clang
 	>=sys-devel/llvm-3.5
-	<sys-devel/llvm-3.10
 	x11-libs/libdrm[video_cards_intel]
 	x11-libs/libXext
 	x11-libs/libXfixes
@@ -51,6 +51,7 @@ PATCHES=(
 	"${FILESDIR}"/beignet-9999-libOpenCL.patch
 	"${FILESDIR}"/beignet-9999-llvm-libs-tr.patch
 	"${FILESDIR}"/beignet-9999-silence-dri2-failure-r2.patch
+	"${FILESDIR}"/llvm40/*
 )
 
 DOCS=(

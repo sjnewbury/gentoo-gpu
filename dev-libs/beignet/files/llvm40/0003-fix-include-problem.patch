@@ -1,0 +1,145 @@
+From beignet-bounces@lists.freedesktop.org Fri Mar 17 06:10:27 2017
+Return-Path: <beignet-bounces@lists.freedesktop.org>
+Received: from mail.snewbury.org.uk ([unix socket])
+	 by mail.snewbury.org.uk (Cyrus 2.5.10) with LMTPA;
+	 Fri, 17 Mar 2017 06:10:27 +0000
+X-Sieve: CMU Sieve 2.4
+X-Virus-Scanned: amavisd-new at snewbury.org.uk
+Authentication-Results: mail.snewbury.org.uk (amavisd-new); dkim=neutral
+	reason="invalid (public key: not available)" header.d=intel.com
+Received: from gabe.freedesktop.org (gabe.freedesktop.org
+ [131.252.210.177]) by mail.snewbury.org.uk (8.14.9/8.14.9) with ESMTP id
+ v2H6AOqu031492 (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384
+ bits=256 verify=NO) for <steve@snewbury.org.uk>; Fri, 17 Mar 2017 06:10:25
+ GMT
+Received: from gabe.freedesktop.org (localhost [127.0.0.1])
+	by gabe.freedesktop.org (Postfix) with ESMTP id 4C5126EC9F;
+	Fri, 17 Mar 2017 06:14:28 +0000 (UTC)
+X-Original-To: beignet@lists.freedesktop.org
+Delivered-To: beignet@lists.freedesktop.org
+Received: from mga09.intel.com (mga09.intel.com [134.134.136.24])
+ by gabe.freedesktop.org (Postfix) with ESMTPS id 9DA8D6EC9D
+ for <beignet@lists.freedesktop.org>; Fri, 17 Mar 2017 06:14:26 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple;
+ d=intel.com; i=@intel.com; q=dns/txt; s=intel;
+ t=1489731266; x=1521267266;
+ h=from:to:cc:subject:date:message-id:in-reply-to: references;
+ bh=GCehpfvOGIp9K0cSwJQUy3wCa/D+51JfV49u1X39prk=;
+ b=KNeMmG52k7NfSN/WviVlC19jLPzeoR9FA3LalpqsGYagf2a05pP9PAiz
+ 0ACsisCoOkQPzk7uCbhKkKG792+8tg==;
+Received: from orsmga004.jf.intel.com ([10.7.209.38])
+ by orsmga102.jf.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
+ 16 Mar 2017 23:14:26 -0700
+X-ExtLoop1: 1
+X-IronPort-AV: E=Sophos;i="5.36,175,1486454400"; d="scan'208";a="68271841"
+Received: from pxl-ivb.sh.intel.com ([10.239.160.26])
+ by orsmga004.jf.intel.com with ESMTP; 16 Mar 2017 23:14:25 -0700
+From: Xiuli Pan <xiuli.pan@intel.com>
+To: beignet@lists.freedesktop.org
+Date: Fri, 17 Mar 2017 14:15:59 +0800
+Message-Id: <1489731364-30284-3-git-send-email-xiuli.pan@intel.com>
+X-Mailer: git-send-email 2.7.4
+In-Reply-To: <1489731364-30284-1-git-send-email-xiuli.pan@intel.com>
+References: <1489731364-30284-1-git-send-email-xiuli.pan@intel.com>
+Cc: Pan Xiuli <xiuli.pan@intel.com>
+Subject: [Beignet] [PATCH 3/7] Backend: Fix an include file error problem
+X-BeenThere: beignet@lists.freedesktop.org
+X-Mailman-Version: 2.1.18
+Precedence: list
+List-Id: An open source open CL implemenation for Intel platform
+ <beignet.lists.freedesktop.org>
+List-Unsubscribe: <https://lists.freedesktop.org/mailman/options/beignet>,
+ <mailto:beignet-request@lists.freedesktop.org?subject=unsubscribe>
+List-Archive: <https://lists.freedesktop.org/archives/beignet>
+List-Post: <mailto:beignet@lists.freedesktop.org>
+List-Help: <mailto:beignet-request@lists.freedesktop.org?subject=help>
+List-Subscribe: <https://lists.freedesktop.org/mailman/listinfo/beignet>,
+ <mailto:beignet-request@lists.freedesktop.org?subject=subscribe>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+Errors-To: beignet-bounces@lists.freedesktop.org
+Sender: "Beignet" <beignet-bounces@lists.freedesktop.org>
+X-Evolution-Source: 1389266509.29991.2@artifact
+Content-Transfer-Encoding: 8bit
+
+From: Pan Xiuli <xiuli.pan@intel.com>
+
+We should not include any llvm header in ir unit, and we need add
+missing headers for proliling after deleting llvm headers.
+
+Signed-off-by: Pan Xiuli <xiuli.pan@intel.com>
+---
+ backend/src/ir/profiling.cpp            | 1 +
+ backend/src/ir/unit.hpp                 | 4 +---
+ backend/src/llvm/llvm_gen_backend.cpp   | 2 +-
+ backend/src/llvm/llvm_printf_parser.cpp | 2 +-
+ 4 files changed, 4 insertions(+), 5 deletions(-)
+
+diff --git a/backend/src/ir/profiling.cpp b/backend/src/ir/profiling.cpp
+index ac61e9b..3289e76 100644
+--- a/backend/src/ir/profiling.cpp
++++ b/backend/src/ir/profiling.cpp
+@@ -24,6 +24,7 @@
+ #include <stdlib.h>
+ #include "ir/profiling.hpp"
+ #include "src/cl_device_data.h"
++#include <inttypes.h>
+ 
+ namespace gbe
+ {
+diff --git a/backend/src/ir/unit.hpp b/backend/src/ir/unit.hpp
+index 46d7be7..d7a2a67 100644
+--- a/backend/src/ir/unit.hpp
++++ b/backend/src/ir/unit.hpp
+@@ -32,8 +32,6 @@
+ #include "sys/map.hpp"
+ #include <string.h>
+ 
+-#include "llvm/IR/Instructions.h"
+-
+ namespace gbe {
+ namespace ir {
+ 
+@@ -46,7 +44,7 @@ namespace ir {
+   public:
+     typedef map<std::string, Function*> FunctionSet;
+     /*! Moved from printf pass */
+-    map<llvm::CallInst*, PrintfSet::PrintfFmt*> printfs;
++    map<void *, PrintfSet::PrintfFmt*> printfs;
+     vector<std::string> blockFuncs;
+     /*! Create an empty unit */
+     Unit(PointerSize pointerSize = POINTER_32_BITS);
+diff --git a/backend/src/llvm/llvm_gen_backend.cpp b/backend/src/llvm/llvm_gen_backend.cpp
+index 6fa1ae0..8c04664 100644
+--- a/backend/src/llvm/llvm_gen_backend.cpp
++++ b/backend/src/llvm/llvm_gen_backend.cpp
+@@ -764,7 +764,7 @@ namespace gbe
+     void emitUnalignedDQLoadStore(ir::Register ptr, Value *llvmValues, ir::AddressSpace addrSpace, ir::Register bti, bool isLoad, bool dwAligned, bool fixedBTI);
+     void visitInstruction(Instruction &I) {NOT_SUPPORTED;}
+     ir::PrintfSet::PrintfFmt* getPrintfInfo(CallInst* inst) {
+-      if (unit.printfs.find(inst) == unit.printfs.end())
++      if (unit.printfs.find((void *)inst) == unit.printfs.end())
+         return NULL;
+       return unit.printfs[inst];
+     }
+diff --git a/backend/src/llvm/llvm_printf_parser.cpp b/backend/src/llvm/llvm_printf_parser.cpp
+index d64fc60..a1b1c2c 100644
+--- a/backend/src/llvm/llvm_printf_parser.cpp
++++ b/backend/src/llvm/llvm_printf_parser.cpp
+@@ -381,7 +381,7 @@ error:
+     }
+ 
+     GBE_ASSERT(unit.printfs.find(call) == unit.printfs.end());
+-    unit.printfs.insert(std::pair<llvm::CallInst*, PrintfSet::PrintfFmt*>(call, printf_fmt));
++    unit.printfs.insert(std::pair<void *, PrintfSet::PrintfFmt*>((void *)call, printf_fmt));
+     return true;
+   }
+ 
+-- 
+2.7.4
+
+_______________________________________________
+Beignet mailing list
+Beignet@lists.freedesktop.org
+https://lists.freedesktop.org/mailman/listinfo/beignet
+
