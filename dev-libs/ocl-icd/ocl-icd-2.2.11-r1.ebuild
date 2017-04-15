@@ -1,4 +1,4 @@
-# Copyright 1999-2015 Gentoo Foundation
+# Copyright 1999-2017 Gentoo Foundation
 # Distributed under the terms of the GNU General Public License v2
 # $Id$
 
@@ -10,7 +10,7 @@ inherit ruby-single multilib-minimal
 
 DESCRIPTION="Alternative to vendor specific OpenCL ICD loaders"
 HOMEPAGE="http://forge.imag.fr/projects/ocl-icd/"
-SRC_URI="https://forge.imag.fr/frs/download.php/716/${P}.tar.gz"
+SRC_URI="https://forge.imag.fr/frs/download.php/814/${P}.tar.gz"
 LICENSE="BSD-2"
 SLOT="0"
 KEYWORDS="~amd64 ~x86"
