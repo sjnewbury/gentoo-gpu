@@ -41,11 +41,12 @@ src_compile() {
 }
 
 src_install() {
-	sed -i -e "s#^PRIMUS_libGL=.*#PRIMUS_libGL='/usr/\$LIB/primus'#" primusrun
+	sed -i -e "s#^PRIMUS_libGL=.*#PRIMUS_libGL='/usr/\$LIB/opengl/primus/lib'#" primusrun
 	dobin primusrun
 	myinst() {
-		insinto /usr/$(get_libdir)/primus
+		insinto /usr/$(get_libdir)/opengl/primus/lib
 		doins "${S}"/$(get_libdir)/libGL.so.1
+		dosym libGL.so.1 /usr/$(get_libdir)/opengl/primus/lib/libGL.so
 	}
 	multilib_foreach_abi myinst
 }
