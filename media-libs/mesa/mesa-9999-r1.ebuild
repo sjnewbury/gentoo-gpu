@@ -51,8 +51,7 @@ done
 IUSE="${IUSE_VIDEO_CARDS}
 	bindist +classic d3d9 debug +dri3 +egl +gallium +gbm gles1 gles2 +llvm
 	+nptl opencl osmesa pax_kernel openmax pic selinux vaapi valgrind
-	vdpau wayland xvmc xa kernel_FreeBSD
-	glvnd vulkan gcrypt"
+	vdpau wayland xvmc xa kernel_FreeBSD glvnd vulkan gcrypt eselect-gl-bobwya"
 
 #  Not available at present unfortunately
 #	openvg? ( egl gallium )
@@ -98,6 +97,7 @@ RDEPEND="
 	classic? ( app-eselect/eselect-mesa )
 	gallium? ( app-eselect/eselect-mesa )
 	>=app-eselect/eselect-opengl-1.3.0
+	eselect-gl-bobwya? ( >=app-eselect/eselect-opengl-1.3.3-r1 )
 	kernel_linux? ( >=virtual/libudev-215:=[${MULTILIB_USEDEP}] )
 	>=dev-libs/expat-2.1.0-r3:=[${MULTILIB_USEDEP}]
 	gbm? ( >=virtual/libudev-215:=[${MULTILIB_USEDEP}] )
@@ -516,7 +516,32 @@ multilib_src_install() {
 	emake install DESTDIR="${D}"
 
 	if use classic || use gallium; then
-			ebegin "Moving DRI/Gallium drivers for dynamic switching"
+
+		# Move libGL and others from /usr/lib to /usr/lib/opengl/blah/lib
+		# because user can eselect desired GL provider.  "bobwya" has
+		# forked and improved the symlink management in a new
+		# version of eselect-opengl.  This was removed in portage with
+		# the behaviour of always using the mesa provider for the system
+		# libGL since that provides better build compatibility, but this
+		# can break other things like Bumblebee.  The main benefit was
+		# using predictable headers to this end Mesa GL headers are
+		# always used as system headers even in this case and not
+		# provided by other implementations.
+
+		if use eselect-gl-bobwya; then
+			ebegin "Moving libGL and friends for dynamic switching"
+				dodir /usr/$(get_libdir)/opengl/${OPENGL_DIR}/{lib,extensions,include}
+				local x
+				for x in "${ED}"/usr/$(get_libdir)/lib*GL*.{la,a,so*}; do
+					if [ -f ${x} -o -L ${x} ]; then
+						mv -f "${x}" "${ED}"/usr/$(get_libdir)/opengl/${OPENGL_DIR}/lib \
+							|| die "Failed to move ${x}"
+					fi
+				done
+			eend $?
+		fi
+
+		ebegin "Moving DRI/Gallium drivers for dynamic switching"
 			local gallium_drivers=( i915_dri.so i965_dri.so r300_dri.so r600_dri.so swrast_dri.so )
 			keepdir /usr/$(get_libdir)/dri
 			dodir /usr/$(get_libdir)/mesa
