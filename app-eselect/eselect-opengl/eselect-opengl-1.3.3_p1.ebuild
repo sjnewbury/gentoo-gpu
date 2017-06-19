@@ -16,7 +16,7 @@ GLXEXT="34"
 
 MIRROR="https://dev.gentoo.org/~mattst88/distfiles"
 SRC_URI=
-EGIT_COMMIT=f0e01622dcf7020071ed77a3d01870e2fd6b38d9
+EGIT_COMMIT=1add374a54da7cbbb0ec0c38b8d01555f05145c6
 EGIT_REPO_URI=git://github.com/sjnewbury/opengl.eselect
 #	${MIRROR}/${P}.tar.xz"
 
