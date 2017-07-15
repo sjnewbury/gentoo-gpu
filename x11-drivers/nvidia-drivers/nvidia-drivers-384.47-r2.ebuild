@@ -90,11 +90,11 @@ nvidia_drivers_versions_check() {
 		die "Unexpected \${DEFAULT_ABI} = ${DEFAULT_ABI}"
 	fi
 
-	if use kernel_linux && kernel_is ge 4 12; then
+	if use kernel_linux && kernel_is ge 4 13; then
 		ewarn "Gentoo supports kernels which are supported by NVIDIA"
 		ewarn "which are limited to the following kernels:"
-		ewarn "<sys-kernel/gentoo-sources-4.12"
-		ewarn "<sys-kernel/vanilla-sources-4.12"
+		ewarn "<sys-kernel/gentoo-sources-4.13"
+		ewarn "<sys-kernel/vanilla-sources-4.13"
 		ewarn ""
 		ewarn "You are free to utilize epatch_user to provide whatever"
 		ewarn "support you feel is appropriate, but will not receive"
@@ -357,11 +357,13 @@ src_install() {
 
 	if use X; then
 		doexe "${NV_OBJ}"/nvidia-xconfig
-
-		insinto /usr/share/vulkan/icd.d
-		doins nvidia_icd.json
-
 	fi
+
+	# Put in the full path to the Vulkan client library
+	sed -e "s|__NV_VK_ICD__|/usr/$(get_libdir)/libGLX_nvidia.so.0|" \
+		nvidia_icd.json.template > "${T}"/nvidia_icd.json || die
+	insinto /usr/share/vulkan/icd.d
+	doins "${T}"/nvidia_icd.json
 
 	if use kernel_linux; then
 		doexe "${NV_OBJ}"/nvidia-cuda-mps-control
@@ -515,10 +517,6 @@ src_install-libs() {
 			dosym "${x}" "${glvnd_ROOT}"/lib/"${x##*/}"
 		done
 
-
-		# Put in the full path to the Vulkan client library
-		sed -e "s|\(libGLX_nvidia\.so\.0\)|/usr/$(get_libdir)/\1|g" \
-			-i "${ED}"/usr/share/vulkan/icd.d/nvidia_icd.json || die
 
 		# do same for OpenCL client ICD - don't install NVIDIA
 		# ICD loader
