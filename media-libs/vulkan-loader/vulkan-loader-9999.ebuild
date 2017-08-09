@@ -66,6 +66,9 @@ multilib_src_install() {
 
 	if multilib_is_native_abi; then
 		use vulkaninfo && dobin demos/vulkaninfo
+
+		insinto /usr/lib/pkgconfig/
+		doins loader/vulkan.pc
 	fi
 }
 
