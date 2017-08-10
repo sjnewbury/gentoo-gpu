@@ -1,6 +1,5 @@
-# Copyright 1999-2016 Gentoo Foundation
+# Copyright 1999-2017 Gentoo Foundation
 # Distributed under the terms of the GNU General Public License v2
-# $Id$
 
 EAPI=6
 PYTHON_COMPAT=( python3_{4,5} )
@@ -30,7 +29,7 @@ DOCS=( README.md LICENSE.txt )
 REQUIRED_USE="vulkaninfo? ( Xlib xcb wayland )"
 
 DEPEND=">=dev-lang/python-3
-        dev-util/cmake:*
+	dev-util/cmake:*
 	dev-util/glslang:=
 	dev-util/SPIRV-Tools:=[${MULTILIB_USEDEP}]
 	${RDEPEND}"
@@ -67,6 +66,9 @@ multilib_src_install() {
 
 	if multilib_is_native_abi; then
 		use vulkaninfo && dobin demos/vulkaninfo
+
+		insinto /usr/lib/pkgconfig/
+		doins loader/vulkan.pc
 	fi
 }
 
