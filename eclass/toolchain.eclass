@@ -1,6 +1,5 @@
 # Copyright 1999-2016 Gentoo Foundation
 # Distributed under the terms of the GNU General Public License v2
-# $Id$
 
 # Maintainer: Toolchain Ninjas <toolchain@gentoo.org>
 
@@ -8,7 +7,7 @@ DESCRIPTION="The GNU Compiler Collection"
 HOMEPAGE="https://gcc.gnu.org/"
 RESTRICT="strip" # cross-compilers need controlled stripping
 
-inherit eutils fixheadtails flag-o-matic gnuconfig libtool multilib pax-utils toolchain-funcs versionator
+inherit eutils fixheadtails flag-o-matic gnuconfig libtool multilib pax-utils toolchain-funcs versionator prefix
 
 if [[ ${PV} == *_pre9999* ]] ; then
 	EGIT_REPO_URI="git://gcc.gnu.org/git/gcc.git"
@@ -93,7 +92,7 @@ fi
 
 export GCC_FILESDIR=${GCC_FILESDIR:-${FILESDIR}}
 
-PREFIX=${TOOLCHAIN_PREFIX:-/usr}
+PREFIX=${TOOLCHAIN_PREFIX:-${EPREFIX}/usr}
 
 if tc_version_is_at_least 3.4.0 ; then
 	LIBPATH=${TOOLCHAIN_LIBPATH:-${PREFIX}/lib/gcc/${CTARGET}/${GCC_CONFIG_VER}}
@@ -160,7 +159,7 @@ if [[ ${PN} != "kgcc64" && ${PN} != gcc-* ]] ; then
 	tc_version_is_at_least 4.8 && IUSE+=" graphite gold" IUSE_DEF+=( sanitize )
 	tc_version_is_at_least 4.9 && IUSE+=" cilk +vtv"
 	tc_version_is_at_least 5.0 && IUSE+=" jit mpx"
-	tc_version_is_at_least 6.0 && IUSE+=" pie ssp +pch"
+	tc_version_is_at_least 6.0 && IUSE+=" +pie +ssp +pch"
 	( [[ ${PN} != offload-* ]] && tc_version_is_at_least 7.0 ) && IUSE+=" offload-nvptx offload-mic"
 fi
 
@@ -185,6 +184,12 @@ if tc_version_is_at_least 4 ; then
 fi
 
 tc_version_is_at_least 4.5 && RDEPEND+=" >=dev-libs/mpc-0.8.1:0"
+
+if in_iuse objc-gc ; then
+	if tc_version_is_at_least 7 ; then
+		RDEPEND+=" objc-gc? ( >=dev-libs/boehm-gc-7.4.2 )"
+	fi
+fi
 
 if in_iuse graphite ; then
 	if tc_version_is_at_least 5.0 ; then
@@ -252,7 +257,8 @@ S=$(
 
 gentoo_urls() {
 	local devspace="HTTP~vapier/dist/URI HTTP~rhill/dist/URI
-	HTTP~zorry/patches/gcc/URI HTTP~blueness/dist/URI"
+	HTTP~zorry/patches/gcc/URI HTTP~blueness/dist/URI
+	HTTP~tamiko/distfiles/URI"
 	devspace=${devspace//HTTP/https:\/\/dev.gentoo.org\/}
 	echo mirror://gentoo/$1 ${devspace//URI/$1}
 }
@@ -332,7 +338,11 @@ get_gcc_src_uri() {
 	elif [[ -n ${SNAPSHOT} ]] ; then
 		GCC_SRC_URI="ftp://gcc.gnu.org/pub/gcc/snapshots/${SNAPSHOT}/gcc-${SNAPSHOT}.tar.bz2"
 	else
-		GCC_SRC_URI="mirror://gnu/gcc/gcc-${GCC_PV}/gcc-${GCC_RELEASE_VER}.tar.bz2"
+		if tc_version_is_between 5.5 6 || tc_version_is_between 6.4 7 || tc_version_is_at_least 7.2 ; then
+			GCC_SRC_URI="mirror://gnu/gcc/gcc-${GCC_PV}/gcc-${GCC_RELEASE_VER}.tar.xz"
+		else
+			GCC_SRC_URI="mirror://gnu/gcc/gcc-${GCC_PV}/gcc-${GCC_RELEASE_VER}.tar.bz2"
+		fi
 		# we want all branch updates to be against the main release
 		[[ -n ${BRANCH_UPDATE} ]] && \
 			GCC_SRC_URI+=" $(gentoo_urls gcc-${GCC_RELEASE_VER}-branch-update-${BRANCH_UPDATE}.patch.bz2)"
@@ -436,7 +446,11 @@ gcc_quick_unpack() {
 	elif [[ -n ${SNAPSHOT} ]] ; then
 		unpack gcc-${SNAPSHOT}.tar.bz2
 	elif [[ ${PV} != *9999* ]] ; then
-		unpack gcc-${GCC_RELEASE_VER}.tar.bz2
+		if tc_version_is_between 5.5 6 || tc_version_is_between 6.4 7 || tc_version_is_at_least 7.2 ; then
+			unpack gcc-${GCC_RELEASE_VER}.tar.xz
+		else
+			unpack gcc-${GCC_RELEASE_VER}.tar.bz2
+		fi
 		# We want branch updates to be against a release tarball
 		if [[ -n ${BRANCH_UPDATE} ]] ; then
 			pushd "${S}" > /dev/null
@@ -1024,10 +1038,10 @@ toolchain_src_configure() {
 			elif built_with_use --hidden --missing false ${CATEGORY}/${needed_libc} crosscompile_opts_headers-only ; then
 				confgcc+=(
 					"${confgcc_no_libc[@]}"
-					--with-sysroot=${PREFIX}/${CTARGET}
+					--with-sysroot="${PREFIX}"/${CTARGET}
 				)
 			else
-				confgcc+=( --with-sysroot=${PREFIX}/${CTARGET} )
+				confgcc+=( --with-sysroot="${PREFIX}"/${CTARGET} )
 			fi
 		fi
 
@@ -1341,7 +1355,7 @@ toolchain_src_configure() {
 	echo "${S}"/configure "${confgcc[@]}"
 	# Older gcc versions did not detect bash and re-exec itself, so force the
 	# use of bash.  Newer ones will auto-detect, but this is not harmeful.
-	CONFIG_SHELL="/bin/bash" \
+	CONFIG_SHELL="${EPREFIX}/bin/bash" \
 	bash "${S}"/configure "${confgcc[@]}" || die "failed to run configure"
 
 	# return to whatever directory we were in before
@@ -1487,6 +1501,8 @@ gcc_do_filter_flags() {
 	filter-flags -mno-rtm -mno-htm # 506202
 
 	filter-flags -fno-builtin-strcmp -fno-builtin-memcmp
+
+	filter-flags -fopenmp
 
 	if tc_version_is_between 3.2 3.4 ; then
 		# XXX: this is so outdated it's barely useful, but it don't hurt...
@@ -1780,11 +1796,11 @@ toolchain_src_install() {
 		if [[ -f ${CTARGET}-${x} ]] ; then
 			if ! is_crosscompile ; then
 				ln -sf ${CTARGET}-${x} ${x}
-				dosym ${BINPATH}/${CTARGET}-${x} \
+				dosym ${BINPATH#${EPREFIX}}/${CTARGET}-${x} \
 					/usr/bin/${x}-${GCC_CONFIG_VER}
 			fi
 			# Create versioned symlinks
-			dosym ${BINPATH}/${CTARGET}-${x} \
+			dosym ${BINPATH#${EPREFIX}}/${CTARGET}-${x} \
 				/usr/bin/${CTARGET}-${x}-${GCC_CONFIG_VER}
 		fi
 
@@ -1804,7 +1820,7 @@ toolchain_src_install() {
 	# Now do the fun stripping stuff
 	env RESTRICT="" CHOST=${CHOST} prepstrip "${D}${BINPATH}"
 	is_crosscompile && \
-		env RESTRICT="" CHOST=${CHOST} prepstrip "${D}/${HOSTLIBPATH}"
+		env RESTRICT="" CHOST=${CHOST} prepstrip "${D}${HOSTLIBPATH}"
 	[[ ${CTARGET} != nvptx-* ]] && env RESTRICT="" CHOST=${CTARGET} prepstrip "${D}${LIBPATH}"
 	# gcc used to install helper binaries in lib/ but then moved to libexec/
 	[[ -d ${D}${PREFIX}/libexec/gcc ]] && \
@@ -1812,7 +1828,7 @@ toolchain_src_install() {
 
 	cd "${S}"
 	if is_crosscompile; then
-		rm -rf "${D}"/usr/share/{man,info}
+		rm -rf "${ED}"/usr/share/{man,info}
 		rm -rf "${D}"${DATAPATH}/{man,info}
 		rm -rf "${D}"${DATAPATH/${CTARGET}/${CHOST}}/{man,info}
 		rm -rf "${D}"${PREFIX}/lib/gcc/${CHOST}/${GCC_CONFIG_VER}/include
@@ -1824,11 +1840,11 @@ toolchain_src_install() {
 			fi
 		fi
 		has noinfo ${FEATURES} \
-			&& rm -r "${D}/${DATAPATH}"/info \
-			|| prepinfo "${DATAPATH}"
+			&& rm -r "${D}${DATAPATH}"/info \
+			|| prepinfo "${DATAPATH#${EPREFIX}}"
 		has noman ${FEATURES} \
-			&& rm -r "${D}/${DATAPATH}"/man \
-			|| prepman "${DATAPATH}"
+			&& rm -r "${D}${DATAPATH}"/man \
+			|| prepman "${DATAPATH#${EPREFIX}}"
 	fi
 	# prune empty dirs left behind
 	find "${D}" -depth -type d -delete 2>/dev/null
@@ -1843,10 +1859,10 @@ toolchain_src_install() {
 	# Rather install the script, else portage with changing $FILESDIR
 	# between binary and source package borks things ....
 	if ! is_crosscompile ; then
-		insinto "${DATAPATH}"
-		newins "${GCC_FILESDIR}"/awk/fixlafiles.awk-no_gcc_la fixlafiles.awk || die
-		exeinto "${DATAPATH}"
-		doexe "${GCC_FILESDIR}"/fix_libtool_files.sh || die
+		insinto "${DATAPATH#${EPREFIX}}"
+		newins "$(prefixify_ro "${GCC_FILESDIR}"/awk/fixlafiles.awk-no_gcc_la)" fixlafiles.awk || die
+		exeinto "${DATAPATH#${EPREFIX}}"
+		doexe "$(prefixify_ro "${GCC_FILESDIR}"/fix_libtool_files.sh)" || die
 		doexe "${GCC_FILESDIR}"/c{89,99} || die
 	fi
 
@@ -1891,11 +1907,11 @@ toolchain_src_install() {
 	# Use gid of 0 because some stupid ports don't have
 	# the group 'root' set to gid 0.  Send to /dev/null
 	# for people who are testing as non-root.
-	chown -R root:0 "${D}"${LIBPATH} 2>/dev/null
+	chown -R root:0 "${D}${LIBPATH}" 2>/dev/null
 
 	# Move pretty-printers to gdb datadir to shut ldconfig up
 	local py gdbdir=/usr/share/gdb/auto-load${LIBPATH/\/lib\//\/$(get_libdir)\/}
-	pushd "${D}"${LIBPATH} >/dev/null
+	pushd "${D}${LIBPATH}" >/dev/null
 	for py in $(find . -name '*-gdb.py') ; do
 		local multidir=${py%/*}
 		insinto "${gdbdir}/${multidir}"
@@ -1933,8 +1949,8 @@ gcc_movelibs() {
 	# that you want to link against when building tools rather than building
 	# code to run on the target.
 	if tc_version_is_at_least 5 && is_crosscompile ; then
-		dodir "${HOSTLIBPATH}"
-		mv "${D}"/usr/$(get_libdir)/libcc1* "${D}${HOSTLIBPATH}" || die
+		dodir "${HOSTLIBPATH#${EPREFIX}}"
+		mv "${ED}"usr/$(get_libdir)/libcc1* "${D}${HOSTLIBPATH}" || die
 	fi
 
 	# Offload accelerators treat multilib differently
@@ -1949,16 +1965,16 @@ gcc_movelibs() {
 
 		local OS_MULTIDIR=$($(XGCC) ${multiarg} --print-multi-os-directory)
 		local MULTIDIR=$($(XGCC) ${multiarg} --print-multi-directory)
-		local TODIR=${D}${LIBPATH}/${MULTIDIR}
+		local TODIR="${D}${LIBPATH}"/${MULTIDIR}
 		local FROMDIR=
 
 		[[ -d ${TODIR} ]] || mkdir -p ${TODIR}
 
 		for FROMDIR in \
-			${LIBPATH}/${OS_MULTIDIR} \
-			${LIBPATH}/../${MULTIDIR} \
-			${PREFIX}/lib/${OS_MULTIDIR} \
-			${PREFIX}/${CTARGET}/lib/${OS_MULTIDIR}
+			"${LIBPATH}"/${OS_MULTIDIR} \
+			"${LIBPATH}"/../${MULTIDIR} \
+			"${PREFIX}"/lib/${OS_MULTIDIR} \
+			"${PREFIX}"/${CTARGET}/lib/${OS_MULTIDIR}
 		do
 			removedirs="${removedirs} ${FROMDIR}"
 			FROMDIR=${D}${FROMDIR}
@@ -2022,7 +2038,7 @@ create_gcc_env_entry() {
 	local gcc_envd_base="/etc/env.d/gcc/${CTARGET}-${GCC_CONFIG_VER}"
 
 	local gcc_specs_file
-	local gcc_envd_file="${D}${gcc_envd_base}"
+	local gcc_envd_file="${ED}${gcc_envd_base}"
 	if [[ -z $1 ]] ; then
 		# I'm leaving the following commented out to remind me that it
 		# was an insanely -bad- idea. Stuff broke. GCC_SPECS isnt unset
@@ -2086,7 +2102,7 @@ copy_minispecs_gcc_specs() {
 		create_gcc_env_entry hardenednossp
 	fi
 	create_gcc_env_entry vanilla
-	insinto ${LIBPATH}
+	insinto ${LIBPATH#${EPREFIX}}
 	doins "${WORKDIR}"/specs/*.specs || die "failed to install specs"
 	# Build system specs file which, if it exists, must be a complete set of
 	# specs as it completely and unconditionally overrides the builtin specs.
@@ -2101,27 +2117,27 @@ gcc_slot_java() {
 	local x
 
 	# Move Java headers to compiler-specific dir
-	for x in "${D}"${PREFIX}/include/gc*.h "${D}"${PREFIX}/include/j*.h ; do
-		[[ -f ${x} ]] && mv -f "${x}" "${D}"${LIBPATH}/include/
+	for x in "${D}${PREFIX}"/include/gc*.h "${D}${PREFIX}"/include/j*.h ; do
+		[[ -f ${x} ]] && mv -f "${x}" "${D}${LIBPATH}"/include/
 	done
 	for x in gcj gnu java javax org ; do
 		if [[ -d ${D}${PREFIX}/include/${x} ]] ; then
-			dodir /${LIBPATH}/include/${x}
-			mv -f "${D}"${PREFIX}/include/${x}/* "${D}"${LIBPATH}/include/${x}/
-			rm -rf "${D}"${PREFIX}/include/${x}
+			dodir /${LIBPATH#${EPREFIX}}/include/${x}
+			mv -f "${D}${PREFIX}"/include/${x}/* "${D}${LIBPATH}"/include/${x}/
+			rm -rf "${D}${PREFIX}"/include/${x}
 		fi
 	done
 
 	if [[ -d ${D}${PREFIX}/lib/security ]] || [[ -d ${D}${PREFIX}/$(get_libdir)/security ]] ; then
-		dodir /${LIBPATH}/security
-		mv -f "${D}"${PREFIX}/lib*/security/* "${D}"${LIBPATH}/security
-		rm -rf "${D}"${PREFIX}/lib*/security
+		dodir /${LIBPATH#${EPREFIX}}/security
+		mv -f "${D}${PREFIX}"/lib*/security/* "${D}${LIBPATH}"/security
+		rm -rf "${D}${PREFIX}"/lib*/security
 	fi
 
 	# Move random gcj files to compiler-specific directories
 	for x in libgcj.spec logging.properties ; do
 		x="${D}${PREFIX}/lib/${x}"
-		[[ -f ${x} ]] && mv -f "${x}" "${D}"${LIBPATH}/
+		[[ -f ${x} ]] && mv -f "${x}" "${D}${LIBPATH}"/
 	done
 
 	# Rename jar because it could clash with Kaffe's jar if this gcc is
@@ -2136,6 +2152,9 @@ gcc_slot_java() {
 
 toolchain_pkg_postinst() {
 	[[ ${PN} != offload-* ]] && do_gcc_config
+	if [[ ${ROOT} == / && -f ${EPREFIX}/usr/share/eselect/modules/compiler-shadow.eselect ]] ; then
+		eselect compiler-shadow update all
+	fi
 
 	if ! is_crosscompile ; then
 		echo
@@ -2148,16 +2167,17 @@ toolchain_pkg_postinst() {
 		echo
 
 		# Clean up old paths
-		rm -f "${ROOT}"/*/rcscripts/awk/fixlafiles.awk "${ROOT}"/sbin/fix_libtool_files.sh
-		rmdir "${ROOT}"/*/rcscripts{/awk,} 2>/dev/null
+		rm -f "${EROOT}"*/rcscripts/awk/fixlafiles.awk "${EROOT}"sbin/fix_libtool_files.sh
+		rmdir "${EROOT}"*/rcscripts{/awk,} 2>/dev/null
 
-		mkdir -p "${ROOT}"/usr/{share/gcc-data,sbin,bin}
-		cp "${ROOT}/${DATAPATH}"/fixlafiles.awk "${ROOT}"/usr/share/gcc-data/ || die
-		cp "${ROOT}/${DATAPATH}"/fix_libtool_files.sh "${ROOT}"/usr/sbin/ || die
+		mkdir -p "${EROOT}"usr/{share/gcc-data,sbin,bin}
+		# DATAPATH has EPREFIX already, use ROOT with it
+		cp "${ROOT}${DATAPATH}"/fixlafiles.awk "${EROOT}"usr/share/gcc-data/ || die
+		cp "${ROOT}${DATAPATH}"/fix_libtool_files.sh "${EROOT}"usr/sbin/ || die
 
 		# Since these aren't critical files and portage sucks with
 		# handling of binpkgs, don't require these to be found
-		cp "${ROOT}/${DATAPATH}"/c{89,99} "${ROOT}"/usr/bin/ 2>/dev/null
+		cp "${ROOT}${DATAPATH}"/c{89,99} "${EROOT}"usr/bin/ 2>/dev/null
 	fi
 
 	if use regression-test ; then
@@ -2173,6 +2193,10 @@ toolchain_pkg_postinst() {
 }
 
 toolchain_pkg_postrm() {
+	if [[ ${ROOT} == / && -f ${EPREFIX}/usr/share/eselect/modules/compiler-shadow.eselect ]] ; then
+		eselect compiler-shadow clean all
+	fi
+
 	# to make our lives easier (and saner), we do the fix_libtool stuff here.
 	# rather than checking SLOT's and trying in upgrade paths, we just see if
 	# the common libstdc++.la exists in the ${LIBPATH} of the gcc that we are
@@ -2180,10 +2204,10 @@ toolchain_pkg_postrm() {
 
 	# clean up the cruft left behind by cross-compilers
 	if is_crosscompile ; then
-		if [[ -z $(ls "${ROOT}"/etc/env.d/gcc/${CTARGET}* 2>/dev/null) ]] ; then
-			rm -f "${ROOT}"/etc/env.d/gcc/config-${CTARGET}
-			rm -f "${ROOT}"/etc/env.d/??gcc-${CTARGET}
-			rm -f "${ROOT}"/usr/bin/${CTARGET}-{gcc,{g,c}++}{,32,64}
+		if [[ -z $(ls "${EROOT}"etc/env.d/gcc/${CTARGET}* 2>/dev/null) ]] ; then
+			rm -f "${EROOT}"etc/env.d/gcc/config-${CTARGET}
+			rm -f "${EROOT}"etc/env.d/??gcc-${CTARGET}
+			rm -f "${EROOT}"usr/bin/${CTARGET}-{gcc,{g,c}++}{,32,64}
 		fi
 		return 0
 	fi
@@ -2196,10 +2220,10 @@ toolchain_pkg_postrm() {
 		do_gcc_config
 
 		einfo "Running 'fix_libtool_files.sh ${GCC_RELEASE_VER}'"
-		/usr/sbin/fix_libtool_files.sh ${GCC_RELEASE_VER}
+		fix_libtool_files.sh ${GCC_RELEASE_VER}
 		if [[ -n ${BRANCH_UPDATE} ]] ; then
 			einfo "Running 'fix_libtool_files.sh ${GCC_RELEASE_VER}-${BRANCH_UPDATE}'"
-			/usr/sbin/fix_libtool_files.sh ${GCC_RELEASE_VER}-${BRANCH_UPDATE}
+			fix_libtool_files.sh ${GCC_RELEASE_VER}-${BRANCH_UPDATE}
 		fi
 	fi
 
@@ -2208,13 +2232,13 @@ toolchain_pkg_postrm() {
 
 do_gcc_config() {
 	if ! should_we_gcc_config ; then
-		env -i ROOT="${ROOT}" gcc-config --use-old --force
+		gcc-config --use-old --force
 		return 0
 	fi
 
 	local current_gcc_config target
 
-	current_gcc_config=$(env -i ROOT="${ROOT}" gcc-config -c ${CTARGET} 2>/dev/null)
+	current_gcc_config=$(gcc-config -c ${CTARGET} 2>/dev/null)
 	if [[ -n ${current_gcc_config} ]] ; then
 		local current_specs use_specs
 		# figure out which specs-specific config is active
@@ -2248,12 +2272,12 @@ should_we_gcc_config() {
 	# if the current config is invalid, we definitely want a new one
 	# Note: due to bash quirkiness, the following must not be 1 line
 	local curr_config
-	curr_config=$(env -i ROOT="${ROOT}" gcc-config -c ${CTARGET} 2>&1) || return 0
+	curr_config=$(gcc-config -c ${CTARGET} 2>&1) || return 0
 
 	# if the previously selected config has the same major.minor (branch) as
 	# the version we are installing, then it will probably be uninstalled
 	# for being in the same SLOT, make sure we run gcc-config.
-	local curr_config_ver=$(env -i ROOT="${ROOT}" gcc-config -S ${curr_config} | awk '{print $2}')
+	local curr_config_ver=$(gcc-config -S ${curr_config} | awk '{print $2}')
 
 	local curr_branch_ver=$(get_version_component_range 1-2 ${curr_config_ver})
 
