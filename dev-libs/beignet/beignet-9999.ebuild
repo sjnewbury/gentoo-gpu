@@ -12,7 +12,7 @@ inherit python-any-r1 cmake-multilib flag-o-matic toolchain-funcs
 DESCRIPTION="OpenCL implementation for Intel GPUs"
 HOMEPAGE="https://01.org/beignet"
 
-IUSE="beignet-generic"
+IUSE="beignet-generic opencl20"
 # beignet-egl build requires mesa sources
 
 LICENSE="LGPL-2.1+"
@@ -100,6 +100,12 @@ multilib_src_configure() {
 	local mycmakeargs=(
 		-DBEIGNET_INSTALL_DIR="${VENDOR_DIR}"
 	)
+
+	if use opencl20; then
+		local mycmakeargs+=(
+			-DENABLE_OPENCL_20=0
+		)
+	fi
 
 	if ! use beignet-generic; then
 		mycmakeargs+=(
