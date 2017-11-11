@@ -25,7 +25,15 @@ index 53e29d87ef2..570725da55d 100644
  #include "main/points.h"
  #include "main/version.h"
  #include "main/vtxfmt.h"
-@@ -1298,6 +1299,13 @@ intelMakeCurrent(__DRIcontext * driContextPriv,
+@@ -1226,6 +1226,7 @@
+                  __DRIdrawable * driDrawPriv,
+                  __DRIdrawable * driReadPriv)
+ {
++   GET_CURRENT_CONTEXT(curCtx);
+    struct brw_context *brw;
+ 
+    if (driContextPriv)
+@@ -1225,6 +1227,13 @@
     else
        brw = NULL;
  
@@ -36,9 +44,9 @@ index 53e29d87ef2..570725da55d 100644
 +   if (curCtx)
 +      _mesa_glthread_finish(curCtx);
 +
-    /* According to the glXMakeCurrent() man page: "Pending commands to
-     * the previous context, if any, are flushed before it is released."
-     * But only flush if we're actually changing contexts.
+    if (driContextPriv) {
+       struct gl_context *ctx = &brw->ctx;
+       struct gl_framebuffer *fb, *readFb;
 diff --git a/src/mesa/drivers/dri/i965/intel_screen.c b/src/mesa/drivers/dri/i965/intel_screen.c
 index bb7a4a734ed..e7055e02e2d 100644
 --- a/src/mesa/drivers/dri/i965/intel_screen.c
