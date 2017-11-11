@@ -1,25 +1,26 @@
-# Copyright 1999-2016 Gentoo Foundation
+# Copyright 1999-2017 Gentoo Foundation
 # Distributed under the terms of the GNU General Public License v2
-# $Id$
 
 EAPI=6
 
-inherit eutils multilib-minimal
+inherit autotools eutils multilib-minimal git-r3
 
-MY_PN="gstreamer-vaapi"
+#MY_PN="gstreamer-vaapi"
 DESCRIPTION="Hardware accelerated video decoding through VA-API plugin for GStreamer"
 HOMEPAGE="https://cgit.freedesktop.org/gstreamer/gstreamer-vaapi"
-SRC_URI="https://gstreamer.freedesktop.org/src/${MY_PN}/${MY_PN}-${PV}.tar.xz"
+#SRC_URI="https://gstreamer.freedesktop.org/src/${MY_PN}/${MY_PN}-${PV}.tar.xz"
+EGIT_REPO_URI=https://github.com/GStreamer/gstreamer-vaapi.git
+EGIT_BRANCH=1.12
 
 LICENSE="LGPL-2.1"
 SLOT="1.0"
-KEYWORDS="amd64 x86"
+KEYWORDS="~amd64 ~arm64 ~x86"
 
 IUSE="+drm egl opengl wayland +X"
 REQUIRED_USE="|| ( drm opengl wayland X )"
 
 RDEPEND="
-	>=dev-libs/glib-2.34.3:2[${MULTILIB_USEDEP}]
+	>=dev-libs/glib-2.40:2[${MULTILIB_USEDEP}]
 	>=media-libs/gstreamer-${PV}:${SLOT}[${MULTILIB_USEDEP}]
 	>=media-libs/gst-plugins-base-${PV}:${SLOT}[${MULTILIB_USEDEP}]
 	egl? (
@@ -46,7 +47,12 @@ DEPEND="${RDEPEND}
 	>=virtual/pkgconfig-0-r1[${MULTILIB_USEDEP}]
 "
 
-S="${WORKDIR}/${MY_PN}-${PV}"
+S="${WORKDIR}/${P}"
+
+src_prepare() {
+	eautoreconf
+	default
+}
 
 multilib_src_configure() {
 	ECONF_SOURCE=${S} \
