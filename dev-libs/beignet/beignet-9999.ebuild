@@ -101,7 +101,7 @@ multilib_src_configure() {
 		-DBEIGNET_INSTALL_DIR="${VENDOR_DIR}"
 	)
 
-	if use opencl20; then
+	if ! use opencl20; then
 		local mycmakeargs+=(
 			-DENABLE_OPENCL_20=0
 		)
