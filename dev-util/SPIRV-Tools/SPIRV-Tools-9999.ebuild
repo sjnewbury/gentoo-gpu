@@ -32,8 +32,6 @@ if [[ "${PV}" != 9999* ]]; then
 	S="${WORKDIR}/${PN}-spirv-${MY_PV}-rev${MY_REV:1}"
 fi
 
-PATCHES=( "${FILESDIR}/fix-multilib-${PV}.patch" )
-
 if [[ "${PV}" == 9999* ]]; then
 	src_unpack() {
 		git-r3_src_unpack
