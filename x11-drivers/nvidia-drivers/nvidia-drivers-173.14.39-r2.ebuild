@@ -27,6 +27,7 @@ EMULTILIB_PKG="true"
 COMMON="
 	>=app-eselect/eselect-opengl-1.0.9
 	kernel_linux? ( >=sys-libs/glibc-2.6.1 )
+	sys-devel/prelink
 "
 DEPEND="
 	${COMMON}

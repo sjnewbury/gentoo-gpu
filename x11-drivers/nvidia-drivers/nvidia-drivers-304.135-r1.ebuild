@@ -32,6 +32,7 @@ EMULTILIB_PKG="true"
 COMMON="
 	app-eselect/eselect-opencl
 	kernel_linux? ( >=sys-libs/glibc-2.6.1 )
+	sys-devel/prelink
 	tools? (
 		dev-libs/atk[${MULTILIB_USEDEP}]
 		dev-libs/glib:2[${MULTILIB_USEDEP}]

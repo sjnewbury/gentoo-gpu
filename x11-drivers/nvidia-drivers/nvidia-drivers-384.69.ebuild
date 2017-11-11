@@ -40,6 +40,7 @@ REQUIRED_USE="
 COMMON="
 	app-eselect/eselect-opencl
 	kernel_linux? ( >=sys-libs/glibc-2.6.1 )
+	sys-devel/prelink
 	tools? (
 		dev-libs/atk
 		dev-libs/glib:2
