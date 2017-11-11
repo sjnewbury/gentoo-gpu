@@ -220,7 +220,7 @@ src_compile() {
 		emake -C "${S}"/nvidia-settings-${PV}/src \
 			CC="$(tc-getCC)" \
 			GTK3_AVAILABLE=$(usex gtk3 1 0) \
-			LD="$(tc-getCC)" \
+			LD="$(tc-getLD)" \
 			LIBDIR="$(get_libdir)" \
 			NVML_ENABLED=0 \
 			NV_USE_BUNDLED_LIBJANSSON=0 \
@@ -482,7 +482,7 @@ src_install-libs() {
 		if use wayland && has_multilib_profile && [[ ${ABI} == "amd64" ]];
 		then
 			NV_GLX_LIBRARIES+=(
-				"libnvidia-egl-wayland.so.1.0.1"
+				"libnvidia-egl-wayland.so.1.0.2"
 			)
 		fi
 
