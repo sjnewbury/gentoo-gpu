@@ -17,6 +17,8 @@ KEYWORDS="~amd64 ~x86"
 
 IUSE=""
 
+PATCHES=("${FILESDIR}/${P}-static-inline.patch")
+
 DEPEND="${RUBY_DEPS}"
 
 RDEPEND="app-eselect/eselect-opencl"
