@@ -18,7 +18,8 @@ FFMPEG_SUBSLOT=55.57.57
 SCM=""
 if [ "${PV#9999}" != "${PV}" ] ; then
 	SCM="git-r3"
-	EGIT_REPO_URI="git://source.ffmpeg.org/ffmpeg.git"
+	#EGIT_REPO_URI="git://source.ffmpeg.org/ffmpeg.git"
+	EGIT_REPO_URI="https://github.com/mpv-player/ffmpeg-mpv"
 fi
 
 inherit eutils flag-o-matic multilib multilib-minimal toolchain-funcs ${SCM}
