@@ -33,6 +33,9 @@ src_prepare() {
 	cmake-utils_src_prepare
 	# Change the search path to match dev-util/glslang
 	sed -i -e 's@\("library_path": "\).@\1/usr/lib@' layers/linux/*.json
+	# Use our system SPIRV-Tools (including generated commit_id)
+	sed -i -e '/spirv_tools_commit_id\.h/d' CMakeLists.txt
+	sed -i -e 's/\(spirv_tools_commit_id\.h\)/spirv-tools\/\1/' layers/shader_validation.h
 	default
 }
 
@@ -68,14 +71,13 @@ multilib_src_configure() {
 }
 
 multilib_src_install() {
-#	cd ${CMAKE_BUILD_DIR}
 	dolib.so loader/libvulkan.so*
 	dolib.so layers/*.so
 
 	if multilib_is_native_abi; then
 		use vulkaninfo && dobin demos/vulkaninfo
 
-		insinto /usr/lib/pkgconfig/
+		insinto /usr/$(get_libdir)/pkgconfig/
 		doins loader/vulkan.pc
 	fi
 }
