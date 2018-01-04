@@ -12,8 +12,7 @@ HOMEPAGE="https://github.com/${MY_AUTHOR}/${PN}"
 if [[ ${PV} == 9999* ]] ; then
 	inherit git-r3
 	SRC_URI=""
-	EGIT_REPO_URI="git://github.com/${MY_AUTHOR}/${PN}.git
-		       https://github.com/${MY_AUTHOR}/${PN}.git"
+	EGIT_REPO_URI="https://github.com/${MY_AUTHOR}/${PN}.git"
 	KEYWORDS=""
 else
 	SRC_URI="https://github.com/${MY_AUTHOR}/${PN}/archive/v${PV}.tar.gz -> ${P}.tar.gz"
