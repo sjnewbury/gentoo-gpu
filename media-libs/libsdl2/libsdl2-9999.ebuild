@@ -22,7 +22,7 @@ fi
 LICENSE="ZLIB"
 SLOT="0"
 
-IUSE="cpu_flags_x86_3dnow alsa altivec custom-cflags dbus fusionsound gles haptic +joystick cpu_flags_x86_mmx nas opengl oss pulseaudio +sound cpu_flags_x86_sse cpu_flags_x86_sse2 static-libs +threads tslib udev +video wayland X xinerama xscreensaver libsamplerate"
+IUSE="cpu_flags_x86_3dnow alsa altivec custom-cflags dbus fusionsound gles haptic +joystick cpu_flags_x86_mmx nas opengl oss pulseaudio +sound cpu_flags_x86_sse cpu_flags_x86_sse2 static-libs +threads tslib udev +video wayland X xinerama xscreensaver libsamplerate vulkan"
 REQUIRED_USE="
 	alsa? ( sound )
 	fusionsound? ( sound )
@@ -63,7 +63,8 @@ RDEPEND="
 		xinerama? ( >=x11-libs/libXinerama-1.1.3[${MULTILIB_USEDEP}] )
 		xscreensaver? ( >=x11-libs/libXScrnSaver-1.2.2-r1[${MULTILIB_USEDEP}] )
 		libsamplerate? ( media-libs/libsamplerate )
-	)"
+	)
+	vulkan? ( >=media-libs/vulkan-loader-1.0.61 )"
 DEPEND="${RDEPEND}
 	X? (
 		>=x11-proto/xextproto-7.2.1-r1[${MULTILIB_USEDEP}]
@@ -71,9 +72,13 @@ DEPEND="${RDEPEND}
 	)
 	virtual/pkgconfig"
 
+MULTILIB_WRAPPED_HEADERS=(
+	/usr/include/SDL2/SDL_config.h
+)
+
 PATCHES=(
 	# https://bugzilla.libsdl.org/show_bug.cgi?id=1431
-	#"${FILESDIR}"/${PN}-2.0.5-static-libs.patch
+	"${FILESDIR}"/${PN}-2.0.6-static-libs.patch
 	"${FILESDIR}"/${PN}-2.0.5-wayland-before-x11.patch
 )
 
@@ -82,12 +87,14 @@ S=${WORKDIR}/${MY_P}
 src_prepare() {
 	default
 	sed -i -e 's/configure.in/configure.ac/' Makefile.in || die
+	sed -i -e 's/\"\.\/khronos\/\(.*\)\"/<\1>/' src/video/SDL_vulkan_internal.h || die
 	mv configure.{in,ac} || die
 	AT_M4DIR="/usr/share/aclocal acinclude" eautoreconf
 }
 
 multilib_src_configure() {
 	use custom-cflags || strip-flags
+	append-cppflags -DHAVE_VULKAN_H
 
 	# sorted by `./configure --help`
 	ECONF_SOURCE="${S}" econf \
@@ -104,7 +111,7 @@ multilib_src_configure() {
 		$(use_enable threads) \
 		--enable-timers \
 		--enable-file \
-		--disable-loadso \
+		--enable-loadso \
 		--enable-cpuinfo \
 		--enable-assembly \
 		$(use_enable cpu_flags_x86_sse ssemath) \
@@ -143,6 +150,7 @@ multilib_src_configure() {
 		$(use_enable X video-x11-vm) \
 		--disable-video-cocoa \
 		--disable-video-directfb \
+		$(use_enable vulkan video-vulkan) \
 		$(multilib_native_use_enable fusionsound) \
 		--disable-fusionsound-shared \
 		$(use_enable video video-dummy) \
