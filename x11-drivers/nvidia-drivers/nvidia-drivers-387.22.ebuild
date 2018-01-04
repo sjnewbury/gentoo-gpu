@@ -361,8 +361,8 @@ src_install() {
 		doexe ${NV_OBJ}/nvidia-xconfig
 	fi
 
-	# Put in the full path to the Vulkan client library
-	sed -e "s|__NV_VK_ICD__|/usr/$(get_libdir)/libGLX_nvidia.so.0|" \
+	# Put in the full path to the client library
+	sed -e "s|__NV_VK_ICD__|/usr/$(get_libdir)/opengl/nvidia/lib/libGLX_nvidia.so.0|" \
 		nvidia_icd.json.template > "${T}"/nvidia_icd.${ABI}.json || die
 	insinto /usr/share/vulkan/icd.d
 	doins "${T}"/nvidia_icd.${ABI}.json
