@@ -5,6 +5,7 @@ EAPI=6
 
 inherit autotools eutils multilib-minimal git-r3
 
+GST_V=1.12.0
 #MY_PN="gstreamer-vaapi"
 DESCRIPTION="Hardware accelerated video decoding through VA-API plugin for GStreamer"
 HOMEPAGE="https://cgit.freedesktop.org/gstreamer/gstreamer-vaapi"
@@ -21,13 +22,13 @@ REQUIRED_USE="|| ( drm opengl wayland X )"
 
 RDEPEND="
 	>=dev-libs/glib-2.40:2[${MULTILIB_USEDEP}]
-	>=media-libs/gstreamer-${PV}:${SLOT}[${MULTILIB_USEDEP}]
-	>=media-libs/gst-plugins-base-${PV}:${SLOT}[${MULTILIB_USEDEP}]
+	>=media-libs/gstreamer-${GST_V}:${SLOT}[${MULTILIB_USEDEP}]
+	>=media-libs/gst-plugins-base-${GST_V}:${SLOT}[${MULTILIB_USEDEP}]
 	egl? (
-		>=media-libs/gst-plugins-bad-${PV}:${SLOT}[gles2,${MULTILIB_USEDEP}]
+		>=media-libs/gst-plugins-bad-${GST_V}:${SLOT}[gles2,${MULTILIB_USEDEP}]
 	)
 	!egl? (
-		>=media-libs/gst-plugins-bad-${PV}:${SLOT}[opengl?,${MULTILIB_USEDEP}]
+		>=media-libs/gst-plugins-bad-${GST_V}:${SLOT}[opengl?,${MULTILIB_USEDEP}]
 	)
 	>=x11-libs/libva-1.4.0[drm?,X?,opengl?,wayland?,${MULTILIB_USEDEP}]
 	drm? (
