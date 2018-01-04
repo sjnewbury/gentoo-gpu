@@ -7,7 +7,7 @@ PYTHON_COMPAT=( python2_7 )
 
 EGIT_REPO_URI="http://llvm.org/git/${PN}.git
 	https://github.com/llvm-mirror/${PN}.git"
-EGIT_COMMIT="520743b0b72862a987ead6213dc1a5321a2010f9"
+#EGIT_COMMIT="520743b0b72862a987ead6213dc1a5321a2010f9"
 
 if [[ ${PV} = 9999* ]]; then
 	GIT_ECLASS="git-r3"
