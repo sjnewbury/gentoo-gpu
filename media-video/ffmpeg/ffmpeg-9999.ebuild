@@ -18,8 +18,8 @@ FFMPEG_SUBSLOT=55.57.57
 SCM=""
 if [ "${PV#9999}" != "${PV}" ] ; then
 	SCM="git-r3"
-	#EGIT_REPO_URI="git://source.ffmpeg.org/ffmpeg.git"
-	EGIT_REPO_URI="https://github.com/mpv-player/ffmpeg-mpv"
+	EGIT_REPO_URI="https://git.ffmpeg.org/ffmpeg.git"
+	#EGIT_REPO_URI="https://github.com/mpv-player/ffmpeg-mpv"
 fi
 
 inherit eutils flag-o-matic multilib multilib-minimal toolchain-funcs ${SCM}
@@ -93,7 +93,7 @@ FFMPEG_FLAG_MAP=(
 # Same as above but for encoders, i.e. they do something only with USE=encode.
 FFMPEG_ENCODER_FLAG_MAP=(
 	amrenc:libvo-amrwbenc mp3:libmp3lame
-	kvazaar:libkvazaar nvenc:nvenc
+	kvazaar:libkvazaar nvenc:nvenc cuvid:cuvid
 	openh264:libopenh264 snappy:libsnappy theora:libtheora twolame:libtwolame
 	wavpack:libwavpack webp:libwebp x264:libx264 x265:libx265 xvid:libxvid
 )
@@ -169,6 +169,7 @@ RDEPEND="
 		kvazaar? ( media-libs/kvazaar[${MULTILIB_USEDEP}] )
 		mp3? ( >=media-sound/lame-3.99.5-r1[${MULTILIB_USEDEP}] )
 		nvenc? ( media-video/nvidia_video_sdk )
+		cuvid? ( dev-util/nvidia-cuda-sdk )
 		openh264? ( >=media-libs/openh264-1.4.0-r1[${MULTILIB_USEDEP}] )
 		snappy? ( >=app-arch/snappy-1.1.2-r1[${MULTILIB_USEDEP}] )
 		theora? (
@@ -293,6 +294,9 @@ src_prepare() {
 	if [[ "${PV%_p*}" != "${PV}" ]] ; then # Snapshot
 		export revision=git-N-${FFMPEG_REVISION}
 	fi
+	eapply "${FILESDIR}/vaapi_encode_mpeg2-anamophic.patch"
+	eapply "${FILESDIR}/vaapi-cpb_props.patch"
+
 	default
 }
 
@@ -312,6 +316,9 @@ multilib_src_configure() {
 			myconf+=( --enable-version3 )
 		fi
 		if use nvenc ; then
+			myconf+=( --enable-nonfree )
+		fi
+		if use cuvid ; then
 			myconf+=( --enable-nonfree )
 		fi
 	else
