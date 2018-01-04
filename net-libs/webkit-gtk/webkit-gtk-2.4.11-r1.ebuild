@@ -188,6 +188,9 @@ src_configure() {
 	# Respect CC, otherwise fails on prefix #395875
 	tc-export CC
 
+	# CXX code needs to be built with -fpermissive on any recent gcc
+	append-cxxflags -fpermissive
+
 	# Arches without JIT support also need this to really disable it in all places
 	use jit || append-cppflags -DENABLE_JIT=0 -DENABLE_YARR_JIT=0 -DENABLE_ASSEMBLER=0
 
