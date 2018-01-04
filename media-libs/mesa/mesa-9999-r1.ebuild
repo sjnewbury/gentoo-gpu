@@ -50,7 +50,7 @@ done
 
 IUSE="${IUSE_VIDEO_CARDS}
 	bindist +classic d3d9 debug +dri3 +egl +gallium +gbm gles1 gles2 +llvm
-	+nptl opencl osmesa pax_kernel openmax pic selinux vaapi valgrind
+	+nptl opencl osmesa pax_kernel ocl-icd openmax pic selinux vaapi valgrind
 	vdpau wayland xvmc xa kernel_FreeBSD glvnd vulkan gcrypt eselect-gl-bobwya"
 
 #  Not available at present unfortunately
@@ -64,6 +64,7 @@ REQUIRED_USE="
 		video_cards_radeon? ( gallium )
 		video_cards_radeonsi? ( gallium )
 	)
+	ocl-icd? ( opencl )
 	openmax? ( gallium )
 	gles1?  ( egl )
 	gles2?  ( egl )
@@ -128,6 +129,7 @@ RDEPEND="
 	)
 	opencl? (
 				app-eselect/eselect-opencl
+				ocl-icd? ( dev-libs/ocl-icd )
 				gallium? (
 					dev-libs/libclc
 					( || (
@@ -454,6 +456,7 @@ multilib_src_configure() {
 		$(use_enable gles1) \
 		$(use_enable gles2) \
 		$(use_enable nptl glx-tls) \
+		$(use_enable ocl-icd opencl-icd) \
 		--enable-valgrind=$(usex valgrind auto no) \
 		--enable-llvm-shared-libs \
 		--with-dri-drivers=${DRI_DRIVERS} \
@@ -573,19 +576,24 @@ multilib_src_install() {
 	fi
 
 	if use opencl; then
-		ebegin "Moving Gallium/Clover OpenCL implementation for dynamic switching"
-		local cl_dir="/usr/$(get_libdir)/OpenCL/vendors/mesa"
-		dodir ${cl_dir}/{lib,include}
-		if [ -f "${ED}/usr/$(get_libdir)/libOpenCL.so" ]; then
-			mv -f "${ED}"/usr/$(get_libdir)/libOpenCL.so* \
-			"${ED}"${cl_dir}
+		if use ocl-icd; then
 			einfo "Gallium/Clover OpenCL driver installed, creating ICD config"
+			local ocl_lib=libMesaOpenCL.so
 			dodir /etc/OpenCL/vendors/
-			echo "${cl_dir}/libOpenCL.so" > "${ED}"/etc/OpenCL/vendors/mesa.icd
-		fi
-		if [ -f "${ED}/usr/include/CL/opencl.h" ]; then
-			mv -f "${ED}"/usr/include/CL \
-			"${ED}"${cl_dir}/include
+			echo "/usr/$(get_libdir)/${ocl_lib}" > "${ED}"/etc/OpenCL/vendors/mesa-${ABI}.icd
+		else
+			ebegin "Moving Gallium/Clover OpenCL implementation for dynamic switching"
+			local cl_dir="/usr/$(get_libdir)/OpenCL/vendors/mesa"
+			local ocl_lib=libOpenCL.so
+			dodir ${cl_dir}/{lib,include}
+			if [ -f "${ED}/usr/include/CL/opencl.h" ]; then
+				mv -f "${ED}"/usr/include/CL \
+					"${ED}"${cl_dir}/include
+			fi
+			if [ -f "${ED}/usr/$(get_libdir)/${ocl_lib}" ]; then
+				mv -f "${ED}"/usr/$(get_libdir)/${ocl_lib}* \
+					"${ED}"${cl_dir}
+			fi
 		fi
 		eend $?
 	fi
