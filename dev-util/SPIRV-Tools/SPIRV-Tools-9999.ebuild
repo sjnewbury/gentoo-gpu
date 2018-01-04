@@ -3,8 +3,9 @@
 # $Id$
 
 EAPI=6
+PYTHON_COMPAT=( python3_{4,5,6} )
 
-inherit cmake-multilib
+inherit python-any-r1 cmake-multilib
 
 DESCRIPTION="GLSL reference compiler."
 HOMEPAGE="https://github.com/KhronosGroup/SPIRV-Tools"
@@ -22,10 +23,10 @@ else
 fi
 
 LICENSE="spirv-tools"
-SLOT="0"
+SLOT="0/${PV}"
 IUSE=""
 
-DEPEND=""
+DEPEND="${PYTHON_DEPS}"
 RDEPEND="${DEPEND}"
 
 if [[ "${PV}" != 9999* ]]; then
@@ -41,3 +42,16 @@ if [[ "${PV}" == 9999* ]]; then
 				${S}/external/spirv-headers
 	}
 fi
+
+src_prepare() {
+	default
+
+	# Stolen from vulkan-loader
+	python ${FILESDIR}/external_revision_generator.py \
+		${S} SPIRV_TOOLS_COMMIT_ID include/spirv-tools/spirv_tools_commit_id.h || die failed to generate commit_id header
+
+	# Hack to install generated id header
+	sed -i \
+		-e '/linker\.hpp/a \${CMAKE_CURRENT_SOURCE_DIR}\/include\/spirv-tools\/spirv_tools_commit_id\.h' \
+		CMakeLists.txt || die sed failed
+}
