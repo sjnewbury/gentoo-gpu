@@ -11,7 +11,7 @@ diff --git a/src/mesa/drivers/dri/i965/brw_context.c b/src/mesa/drivers/dri/i965
 index 0e882cac84c..53e29d87ef2 100644
 --- a/src/mesa/drivers/dri/i965/brw_context.c
 +++ b/src/mesa/drivers/dri/i965/brw_context.c
-@@ -123,6 +123,22 @@ brw_get_renderer_string(const struct intel_screen *screen)
+@@ -125,6 +125,22 @@
     return buffer;
  }
  
@@ -34,15 +34,15 @@ index 0e882cac84c..53e29d87ef2 100644
  static const GLubyte *
  intel_get_string(struct gl_context * ctx, GLenum name)
  {
-@@ -488,6 +504,8 @@ brw_init_driver_functions(struct brw_context *brw,
- 
-    if (brw->gen >= 6)
+@@ -330,6 +346,9 @@
+    if (devinfo->gen >= 6)
        functions->GetSamplePosition = gen6_get_sample_position;
-+
-+   functions->SetBackgroundContext = brw_set_background_context;
- }
  
- static void
++   /* Multi-threading */
++   functions->SetBackgroundContext = brw_set_background_context;
++
+    /* GL_ARB_get_program_binary */
+    brw_program_binary_init(brw->screen->deviceID);
+    functions->GetProgramBinaryDriverSHA1 = brw_get_program_binary_driver_sha1;
 -- 
 2.11.1
-
