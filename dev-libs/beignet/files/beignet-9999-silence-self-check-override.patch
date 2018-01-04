@@ -1,0 +1,28 @@
+--- ./src/cl_device_id.c~	2017-12-26 10:30:07.000000000 +0000
++++ ./src/cl_device_id.c	2017-12-26 10:33:55.710360653 +0000
+@@ -892,10 +892,12 @@
+                       ret = SELF_TEST_PASS;
+                     } else {
+                       ret = SELF_TEST_SLM_FAIL;
++#if 0
+                       printf("Beignet: self-test failed: (3, 7, 5) + (5, 7, 3) returned (%i, %i, %i)\n"
+                              "See README.md or http://www.freedesktop.org/wiki/Software/Beignet/\n",
+                              test_data[0], test_data[1], test_data[2]);
+ 
++#endif
+                     }
+                   }
+                 } else{
+@@ -946,9 +948,11 @@
+         sscanf(env, "%i", &disable_self_test);
+       }
+       if (disable_self_test) {
++#if 0
+         printf("Beignet: Warning - overriding self-test failure\n");
++#endif
+       } else {
+-        printf("Beignet: disabling non-working device\n");
++        printf("Beignet: self-test failed - disabling non-working device\n");
+         device = 0;
+       }
+     }
