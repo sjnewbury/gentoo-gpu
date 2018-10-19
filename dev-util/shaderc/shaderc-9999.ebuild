@@ -28,11 +28,8 @@ DEPEND="${PYTHON_DEPS}
 	dev-util/SPIRV-Tools:=[${MULTILIB_USEDEP}]"
 
 src_prepare() {
+	epatch "${FILESDIR}"/${PN}-use-system-libs.patch
 	cmake-utils_src_prepare
-	sed -i \
-		-e '/third_party/d' \
-		-e '/build-version/,/COMMENT/d' \
-		CMakeLists.txt || die sed failed
 
 	# Create build-version.inc since we want to use our packaged
 	# SPIRV-Tools and glslang
