@@ -1,0 +1,79 @@
+From 9b4909048afaf690c0b3adb11caae69604618757 Mon Sep 17 00:00:00 2001
+From: Steven Newbury <steve@snewbury.org.uk>
+Date: Tue, 21 Aug 2018 13:06:08 +0100
+Subject: [PATCH] Revert "autoconf: stop exporting internal wayland details"
+
+This reverts commit 6b8657aff0adb9952aa3178d3b332de19d354561.
+---
+ configure.ac                            | 4 ----
+ src/egl/Makefile.am                     | 2 +-
+ src/egl/wayland/wayland-drm/Makefile.am | 2 +-
+ src/vulkan/Makefile.am                  | 4 ++--
+ 4 files changed, 4 insertions(+), 8 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index 4d9d9e5928..4dc8f8ff49 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -1825,10 +1825,6 @@ for plat in $platforms; do
+         PKG_CHECK_MODULES([WAYLAND_SCANNER], [wayland-scanner],
+                           WAYLAND_SCANNER=`$PKG_CONFIG --variable=wayland_scanner wayland-scanner`,
+                           WAYLAND_SCANNER='')
+-        PKG_CHECK_EXISTS([wayland-scanner >= 1.15],
+-                          AC_SUBST(SCANNER_ARG, 'private-code'),
+-                          AC_SUBST(SCANNER_ARG, 'code'))
+-
+         if test "x$WAYLAND_SCANNER" = x; then
+             AC_PATH_PROG([WAYLAND_SCANNER], [wayland-scanner], [:])
+         fi
+diff --git a/src/egl/Makefile.am b/src/egl/Makefile.am
+index 485f145cec..0e189e583a 100644
+--- a/src/egl/Makefile.am
++++ b/src/egl/Makefile.am
+@@ -72,7 +72,7 @@ WL_DMABUF_XML = $(WAYLAND_PROTOCOLS_DATADIR)/unstable/linux-dmabuf/linux-dmabuf-
+ 
+ drivers/dri2/linux-dmabuf-unstable-v1-protocol.c: $(WL_DMABUF_XML)
+ 	$(MKDIR_GEN)
+-	$(AM_V_GEN)$(WAYLAND_SCANNER) $(SCANNER_ARG) $< $@
++	$(AM_V_GEN)$(WAYLAND_SCANNER) code $< $@
+ 
+ drivers/dri2/linux-dmabuf-unstable-v1-client-protocol.h: $(WL_DMABUF_XML)
+ 	$(MKDIR_GEN)
+diff --git a/src/egl/wayland/wayland-drm/Makefile.am b/src/egl/wayland/wayland-drm/Makefile.am
+index 40174c6acd..0404c79e7f 100644
+--- a/src/egl/wayland/wayland-drm/Makefile.am
++++ b/src/egl/wayland/wayland-drm/Makefile.am
+@@ -28,7 +28,7 @@ CLEANFILES = \
+ 	wayland-drm-server-protocol.h
+ 
+ %-protocol.c : %.xml
+-	$(AM_V_GEN)$(WAYLAND_SCANNER) $(SCANNER_ARG) $< $@
++	$(AM_V_GEN)$(WAYLAND_SCANNER) code $< $@
+ 
+ %-server-protocol.h : %.xml
+ 	$(AM_V_GEN)$(WAYLAND_SCANNER) server-header $< $@
+diff --git a/src/vulkan/Makefile.am b/src/vulkan/Makefile.am
+index db3831229e..ce1a79d0c4 100644
+--- a/src/vulkan/Makefile.am
++++ b/src/vulkan/Makefile.am
+@@ -76,7 +76,7 @@ WL_DRM_XML = $(top_srcdir)/src/egl/wayland/wayland-drm/wayland-drm.xml
+ 
+ wsi/wayland-drm-protocol.c : $(WL_DRM_XML)
+ 	$(MKDIR_GEN)
+-	$(AM_V_GEN)$(WAYLAND_SCANNER) $(SCANNER_ARG) $< $@
++	$(AM_V_GEN)$(WAYLAND_SCANNER) code $< $@
+ 
+ wsi/wayland-drm-client-protocol.h : $(WL_DRM_XML)
+ 	$(MKDIR_GEN)
+@@ -86,7 +86,7 @@ WL_DMABUF_XML = $(WAYLAND_PROTOCOLS_DATADIR)/unstable/linux-dmabuf/linux-dmabuf-
+ 
+ wsi/linux-dmabuf-unstable-v1-protocol.c : $(WL_DMABUF_XML)
+ 	$(MKDIR_GEN)
+-	$(AM_V_GEN)$(WAYLAND_SCANNER) $(SCANNER_ARG) $< $@
++	$(AM_V_GEN)$(WAYLAND_SCANNER) code $< $@
+ 
+ wsi/linux-dmabuf-unstable-v1-client-protocol.h : $(WL_DMABUF_XML)
+ 	$(MKDIR_GEN)
+-- 
+2.18.0
+

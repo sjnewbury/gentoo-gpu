@@ -39,7 +39,6 @@ fi
 
 LICENSE="MIT"
 SLOT="0"
-RESTRICT="!bindist? ( bindist )"
 
 INTEL_CARDS="i915 i965 intel"
 RADEON_CARDS="r100 r200 r300 r600 radeon radeonsi"
@@ -49,7 +48,7 @@ for card in ${VIDEO_CARDS}; do
 done
 
 IUSE="${IUSE_VIDEO_CARDS}
-	bindist +classic d3d9 debug +dri3 +egl +gallium +gbm gles1 gles2 +llvm
+	+classic d3d9 debug +dri3 +egl +gallium +gbm gles1 gles2 +llvm
 	+nptl opencl osmesa pax_kernel ocl-icd openmax pic selinux vaapi valgrind
 	vdpau wayland xvmc xa kernel_FreeBSD glvnd vulkan gcrypt eselect-gl-bobwya"
 
@@ -193,15 +192,7 @@ DEPEND="${RDEPEND}
 	sys-devel/gettext
 	virtual/pkgconfig
 	valgrind? ( dev-util/valgrind )
-	>=x11-proto/dri2proto-2.8-r1:=[${MULTILIB_USEDEP}]
-	dri3? (
-		>=x11-proto/dri3proto-1.0:=[${MULTILIB_USEDEP}]
-		>=x11-proto/presentproto-1.0:=[${MULTILIB_USEDEP}]
-	)
-	>=x11-proto/glproto-1.4.17-r1:=[${MULTILIB_USEDEP}]
-	>=x11-proto/xextproto-7.2.1-r1:=[${MULTILIB_USEDEP}]
-	>=x11-proto/xf86driproto-2.1.1-r1:=[${MULTILIB_USEDEP}]
-	>=x11-proto/xf86vidmodeproto-2.3.1-r1:=[${MULTILIB_USEDEP}]
+	x11-base/xorg-proto
 	dev-lang/python:2.7
 	vulkan? ( =dev-lang/python-3* )
 	>=dev-python/mako-0.7.3[python_targets_python2_7]
@@ -272,6 +263,7 @@ apply_mesa_patches() {
 
 	epatch "${FILESDIR}/${P}-fix-missing-openmp-include.patch"
 	epatch "${FILESDIR}"/glthread/*
+	epatch "${FILESDIR}"/0001-Revert-autoconf-stop-exporting-internal-wayland-deta.patch
 #	epatch "${FILESDIR}"/${P}-with-sha1.patch
 }
 
@@ -303,7 +295,6 @@ glvnd_src_configure() {
 		$(use_enable gles2) \
 		$(use_enable gbm) \
 		$(use_enable nptl glx-tls) \
-		$(use_enable !bindist texture-float) \
 		$(use_enable debug) \
 		$(use_enable dri3) \
 		--enable-llvm-shared-libs \
@@ -448,7 +439,6 @@ multilib_src_configure() {
 		--enable-dri \
 		--enable-glx \
 		--enable-shared-glapi \
-		$(use_enable !bindist texture-float) \
 		$(use_enable debug) \
 		$(use_enable dri3) \
 		$(use_enable egl) \
@@ -578,6 +568,7 @@ multilib_src_install() {
 	if use opencl; then
 		if use ocl-icd; then
 			einfo "Gallium/Clover OpenCL driver installed, creating ICD config"
+			rm -f "${ED}"/etc/OpenCL/vendors/mesa.icd
 			local ocl_lib=libMesaOpenCL.so
 			dodir /etc/OpenCL/vendors/
 			echo "/usr/$(get_libdir)/${ocl_lib}" > "${ED}"/etc/OpenCL/vendors/mesa-${ABI}.icd
@@ -603,6 +594,11 @@ multilib_src_install() {
 		doenvd "${T}"/99mesaxdgomx
 		keepdir /usr/share/mesa/xdg
 	fi
+
+	# wayland-egl library is now provided by dev-libs/wayland
+	ebegin "Removing wayland-egl libraries"
+	find "${ED}" -name '*wayland-egl*' -exec rm -f {} \;
+	eend $?
 }
 
 multilib_src_install_all() {
@@ -614,10 +610,6 @@ multilib_src_install_all() {
 		ebegin "Remove generic Vulkan headers"
 		rm -rf "${ED}"/usr/include/vulkan || die Remove generic Vulkan headers failed!?!
 		eend $?
-	fi
-
-	if use !bindist; then
-		dodoc docs/patents.txt
 	fi
 
 	# Install config file for eselect mesa
@@ -647,7 +639,7 @@ pkg_postinst() {
 	fi
 
 	# Switch to mesa opencl
-	if use opencl; then
+	if use opencl && ! use ocl-icd; then
 		eselect opencl set --use-old ${PN}
 	fi
 
@@ -658,12 +650,6 @@ pkg_postinst() {
 			OMX_BELLAGIO_REGISTRY=${EPREFIX}/usr/share/mesa/xdg/.omxregister \
 			omxregister-bellagio
 		eend $?
-	fi
-
-	# warn about patent encumbered texture-float
-	if use !bindist; then
-		elog "USE=\"bindist\" was not set. Potentially patent encumbered code was"
-		elog "enabled. Please see patents.txt for an explanation."
 	fi
 
 	if ! has_version media-libs/libtxc_dxtn; then
