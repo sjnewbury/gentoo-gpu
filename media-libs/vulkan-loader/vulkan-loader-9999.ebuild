@@ -85,9 +85,10 @@ multilib_src_install() {
 multilib_src_install_all() {
 	keepdir /etc/vulkan/icd.d
 
-	cd "${S}"
-	insinto /usr/include/vulkan
-	doins include/vulkan/*.h
+	# Now in portage as dev-util/vulkan-headers
+	#cd "${S}"
+	#insinto /usr/include/vulkan
+	#doins include/vulkan/*.h
 
 	insinto /usr/share/vulkan/explicit_layer.d
 	doins layers/linux/*.json
