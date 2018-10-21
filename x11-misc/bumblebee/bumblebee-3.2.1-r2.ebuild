@@ -34,6 +34,7 @@ src_prepare() {
 	#epatch "${FILESDIR}/replace_rmmod_with_modprobe.patch"
 	#epatch "${FILESDIR}/bb_nvidia_modeset-detection_bug699.patch"
 	epatch "${FILESDIR}"/${P}-nvidia-modeset.patch
+	epatch "${FILESDIR}"/${P}-always-unload-driver.patch
 }
 
 src_configure() {
