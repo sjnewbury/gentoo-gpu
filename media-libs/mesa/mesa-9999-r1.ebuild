@@ -39,7 +39,6 @@ fi
 
 LICENSE="MIT"
 SLOT="0"
-RESTRICT="!bindist? ( bindist )"
 
 INTEL_CARDS="i915 i965 intel"
 RADEON_CARDS="r100 r200 r300 r600 radeon radeonsi"
@@ -49,7 +48,7 @@ for card in ${VIDEO_CARDS}; do
 done
 
 IUSE="${IUSE_VIDEO_CARDS}
-	bindist +classic d3d9 debug +dri3 +egl +gallium +gbm gles1 gles2 +llvm
+	+classic d3d9 debug +dri3 +egl +gallium +gbm gles1 gles2 +llvm
 	+nptl opencl osmesa pax_kernel ocl-icd openmax pic selinux vaapi valgrind
 	vdpau wayland xvmc xa kernel_FreeBSD glvnd vulkan gcrypt eselect-gl-bobwya"
 
@@ -296,7 +295,6 @@ glvnd_src_configure() {
 		$(use_enable gles2) \
 		$(use_enable gbm) \
 		$(use_enable nptl glx-tls) \
-		$(use_enable !bindist texture-float) \
 		$(use_enable debug) \
 		$(use_enable dri3) \
 		--enable-llvm-shared-libs \
@@ -441,7 +439,6 @@ multilib_src_configure() {
 		--enable-dri \
 		--enable-glx \
 		--enable-shared-glapi \
-		$(use_enable !bindist texture-float) \
 		$(use_enable debug) \
 		$(use_enable dri3) \
 		$(use_enable egl) \
@@ -571,6 +568,7 @@ multilib_src_install() {
 	if use opencl; then
 		if use ocl-icd; then
 			einfo "Gallium/Clover OpenCL driver installed, creating ICD config"
+			rm -f "${ED}"/etc/OpenCL/vendors/mesa.icd
 			local ocl_lib=libMesaOpenCL.so
 			dodir /etc/OpenCL/vendors/
 			echo "/usr/$(get_libdir)/${ocl_lib}" > "${ED}"/etc/OpenCL/vendors/mesa-${ABI}.icd
@@ -641,7 +639,7 @@ pkg_postinst() {
 	fi
 
 	# Switch to mesa opencl
-	if use opencl; then
+	if use opencl && ! use ocl-icd; then
 		eselect opencl set --use-old ${PN}
 	fi
 

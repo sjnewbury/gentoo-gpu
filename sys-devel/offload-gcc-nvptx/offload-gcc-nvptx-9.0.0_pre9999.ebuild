@@ -7,7 +7,7 @@ EAPI="5"
 #UCLIBC_VER="1.0"
 NEWLIBV=3.0.0.20180831
 
-offload_gcc_nvptx_LIVE_BRANCH="gcc-7-branch"
+offload_gcc_nvptx_LIVE_BRANCH="master"
 
 CTARGET=nvptx-none
 TOOLCHAIN_ALLOWED_LANGS="c c++ jit objc obj-c++ fortran"

@@ -2,6 +2,7 @@
 # Distributed under the terms of the GNU General Public License v2
 
 # Maintainer: Toolchain Ninjas <toolchain@gentoo.org>
+# @SUPPORTED_EAPIS: 5
 
 DESCRIPTION="The GNU Compiler Collection"
 HOMEPAGE="https://gcc.gnu.org/"
@@ -135,7 +136,7 @@ fi
 IUSE="regression-test vanilla"
 IUSE_DEF=( nls nptl )
 
-if [[ ${PN} != "kgcc64" && ${PN} != gcc-* ]] ; then
+if [[ ${PN} != "kgcc64" && ${PN} != gcc-* && ${PN} != offload-* ]] ; then
 	IUSE+=" altivec debug"
 	IUSE_DEF+=( cxx fortran )
 	[[ -n ${PIE_VER} ]] && IUSE+=" nopie"
@@ -160,9 +161,13 @@ if [[ ${PN} != "kgcc64" && ${PN} != gcc-* ]] ; then
 	tc_version_is_at_least 4.9 && IUSE+=" +vtv"
 	tc_version_is_at_least 5.0 && IUSE+=" jit mpx"
 	tc_version_is_at_least 6.0 && IUSE+=" +pie +ssp +pch"
+	tc_version_is_at_least 7.0 && IUSE+=" offload-nvptx offload-mic"
 	# systemtap is a gentoo-specific switch: bug #654748
 	tc_version_is_at_least 8.0 && IUSE+=" systemtap"
-	( [[ ${PN} != offload-* ]] && tc_version_is_at_least 7.0 ) && IUSE+=" offload-nvptx offload-mic"
+fi
+
+if [[ ${PN} == offload-* ]]; then
+	IUSE_DEF+=( cxx fortran )
 fi
 
 IUSE+=" ${IUSE_DEF[*]/#/+}"
@@ -405,6 +410,14 @@ get_gcc_src_uri() {
 		GCC_SRC_URI+=" elibc_Cygwin? ( https://github.com/cygwinports/gcc/archive/${CYGWINPORTS_GITREV}.tar.gz
 			-> gcc-cygwinports-${CYGWINPORTS_GITREV}.tar.gz )"
 
+	if [[ ${PN} == offload-* ]] ; then
+		if [[ -n ${NEWLIBV} ]] ; then
+			GCC_SRC_URI+=" ftp://sourceware.org/pub/newlib/newlib-${NEWLIBV}.tar.gz"
+		else
+			die "NEWLIBV is unset for offload plugin"
+		fi
+	fi
+
 	echo "${GCC_SRC_URI}"
 }
 
@@ -512,6 +525,8 @@ gcc_quick_unpack() {
 	use_if_iuse boundschecking && unpack "bounds-checking-gcc-${HTB_GCC_VER}-${HTB_VER}.patch.bz2"
 
 	[[ -n ${CYGWINPORTS_GITREV} ]] && use elibc_Cygwin && unpack "gcc-cygwinports-${CYGWINPORTS_GITREV}.tar.gz"
+
+	[[ ${PN} == offload-* ]] && unpack "newlib-${NEWLIBV}.tar.gz"
 
 	popd > /dev/null
 }
@@ -637,6 +652,8 @@ toolchain_src_prepare() {
 				einfo "  ${f%%...}"
 			done
 	fi
+
+	[[ ${PN} == offload-* ]] && ln -s "${WORKDIR}"/newlib-${NEWLIBV}/newlib "${S}"/newlib
 }
 
 guess_patch_type_in_dir() {
@@ -1014,7 +1031,7 @@ toolchain_src_configure() {
 	fi
 
 	# default to avx for math ops
-	if use cpu_flags_x86_avx && tc_version_is_at_least 4.6; then
+	if use_if_iuse cpu_flags_x86_avx && tc_version_is_at_least 4.6; then
 		case $(tc-arch) in
 			amd64|x86) confgcc+=( --with-fpmath=avx ) ;;
 		esac
@@ -1022,7 +1039,7 @@ toolchain_src_configure() {
 
 	# use gold linker
 	if tc_version_is_at_least 4.8; then
-		confgcc+=( $(use_enable gold) )
+		in_iuse gold && confgcc+=( $(use_enable gold) )
 	fi
 
 	### Cross-compiler options
@@ -1065,7 +1082,8 @@ toolchain_src_configure() {
 			fi
 			needed_libc=uclibc
 			;;
-		*-cygwin)		 needed_libc=cygwin;;
+		*-cygwin)		 needed_libc=cygwin
+			;;
 		x86_64-*-mingw*|\
 		*-w64-mingw*)	 needed_libc=mingw64-runtime;;
 		mingw*|*-mingw*) needed_libc=mingw-runtime;;
@@ -1151,8 +1169,9 @@ toolchain_src_configure() {
 	nvptx-*)
 		[[ ${CHOST} == x86_64 ]] && confgcc+=( --enable-newlib-io-long-long )
 		confgcc+=(
-				--enable-as-accelerator-for=${CHOST}
-				--with-sysroot=${PREFIX}/${CTARGET}
+			--disable-sjlj-exceptions 
+			--enable-as-accelerator-for=${CHOST}
+			--with-sysroot="${PREFIX}"/${CTARGET}
 		)
 		;;
 	esac
@@ -1162,12 +1181,12 @@ toolchain_src_configure() {
 	gcc-multilib-configure
 
 	# ppc altivec support
-	confgcc+=( $(use_enable altivec) )
+	in_iuse altivec && confgcc+=( $(use_enable altivec) )
 
 	# gcc has fixed-point arithmetic support in 4.3 for mips targets that can
 	# significantly increase compile time by several hours.  This will allow
 	# users to control this feature in the event they need the support.
-	tc_version_is_at_least 4.3 && confgcc+=( $(use_enable fixed-point) )
+	tc_version_is_at_least 4.3 && in_iuse fixed-point && confgcc+=( $(use_enable fixed-point) )
 
 	case $(tc-is-softfloat) in
 	yes)    confgcc+=( --with-float=soft ) ;;
@@ -1418,7 +1437,7 @@ toolchain_src_configure() {
 	addwrite /dev/zero
 	echo "${S}"/configure "${confgcc[@]}"
 	# Older gcc versions did not detect bash and re-exec itself, so force the
-	# use of bash.  Newer ones will auto-detect, but this is not harmeful.
+	# use of bash.  Newer ones will auto-detect, but this is not harmful.
 	CONFIG_SHELL="${EPREFIX}/bin/bash" \
 	bash "${S}"/configure "${confgcc[@]}" || die "failed to run configure"
 
@@ -1579,6 +1598,11 @@ gcc_do_filter_flags() {
 		filter-flags -f{no-,}unit-at-a-time -f{no-,}web -mno-tls-direct-seg-refs
 		filter-flags -f{no-,}stack-protector{,-all}
 		filter-flags -fvisibility-inlines-hidden -fvisibility=hidden
+		# and warning options
+		filter-flags -Wextra -Wstack-protector
+	fi
+	if ! tc_version_is_at_least 4.1 ; then
+		filter-flags -fdiagnostics-show-option
 	fi
 
 	if tc_version_is_at_least 3.4 ; then
@@ -1694,6 +1718,11 @@ toolchain_src_compile() {
 	[[ ! -x /usr/bin/perl ]] \
 		&& find "${WORKDIR}"/build -name '*.[17]' -exec touch {} +
 
+	# Older gcc versions did not detect bash and re-exec itself, so force the
+	# use of bash.  Newer ones will auto-detect, but this is not harmful.
+	# This needs to be set for compile as well, as it's used in libtool
+	# generation, which will break install otherwise (at least in 3.3.6): #664486
+	CONFIG_SHELL="${EPREFIX}/bin/bash" \
 	gcc_do_make ${GCC_MAKE_TARGET}
 }
 
@@ -1846,6 +1875,9 @@ toolchain_src_install() {
 	# Make sure we dont have stuff lying around that
 	# can nuke multiple versions of gcc
 	gcc_slot_java
+
+	# Move offload compiler cross-headers to prevent slot collisions
+	[[ ${PN} == offload-* ]] && gcc_slot_offload
 
 	dodir /usr/bin
 	[[ -d "${D}"${BINPATH} ]] || mkdir -p "${D}"${BINPATH}
@@ -2030,7 +2062,7 @@ gcc_movelibs() {
 		mv "${ED}"/usr/$(get_libdir)/libcc1* "${D}${HOSTLIBPATH}" || die
 	fi
 
-	# Offload accelerators treat multilib namespace differently
+	# Offload accelerators are handled separately
 	[[ ${PN} == offload-* ]] && return 0
 
 	# For all the libs that are built for CTARGET, move them into the
@@ -2188,6 +2220,37 @@ copy_minispecs_gcc_specs() {
 		cat "${WORKDIR}"/build.specs >> "${WORKDIR}"/specs/specs
 		doins "${WORKDIR}"/specs/specs || die "failed to install the specs file"
 	fi
+}
+
+gcc_slot_offload() {
+	local x
+	local OFFLOADPATH="${PREFIX}"/lib/gcc/${CHOST}/${GCC_CONFIG_VER}/accel/${CTARGET}
+
+	# Move Offload headers to compiler-specific dir
+	for x in "${D}${PREFIX}"/${CTARGET}/include/*.h ; do
+		[[ -f ${x} ]] && mv -f "${x}" "${D}${OFFLOADPATH}"/include/
+	done
+	for x in ssp sys machine ; do
+		if [[ -d ${D}${PREFIX}/${CTARGET}/include/${x} ]] ; then
+			dodir /${OFFLOADPATH#${EPREFIX}}/include/${x}
+			mv -f "${D}${PREFIX}"/${CTARGET}/include/${x}/* "${D}${OFFLOADPATH}"/include/${x}/
+			rm -rf "${D}${PREFIX}"/${CTARGET}/include/${x}
+		fi
+	done
+
+	# Move libraries normally contained in sysroot (including libc) built
+	# with offload compiler
+	local FROMDIR="${PREFIX}"/${CTARGET}/lib
+	removedirs="${removedirs} ${FROMDIR}"
+	FROMDIR=${D}${FROMDIR}
+	TODIR=${D}${OFFLOADPATH}
+	if [[ ${FROMDIR} != "${TODIR}" && -d ${FROMDIR} ]] ; then
+		local files=$(find "${FROMDIR}" -maxdepth 1 ! -type d 2>/dev/null)
+		if [[ -n ${files} ]] ; then
+			mv ${files} "${TODIR}" || die
+		fi
+	fi
+	fix_libtool_libdir_paths "${OFFLOADPATH}"
 }
 
 gcc_slot_java() {
