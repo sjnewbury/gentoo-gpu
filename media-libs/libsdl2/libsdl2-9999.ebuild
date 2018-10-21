@@ -67,8 +67,7 @@ RDEPEND="
 	vulkan? ( >=media-libs/vulkan-loader-1.0.61 )"
 DEPEND="${RDEPEND}
 	X? (
-		>=x11-proto/xextproto-7.2.1-r1[${MULTILIB_USEDEP}]
-		>=x11-proto/xproto-7.0.24[${MULTILIB_USEDEP}]
+		>=x11-base/xorg-proto-2018.4
 	)
 	virtual/pkgconfig"
 
