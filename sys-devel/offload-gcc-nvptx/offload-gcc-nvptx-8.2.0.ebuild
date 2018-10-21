@@ -8,7 +8,7 @@ PATCH_VER="1.4"
 NEWLIBV=3.0.0.20180831
 
 CTARGET=nvptx-none
-TOOLCHAIN_ALLOWED_LANGS="c c++ jit objc obj-c++ fortran"
+TOOLCHAIN_ALLOWED_LANGS="c c++ jit fortran"
 
 inherit toolchain
 
@@ -17,13 +17,6 @@ KEYWORDS=""
 RDEPEND=""
 DEPEND="${RDEPEND}
 	sys-devel/nvptx-tools"
-#	sys-libs/nvptx-newlib
-
-#PDEPEND="${PDEPEND} sys-libs/nvptx-newlib"
-
-#src_unpack() {
-#	toolchain_src_unpack
-#}
 
 src_prepare() {
 	epatch	"${FILESDIR}/nvptx-no-libffi.patch" \
