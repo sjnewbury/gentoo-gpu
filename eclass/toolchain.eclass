@@ -236,7 +236,7 @@ fi
 
 if in_iuse offload-nvptx ; then
 	DEPEND+=" offload-nvptx? (
-				sys-devel/offload-gcc-nvptx
+				~sys-devel/offload-gcc-nvptx-${PV}:${SLOT}=
 				dev-util/nvidia-cuda-toolkit
 		  )"
 fi
