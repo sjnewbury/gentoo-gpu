@@ -1,0 +1,18 @@
+--- ./src/cl_device_id.c~	2018-10-18 17:54:49.000000000 +0100
++++ ./src/cl_device_id.c	2018-10-18 17:55:51.792951448 +0100
+@@ -1018,6 +1018,7 @@
+ 
+   /* Do we have a usable device? */
+   device = cl_get_gt_device(device_type);
++#if 0
+   if (device) {
+     cl_self_test_res ret = cl_self_test(device, SELF_TEST_PASS);
+     if (ret == SELF_TEST_ATOMIC_FAIL) {
+@@ -1041,6 +1042,7 @@
+       }
+     }
+   }
++#endif
+   if (!device) {
+     if (num_devices)
+       *num_devices = 0;
