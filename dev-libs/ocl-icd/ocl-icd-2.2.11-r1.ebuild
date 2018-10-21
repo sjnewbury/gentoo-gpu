@@ -4,7 +4,7 @@
 
 EAPI=6
 
-USE_RUBY="ruby23 ruby22 ruby21 ruby20"
+USE_RUBY="ruby25 ruby24 ruby23 ruby22"
 
 inherit ruby-single multilib-minimal
 
@@ -25,9 +25,14 @@ RDEPEND="app-eselect/eselect-opencl"
 
 ECONF_SOURCE="${S}"
 
+append_abi_icd()
+{
+	echo "/usr/$(get_libdir)/OpenCL/vendors/ocl-icd/libOpenCL.so" >> ocl-icd.icd
+}
+
 src_prepare() {
 	default
-	multilib_foreach_abi echo "/usr/$(get_libdir)/OpenCL/vendors/ocl-icd/libOpenCL.so" >> ocl-icd.icd
+	multilib_foreach_abi append_abi_icd
 }
 
 multilib_src_install() {
