@@ -8,16 +8,6 @@
  #include "main/glheader.h"
  #include "main/context.h"
  #include "main/macros.h"
---- ./src/mesa/swrast/s_context.c~	2016-10-25 16:57:09.000000000 +0100
-+++ ./src/mesa/swrast/s_context.c	2016-10-25 17:19:41.843088794 +0100
-@@ -25,6 +25,7 @@
-  *    Keith Whitwell <keithw@vmware.com> Brian Paul
-  */
- 
-+#include <omp.h>
- #include "main/imports.h"
- #include "main/bufferobj.h"
- #include "main/mtypes.h"
 --- ./src/mesa/swrast/s_texcombine.c~	2016-10-25 16:57:09.000000000 +0100
 +++ ./src/mesa/swrast/s_texcombine.c	2016-10-25 17:20:20.297138713 +0100
 @@ -24,6 +24,7 @@
@@ -28,3 +18,13 @@
  #include "main/glheader.h"
  #include "main/context.h"
  #include "main/imports.h"
+--- ./src/mesa/swrast/s_context.c.orig	2018-04-15 14:17:00.068953510 +0100
++++ ./src/mesa/swrast/s_context.c	2018-04-15 14:18:35.792278998 +0100
+@@ -25,6 +25,7 @@
+  *    Keith Whitwell <keithw@vmware.com> Brian Paul
+  */
+ 
++#include <omp.h>
+ #include "main/errors.h"
+ #include "main/imports.h"
+ #include "main/bufferobj.h"

@@ -193,15 +193,7 @@ DEPEND="${RDEPEND}
 	sys-devel/gettext
 	virtual/pkgconfig
 	valgrind? ( dev-util/valgrind )
-	>=x11-proto/dri2proto-2.8-r1:=[${MULTILIB_USEDEP}]
-	dri3? (
-		>=x11-proto/dri3proto-1.0:=[${MULTILIB_USEDEP}]
-		>=x11-proto/presentproto-1.0:=[${MULTILIB_USEDEP}]
-	)
-	>=x11-proto/glproto-1.4.17-r1:=[${MULTILIB_USEDEP}]
-	>=x11-proto/xextproto-7.2.1-r1:=[${MULTILIB_USEDEP}]
-	>=x11-proto/xf86driproto-2.1.1-r1:=[${MULTILIB_USEDEP}]
-	>=x11-proto/xf86vidmodeproto-2.3.1-r1:=[${MULTILIB_USEDEP}]
+	x11-base/xorg-proto
 	dev-lang/python:2.7
 	vulkan? ( =dev-lang/python-3* )
 	>=dev-python/mako-0.7.3[python_targets_python2_7]
@@ -272,6 +264,7 @@ apply_mesa_patches() {
 
 	epatch "${FILESDIR}/${P}-fix-missing-openmp-include.patch"
 	epatch "${FILESDIR}"/glthread/*
+	epatch "${FILESDIR}"/0001-Revert-autoconf-stop-exporting-internal-wayland-deta.patch
 #	epatch "${FILESDIR}"/${P}-with-sha1.patch
 }
 
@@ -603,6 +596,11 @@ multilib_src_install() {
 		doenvd "${T}"/99mesaxdgomx
 		keepdir /usr/share/mesa/xdg
 	fi
+
+	# wayland-egl library is now provided by dev-libs/wayland
+	ebegin "Removing wayland-egl libraries"
+	find "${ED}" -name '*wayland-egl*' -exec rm -f {} \;
+	eend $?
 }
 
 multilib_src_install_all() {
@@ -614,10 +612,6 @@ multilib_src_install_all() {
 		ebegin "Remove generic Vulkan headers"
 		rm -rf "${ED}"/usr/include/vulkan || die Remove generic Vulkan headers failed!?!
 		eend $?
-	fi
-
-	if use !bindist; then
-		dodoc docs/patents.txt
 	fi
 
 	# Install config file for eselect mesa
@@ -658,12 +652,6 @@ pkg_postinst() {
 			OMX_BELLAGIO_REGISTRY=${EPREFIX}/usr/share/mesa/xdg/.omxregister \
 			omxregister-bellagio
 		eend $?
-	fi
-
-	# warn about patent encumbered texture-float
-	if use !bindist; then
-		elog "USE=\"bindist\" was not set. Potentially patent encumbered code was"
-		elog "enabled. Please see patents.txt for an explanation."
 	fi
 
 	if ! has_version media-libs/libtxc_dxtn; then
