@@ -17,7 +17,7 @@ GLXEXT="34"
 MIRROR="https://dev.gentoo.org/~mattst88/distfiles"
 SRC_URI=
 EGIT_COMMIT=1add374a54da7cbbb0ec0c38b8d01555f05145c6
-EGIT_REPO_URI=git://github.com/sjnewbury/opengl.eselect
+EGIT_REPO_URI=https://github.com/sjnewbury/opengl.eselect
 #	${MIRROR}/${P}.tar.xz"
 
 LICENSE="GPL-2"
@@ -42,7 +42,11 @@ pkg_preinst() {
 }
 
 pkg_postinst() {
-	if path_exists "${EROOT}"/usr/lib*/opengl; then
+	local shopt_save=$(shopt -p nullglob)
+	shopt -s nullglob
+	local opengl_dirs=( "${EROOT}"/usr/lib*/opengl )
+	${shopt_save}
+	if [[ -n ${opengl_dirs[@]} ]]; then
 		# delete broken symlinks
 		find "${EROOT}"/usr/lib*/opengl -xtype l -delete
 		# delete empty leftover directories (they confuse eselect)
