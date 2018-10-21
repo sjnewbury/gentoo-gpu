@@ -59,9 +59,9 @@ src_configure() {
 	local myconf=()
 
 	use video_cards_radeonsi && \
-		targets+=('amdgcn--')
+		targets+=('amdgcn-mesa-mesa3d')
 	( use video_cards_radeon || use video_cards_r600 ) && \
-		targets+=('r600--')
+		targets+=('r600-mesa-mesa3d')
 	use video_cards_nvidia && \
 		targets+=('nvptx--nvidiacl' 'nvptx64--nvidiacl')
 
