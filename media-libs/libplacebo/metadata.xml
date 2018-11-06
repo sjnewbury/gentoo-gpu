@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "http://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+	<maintainer type="person">
+		<email>gentoo@haasn.xyz</email>
+		<name>Niklas Haas</name>
+	</maintainer>
+	<use>
+		<flag name="glslang">Use dev-libs/glslang to compile GLSL</flag>
+		<flag name="shaderc">Use media-libs/shaderc to compile GLSL</flag>
+		<flag name="vulkan">Add support for the vulkan graphics API</flag>
+	</use>
+	<upstream>
+		<remote-id type="github">haasn/libplacebo</remote-id>
+		<bugs-to>https://github.com/haasn/libplacebo/issues</bugs-to>
+	</upstream>
+</pkgmetadata>
