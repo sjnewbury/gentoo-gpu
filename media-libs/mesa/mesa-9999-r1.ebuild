@@ -195,6 +195,7 @@ DEPEND="${RDEPEND}
 	x11-base/xorg-proto
 	dev-lang/python:2.7
 	vulkan? ( =dev-lang/python-3* )
+	wayland? ( >=dev-libs/wayland-protocols-1.16 )
 	>=dev-python/mako-0.7.3[python_targets_python2_7]
 "
 [[ ${PV} == 9999 ]] && DEPEND+="
