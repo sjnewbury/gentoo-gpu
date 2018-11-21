@@ -21,8 +21,8 @@ SLOT="0"
 IUSE="glslang +shaderc +vulkan"
 REQUIRED_USE="vulkan? ( || ( glslang shaderc ) )"
 
-RDEPEND="glslang? ( dev-util/glslang[${MULTILIB_USEDEP}] )
-	shaderc? ( media-libs/shaderc[${MULTILIB_USEDEP}] )
+RDEPEND="glslang? ( <dev-util/glslang-7.10[${MULTILIB_USEDEP}] )
+	shaderc? ( >=media-libs/shaderc-2018.0[${MULTILIB_USEDEP}] )
 	vulkan? ( media-libs/vulkan-loader[${MULTILIB_USEDEP}] )"
 DEPEND="${RDEPEND}"
 
