@@ -23,7 +23,7 @@ IUSE="glslang lcms +shaderc +vulkan"
 REQUIRED_USE="vulkan? ( || ( glslang shaderc ) )"
 
 RDEPEND="glslang? ( <dev-util/glslang-7.10[${MULTILIB_USEDEP}] )
-	shaderc? ( >=media-libs/shaderc-2018.0[${MULTILIB_USEDEP}] )
+	shaderc? ( >=media-libs/shaderc-2017.2[${MULTILIB_USEDEP}] )
 	vulkan? ( media-libs/vulkan-loader[${MULTILIB_USEDEP}] )
 	lcms? ( media-libs/lcms:2[${MULTILIB_USEDEP}] )"
 DEPEND="${RDEPEND}"
