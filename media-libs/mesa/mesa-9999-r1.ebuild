@@ -103,6 +103,7 @@ RDEPEND="
 	gbm? ( >=virtual/libudev-215:=[${MULTILIB_USEDEP}] )
 	dri3? ( >=virtual/libudev-215:=[${MULTILIB_USEDEP}] )
 	>=x11-libs/libX11-1.6.2:=[${MULTILIB_USEDEP}]
+	>=x11-libs/libXrandr-1.5.1:=[${MULTILIB_USEDEP}]
 	>=x11-libs/libxshmfence-1.1:=[${MULTILIB_USEDEP}]
 	>=x11-libs/libXdamage-1.1.4-r1:=[${MULTILIB_USEDEP}]
 	>=x11-libs/libXext-1.3.2:=[${MULTILIB_USEDEP}]
@@ -147,14 +148,7 @@ RDEPEND="
 	xvmc? ( >=x11-libs/libXvMC-1.0.8:=[${MULTILIB_USEDEP}] )
 	glvnd? ( media-libs/libglvnd[${MULTILIB_USEDEP}] )
 	gcrypt? ( dev-libs/libgcrypt )
-	${LIBDRM_DEPSTRING}[video_cards_freedreno?,video_cards_nouveau?,video_cards_vc4?,video_cards_vmware?,video_cards_virgl?,${MULTILIB_USEDEP}]
 "
-
-for card in ${INTEL_CARDS}; do
-	RDEPEND="${RDEPEND}
-		video_cards_${card}? ( ${LIBDRM_DEPSTRING}[video_cards_intel] )
-	"
-done
 
 for card in ${RADEON_CARDS}; do
 	RDEPEND="${RDEPEND}
@@ -173,9 +167,6 @@ for card in ${RADEON_CARDS}; do
 		)
 	"
 done
-RDEPEND="${RDEPEND}
-	video_cards_radeonsi? ( ${LIBDRM_DEPSTRING}[video_cards_amdgpu] )
-"
 
 DEPEND="${RDEPEND}
 	llvm? (
@@ -201,6 +192,20 @@ DEPEND="${RDEPEND}
 [[ ${PV} == 9999 ]] && DEPEND+="
 	sys-devel/bison
 	sys-devel/flex
+"
+
+RDEPEND="${RDEPEND}
+	${LIBDRM_DEPSTRING}[video_cards_freedreno?,video_cards_nouveau?,video_cards_vc4?,video_cards_vmware?,video_cards_virgl?,${MULTILIB_USEDEP}]
+"
+
+for card in ${INTEL_CARDS}; do
+	RDEPEND="${RDEPEND}
+		video_cards_${card}? ( ${LIBDRM_DEPSTRING}[video_cards_intel] )
+	"
+done
+
+RDEPEND="${RDEPEND}
+	video_cards_radeonsi? ( ${LIBDRM_DEPSTRING}[video_cards_amdgpu] )
 "
 
 S="${WORKDIR}/${MY_P}"
@@ -263,7 +268,8 @@ apply_mesa_patches() {
 	fi
 
 	epatch "${FILESDIR}/${P}-fix-missing-openmp-include.patch"
-	epatch "${FILESDIR}"/glthread/*
+	#upstreamed
+	#epatch "${FILESDIR}"/glthread/*
 	epatch "${FILESDIR}"/0001-Revert-autoconf-stop-exporting-internal-wayland-deta.patch
 #	epatch "${FILESDIR}"/${P}-with-sha1.patch
 }
@@ -286,6 +292,7 @@ glvnd_src_configure() {
 	pushd "${BUILD_DIR}"/glvnd_build
 	ECONF_SOURCE="${S}" \
 	econf \
+		--enable-autotools \
 		${myconf} \
 		${eglconf} \
 		--enable-libglvnd \
@@ -304,12 +311,6 @@ glvnd_src_configure() {
 		--disable-nine \
 		--disable-opencl \
 		PYTHON2="${PYTHON}"
-#		--without-dri-drivers \
-#		--without-gallium-drivers \
-#		--disable-osmesa \
-#		--disable-gallium-osmesa \
-# FIXME
-#		$(use_with gcrypt sha1=libgcrypt) \
 	popd
 
 
@@ -437,6 +438,7 @@ multilib_src_configure() {
 
 #	ECONF_SOURCE="${S}" \
 	econf \
+		--enable-autotools \
 		--enable-dri \
 		--enable-glx \
 		--enable-shared-glapi \
