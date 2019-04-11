@@ -521,8 +521,8 @@ src_install-libs() {
 		# symlink libGLX_vendor for system gl-dispatcher
 		local glvnd_ROOT=/usr/$(get_libdir)/opengl/glvnd
 		dodir "${glvnd_ROOT}"/lib
-		for x in "${GL_ROOT}"/lib*_nvidia.so* ; do
-			dosym "${x}" "${glvnd_ROOT}"/lib/"${x##*/}"
+		for x in "${ED}/${GL_ROOT}"/lib*_nvidia.so* ; do
+			dosym "${x/${ED}}" "${glvnd_ROOT}"/lib/"${x##*/}"
 		done
 
 
