@@ -77,17 +77,15 @@ MULTILIB_WRAPPED_HEADERS=(
 
 PATCHES=(
 	# https://bugzilla.libsdl.org/show_bug.cgi?id=1431
-	"${FILESDIR}"/${PN}-2.0.6-static-libs.patch
-	"${FILESDIR}"/${PN}-2.0.5-wayland-before-x11.patch
+	"${FILESDIR}"/${P}-static-libs.patch
+	"${FILESDIR}"/${P}-wayland-before-x11.patch
 )
 
 S=${WORKDIR}/${MY_P}
 
 src_prepare() {
 	default
-	sed -i -e 's/configure.in/configure.ac/' Makefile.in || die
 	sed -i -e 's/\"\.\/khronos\/\(.*\)\"/<\1>/' src/video/SDL_vulkan_internal.h || die
-	mv configure.{in,ac} || die
 	AT_M4DIR="/usr/share/aclocal acinclude" eautoreconf
 }
 
