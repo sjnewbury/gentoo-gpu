@@ -9,9 +9,9 @@
 		<flag name="glslang">Use dev-libs/glslang to compile GLSL</flag>
 		<flag name="shaderc">Use media-libs/shaderc to compile GLSL</flag>
 		<flag name="vulkan">Add support for the vulkan graphics API</flag>
+		<flag name="lcms">Add support for color management via LittleCMS</flag>
 	</use>
 	<upstream>
-		<remote-id type="github">haasn/libplacebo</remote-id>
-		<bugs-to>https://github.com/haasn/libplacebo/issues</bugs-to>
+		<bugs-to>https://code.videolan.org/videolan/libplacebo/issues</bugs-to>
 	</upstream>
 </pkgmetadata>
