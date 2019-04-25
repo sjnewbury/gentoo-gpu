@@ -71,6 +71,7 @@ REQUIRED_USE="
 	opengl? ( || ( egl glx ) )
 	xlib-xcb? ( xcb )
 	glx? ( opengl )
+	egl? ( || ( opengl gles2 ) )
 "
 #	gallium? ( drm )
 
