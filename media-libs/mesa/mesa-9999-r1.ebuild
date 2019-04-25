@@ -270,7 +270,7 @@ apply_mesa_patches() {
 	epatch "${FILESDIR}/${P}-fix-missing-openmp-include.patch"
 	#upstreamed
 	#epatch "${FILESDIR}"/glthread/*
-	epatch "${FILESDIR}"/0001-Revert-autoconf-stop-exporting-internal-wayland-deta.patch
+	#epatch "${FILESDIR}"/0001-Revert-autoconf-stop-exporting-internal-wayland-deta.patch
 #	epatch "${FILESDIR}"/${P}-with-sha1.patch
 }
 

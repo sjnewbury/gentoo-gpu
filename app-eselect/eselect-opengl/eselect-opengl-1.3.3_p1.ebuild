@@ -27,12 +27,12 @@ IUSE=""
 
 DEPEND="app-arch/xz-utils"
 RDEPEND=">=app-admin/eselect-1.2.4
-		 media-libs/mesa
 		 !<x11-proto/glproto-1.4.17-r1
-		 x11-base/xorg-server
 		 !<x11-drivers/ati-drivers-14.9-r2
 		 !=x11-drivers/ati-drivers-14.12
 		 !<=app-emulation/emul-linux-x86-opengl-20140508"
+#		 media-libs/mesa
+#		 x11-base/xorg-server
 
 #S=${WORKDIR}
 
