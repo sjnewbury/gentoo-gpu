@@ -295,7 +295,7 @@ src_prepare() {
 		export revision=git-N-${FFMPEG_REVISION}
 	fi
 	eapply "${FILESDIR}/vaapi_encode_mpeg2-anamophic.patch"
-	eapply "${FILESDIR}/vaapi-cpb_props-r1.patch"
+	eapply "${FILESDIR}/vaapi-cpb_props-r2.patch"
 
 	default
 }
