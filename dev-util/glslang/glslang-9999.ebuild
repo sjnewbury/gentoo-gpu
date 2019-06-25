@@ -16,11 +16,11 @@ if [[ "${PV}" == 9999* ]]; then
 else
 	RELEASE_NAME="Overload400-PrecQual"
 	SRC_URI=""https://github.com/KhronosGroup/glslang"/archive/${RELEASE_NAME}.tar.gz"
+	KEYWORDS="~amd64"
 fi
 
 LICENSE="BSD"
 SLOT="0"
-KEYWORDS="~amd64"
 IUSE=""
 
 DEPEND=""
