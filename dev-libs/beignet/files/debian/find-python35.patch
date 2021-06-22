@@ -1,0 +1,18 @@
+Description: Find Python 3.5
+
+Workaround for
+https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=802826
+https://bugs.launchpad.net/ubuntu/+source/cmake/+bug/1515419
+
+Author: Rebecca N. Palmer <rebecca_palmer@zoho.com>
+
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -222,6 +222,7 @@ ELSE(OCLIcd_FOUND)
+ ENDIF(OCLIcd_FOUND)
+ ENDIF(OCLICD_COMPAT)
+ 
++set(Python_ADDITIONAL_VERSIONS 3.5)
+ Find_Package(PythonInterp)
+ 
+ OPTION(EXPERIMENTAL_DOUBLE "Enable experimental double support" OFF)

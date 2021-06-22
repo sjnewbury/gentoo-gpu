@@ -1,0 +1,37 @@
+Description: Support LLVM 6
+
+LLVMContext::setDiagnosticHandler is renamed
+LoopInfo::markAsRemoved is partly replaced by LoopInfo::erase,
+but that doesn't remove the loop from the queue
+
+Author: Rebecca N. Palmer <rebecca_palmer@zoho.com>
+Forwarded: https://lists.freedesktop.org/archives/beignet/2018-July/009211.html (original), https://lists.freedesktop.org/archives/beignet/2019-January/009222.html (#913141 fix)
+
+--- a/backend/src/llvm/llvm_to_gen.cpp
++++ b/backend/src/llvm/llvm_to_gen.cpp
+@@ -322,7 +322,11 @@ namespace gbe
+     DataLayout DL(&mod);
+     
+     gbeDiagnosticContext dc;
++#if LLVM_VERSION_MAJOR >= 6
++    mod.getContext().setDiagnosticHandlerCallBack(&gbeDiagnosticHandler,&dc);
++#else
+     mod.getContext().setDiagnosticHandler(&gbeDiagnosticHandler,&dc);
++#endif
+ 
+ #if LLVM_VERSION_MAJOR * 10 + LLVM_VERSION_MINOR >= 37
+     mod.setDataLayout(DL);
+--- a/backend/src/llvm/llvm_unroll.cpp
++++ b/backend/src/llvm/llvm_unroll.cpp
+@@ -205,7 +205,10 @@ namespace gbe {
+           if (parentTripCount != 0 && currTripCount * parentTripCount > 32) {
+             //Don't change the unrollID if doesn't force unroll.
+             //setUnrollID(parentL, false);
+-#if LLVM_VERSION_MAJOR * 10 + LLVM_VERSION_MINOR >= 38
++#if LLVM_VERSION_MAJOR >= 6
++            LPM.markLoopAsDeleted(*parentL);
++            loopInfo.erase(parentL);
++#elif LLVM_VERSION_MAJOR * 10 + LLVM_VERSION_MINOR >= 38
+             loopInfo.markAsRemoved(parentL);
+ #else
+             LPM.deleteLoopFromQueue(parentL);

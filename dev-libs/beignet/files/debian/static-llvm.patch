@@ -1,0 +1,52 @@
+Description: Statically link to libllvm
+
+When multiple ICDs are installed, libopencl1 needs to dlopen() them all
+to find out which one works on the available hardware.  If they are
+dynamically linked, this leads to them sharing a libllvm, which has
+enough global state that this is likely to error out.  (This is a known
+LLVM bug, https://bugs.llvm.org/show_bug.cgi?id=22952 , but currently
+has no real fix.)
+
+Author: Rebecca N. Palmer <rebecca_palmer@zoho.com>
+Bug: https://bugs.llvm.org/show_bug.cgi?id=30587
+Bug-Debian: https://bugs.debian.org/852746
+Forwarded: https://lists.freedesktop.org/archives/beignet/2019-January/009226.html
+
+--- beignet-1.3.0.orig/CMake/FindLLVM.cmake
++++ beignet-1.3.0/CMake/FindLLVM.cmake
+@@ -87,18 +87,34 @@ execute_process(
+   OUTPUT_STRIP_TRAILING_WHITESPACE
+ )
+ 
++if (LLVM_VERSION_NODOT VERSION_GREATER 38)
++execute_process(
++  COMMAND ${LLVM_CONFIG_EXECUTABLE} --libs --link-static
++  OUTPUT_VARIABLE LLVM_MODULE_LIBS
++  OUTPUT_STRIP_TRAILING_WHITESPACE
++)
++else (LLVM_VERSION_NODOT VERSION_GREATER 38)
+ execute_process(
+   COMMAND ${LLVM_CONFIG_EXECUTABLE} --libs
+   OUTPUT_VARIABLE LLVM_MODULE_LIBS
+   OUTPUT_STRIP_TRAILING_WHITESPACE
+ )
++endif (LLVM_VERSION_NODOT VERSION_GREATER 38)
+ 
+ if (LLVM_VERSION_NODOT VERSION_GREATER 34)
++if (LLVM_VERSION_NODOT VERSION_GREATER 38)
++execute_process(
++  COMMAND ${LLVM_CONFIG_EXECUTABLE} --system-libs --link-static
++  OUTPUT_VARIABLE LLVM_SYSTEM_LIBS_ORIG
++  OUTPUT_STRIP_TRAILING_WHITESPACE
++)
++else (LLVM_VERSION_NODOT VERSION_GREATER 38)
+ execute_process(
+   COMMAND ${LLVM_CONFIG_EXECUTABLE} --system-libs
+   OUTPUT_VARIABLE LLVM_SYSTEM_LIBS_ORIG
+   OUTPUT_STRIP_TRAILING_WHITESPACE
+ )
++endif (LLVM_VERSION_NODOT VERSION_GREATER 38)
+ if (LLVM_SYSTEM_LIBS_ORIG)
+ string(REGEX REPLACE " *\n" "" LLVM_SYSTEM_LIBS ${LLVM_SYSTEM_LIBS_ORIG})
+ endif (LLVM_SYSTEM_LIBS_ORIG)
+

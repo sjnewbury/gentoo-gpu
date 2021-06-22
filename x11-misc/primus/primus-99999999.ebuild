@@ -32,7 +32,7 @@ DEPEND="virtual/opengl"
 
 
 src_compile() {
-	export PRIMUS_libGLa='/usr/$$LIB/opengl/nvidia/lib/libGL.so.1'
+	export PRIMUS_libGLa='/usr/$$LIB/opengl/nvidia/lib/libGL.so'
 	mymake() {
 		emake LIBDIR=$(get_libdir)
 	}
@@ -40,12 +40,12 @@ src_compile() {
 }
 
 src_install() {
-	sed -i -e "s#^PRIMUS_libGL=.*#PRIMUS_libGL='/usr/\$LIB/opengl/primus/lib'#" primusrun
+	sed -i -e "s#^PRIMUS_libGL=.*#PRIMUS_libGL='/usr/\$LIB/primus'#" primusrun
 	dobin primusrun
 	myinst() {
-		insinto /usr/$(get_libdir)/opengl/primus/lib
+		insinto /usr/$(get_libdir)/primus
 		doins "${S}"/$(get_libdir)/libGL.so.1
-		dosym libGL.so.1 /usr/$(get_libdir)/opengl/primus/lib/libGL.so
+		dosym libGL.so.1 /usr/$(get_libdir)/primus/libGL.so
 	}
 	multilib_foreach_abi myinst
 }

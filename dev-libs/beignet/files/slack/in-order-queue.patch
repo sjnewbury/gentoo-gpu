@@ -1,0 +1,381 @@
+Description: Make in-order command queues actually be in-order
+
+When beignet added out-of-order execution support (7fd45f15),
+it made *all* queues use it, even ones that are nominally in-order.
+
+While using out-of-order queues is probably a good idea when possible
+(for performance), the OpenCL spec does not allow it to be the default.
+
+Author: Rebecca N. Palmer <rebecca_palmer@zoho.com>
+Forwarded: https://lists.freedesktop.org/archives/beignet/2018-July/009213.html
+
+--- a/src/cl_api.c
++++ b/src/cl_api.c
+@@ -276,7 +276,7 @@ clEnqueueSVMFree (cl_command_queue command_queue,
+     data->size      = num_svm_pointers;
+     data->ptr       = user_data;
+ 
+-    if (e_status == CL_COMPLETE) {
++    if (cl_command_queue_allow_bypass_submit(command_queue) && (e_status == CL_COMPLETE)) {
+       // Sync mode, no need to queue event.
+       err = cl_event_exec(e, CL_COMPLETE, CL_FALSE);
+       if (err != CL_SUCCESS) {
+@@ -422,7 +422,7 @@ cl_int clEnqueueSVMMemcpy (cl_command_queue command_queue,
+     data->const_ptr    = src_ptr;
+     data->size         = size;
+ 
+-    if (e_status == CL_COMPLETE) {
++    if (cl_command_queue_allow_bypass_submit(command_queue) && (e_status == CL_COMPLETE)) {
+       // Sync mode, no need to queue event.
+       err = cl_event_exec(e, CL_COMPLETE, CL_FALSE);
+       if (err != CL_SUCCESS) {
+@@ -434,6 +434,9 @@ cl_int clEnqueueSVMMemcpy (cl_command_queue command_queue,
+         break;
+       }
+       cl_command_queue_enqueue_event(command_queue, e);
++      if (blocking_copy) {
++        cl_event_wait_for_events_list(1, &e);
++      }
+     }
+   } while(0);
+ 
+@@ -511,7 +514,7 @@ cl_int clEnqueueSVMMemFill (cl_command_queue command_queue,
+     data->pattern_size = pattern_size;
+     data->size         = size;
+ 
+-    if (e_status == CL_COMPLETE) {
++    if (cl_command_queue_allow_bypass_submit(command_queue) && (e_status == CL_COMPLETE)) {
+       // Sync mode, no need to queue event.
+       err = cl_event_exec(e, CL_COMPLETE, CL_FALSE);
+       if (err != CL_SUCCESS) {
+--- a/src/cl_api_kernel.c
++++ b/src/cl_api_kernel.c
+@@ -223,6 +223,7 @@ clEnqueueNDRangeKernel(cl_command_queue command_queue,
+     count *= global_wk_sz_rem[2] ? 2 : 1;
+ 
+     const size_t *global_wk_all[2] = {global_wk_sz_div, global_wk_sz_rem};
++    cl_bool allow_immediate_submit = cl_command_queue_allow_bypass_submit(command_queue);
+     /* Go through the at most 8 cases and euque if there is work items left */
+     for (i = 0; i < 2; i++) {
+       for (j = 0; j < 2; j++) {
+@@ -263,7 +264,7 @@ clEnqueueNDRangeKernel(cl_command_queue command_queue,
+             break;
+           }
+ 
+-          err = cl_event_exec(e, (event_status == CL_COMPLETE ? CL_SUBMITTED : CL_QUEUED), CL_FALSE);
++          err = cl_event_exec(e, ((allow_immediate_submit && event_status == CL_COMPLETE) ? CL_SUBMITTED : CL_QUEUED), CL_FALSE);
+           if (err != CL_SUCCESS) {
+             break;
+           }
+--- a/src/cl_api_mem.c
++++ b/src/cl_api_mem.c
+@@ -308,7 +308,7 @@ clEnqueueMapBuffer(cl_command_queue command_queue,
+     if (map_flags & (CL_MAP_WRITE | CL_MAP_WRITE_INVALIDATE_REGION))
+       data->write_map = 1;
+ 
+-    if (e_status == CL_COMPLETE) {
++    if (cl_command_queue_allow_bypass_submit(command_queue) && (e_status == CL_COMPLETE)) {
+       // Sync mode, no need to queue event.
+       err = cl_event_exec(e, CL_COMPLETE, CL_FALSE);
+       if (err != CL_SUCCESS) {
+@@ -321,6 +321,9 @@ clEnqueueMapBuffer(cl_command_queue command_queue,
+       }
+ 
+       cl_command_queue_enqueue_event(command_queue, e);
++      if (blocking_map) {
++        cl_event_wait_for_events_list(1, &e);
++      }
+     }
+ 
+     ptr = data->ptr;
+@@ -393,7 +396,7 @@ clEnqueueUnmapMemObject(cl_command_queue command_queue,
+     data->mem_obj = memobj;
+     data->ptr = mapped_ptr;
+ 
+-    if (e_status == CL_COMPLETE) { // No need to wait
++    if (cl_command_queue_allow_bypass_submit(command_queue) && (e_status == CL_COMPLETE)) { // No need to wait
+       err = cl_event_exec(e, CL_COMPLETE, CL_FALSE);
+       if (err != CL_SUCCESS) {
+         break;
+@@ -495,7 +498,7 @@ clEnqueueReadBuffer(cl_command_queue command_queue,
+     data->offset = offset;
+     data->size = size;
+ 
+-    if (e_status == CL_COMPLETE) {
++    if (cl_command_queue_allow_bypass_submit(command_queue) && (e_status == CL_COMPLETE)) {
+       // Sync mode, no need to queue event.
+       err = cl_event_exec(e, CL_COMPLETE, CL_FALSE);
+       if (err != CL_SUCCESS) {
+@@ -507,6 +510,9 @@ clEnqueueReadBuffer(cl_command_queue command_queue,
+         break;
+       }
+       cl_command_queue_enqueue_event(command_queue, e);
++      if (blocking_read) {
++        cl_event_wait_for_events_list(1, &e);
++      }
+     }
+   } while (0);
+ 
+@@ -598,7 +604,7 @@ clEnqueueWriteBuffer(cl_command_queue command_queue,
+     data->offset = offset;
+     data->size = size;
+ 
+-    if (e_status == CL_COMPLETE) {
++    if (cl_command_queue_allow_bypass_submit(command_queue) && (e_status == CL_COMPLETE)) {
+       // Sync mode, no need to queue event.
+       err = cl_event_exec(e, CL_COMPLETE, CL_FALSE);
+       if (err != CL_SUCCESS) {
+@@ -610,6 +616,9 @@ clEnqueueWriteBuffer(cl_command_queue command_queue,
+         break;
+       }
+       cl_command_queue_enqueue_event(command_queue, e);
++      if (blocking_write) {
++        cl_event_wait_for_events_list(1, &e);
++      }
+     }
+   } while (0);
+ 
+@@ -747,7 +756,7 @@ clEnqueueReadBufferRect(cl_command_queue command_queue,
+     data->host_row_pitch = host_row_pitch;
+     data->host_slice_pitch = host_slice_pitch;
+ 
+-    if (e_status == CL_COMPLETE) {
++    if (cl_command_queue_allow_bypass_submit(command_queue) && (e_status == CL_COMPLETE)) {
+       // Sync mode, no need to queue event.
+       err = cl_event_exec(e, CL_COMPLETE, CL_FALSE);
+       if (err != CL_SUCCESS) {
+@@ -759,6 +768,9 @@ clEnqueueReadBufferRect(cl_command_queue command_queue,
+         break;
+       }
+       cl_command_queue_enqueue_event(command_queue, e);
++      if (blocking_read) {
++        cl_event_wait_for_events_list(1, &e);
++      }
+     }
+   } while (0);
+ 
+@@ -898,7 +910,7 @@ clEnqueueWriteBufferRect(cl_command_queue command_queue,
+     data->host_row_pitch = host_row_pitch;
+     data->host_slice_pitch = host_slice_pitch;
+ 
+-    if (e_status == CL_COMPLETE) {
++    if (cl_command_queue_allow_bypass_submit(command_queue) && (e_status == CL_COMPLETE)) {
+       // Sync mode, no need to queue event.
+       err = cl_event_exec(e, CL_COMPLETE, CL_FALSE);
+       if (err != CL_SUCCESS) {
+@@ -910,6 +922,9 @@ clEnqueueWriteBufferRect(cl_command_queue command_queue,
+         break;
+       }
+       cl_command_queue_enqueue_event(command_queue, e);
++      if (blocking_write) {
++        cl_event_wait_for_events_list(1, &e);
++      }
+     }
+   } while (0);
+ 
+@@ -1017,7 +1032,7 @@ clEnqueueCopyBuffer(cl_command_queue command_queue,
+       break;
+     }
+ 
+-    err = cl_event_exec(e, e_status == CL_COMPLETE ? CL_SUBMITTED : CL_QUEUED, CL_FALSE);
++    err = cl_event_exec(e, (cl_command_queue_allow_bypass_submit(command_queue) && (e_status == CL_COMPLETE)) ? CL_SUBMITTED : CL_QUEUED, CL_FALSE);
+     if (err != CL_SUCCESS) {
+       break;
+     }
+@@ -1207,7 +1222,7 @@ clEnqueueCopyBufferRect(cl_command_queue command_queue,
+     if (e_status < CL_COMPLETE) { // Error happend, cancel.
+       err = CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST;
+       break;
+-    } else if (e_status == CL_COMPLETE) {
++    } else if (cl_command_queue_allow_bypass_submit(command_queue) && (e_status == CL_COMPLETE)) {
+       err = cl_event_exec(e, CL_SUBMITTED, CL_FALSE);
+       if (err != CL_SUCCESS) {
+         break;
+@@ -1308,7 +1323,7 @@ clEnqueueFillBuffer(cl_command_queue command_queue,
+       break;
+     }
+ 
+-    err = cl_event_exec(e, e_status == CL_COMPLETE ? CL_SUBMITTED : CL_QUEUED, CL_FALSE);
++    err = cl_event_exec(e, (cl_command_queue_allow_bypass_submit(command_queue) && (e_status == CL_COMPLETE)) ? CL_SUBMITTED : CL_QUEUED, CL_FALSE);
+     if (err != CL_SUCCESS) {
+       break;
+     }
+@@ -1395,7 +1410,7 @@ clEnqueueMigrateMemObjects(cl_command_queue command_queue,
+       break;
+     }
+ 
+-    err = cl_event_exec(e, e_status == CL_COMPLETE ? CL_SUBMITTED : CL_QUEUED, CL_FALSE);
++    err = cl_event_exec(e, (cl_command_queue_allow_bypass_submit(command_queue) && (e_status == CL_COMPLETE)) ? CL_SUBMITTED : CL_QUEUED, CL_FALSE);
+     if (err != CL_SUCCESS) {
+       break;
+     }
+@@ -1574,7 +1589,7 @@ clEnqueueMapImage(cl_command_queue command_queue,
+     if (map_flags & (CL_MAP_WRITE | CL_MAP_WRITE_INVALIDATE_REGION))
+       data->write_map = 1;
+ 
+-    if (e_status == CL_COMPLETE) {
++    if (cl_command_queue_allow_bypass_submit(command_queue) && (e_status == CL_COMPLETE)) {
+       // Sync mode, no need to queue event.
+       err = cl_event_exec(e, CL_COMPLETE, CL_FALSE);
+       if (err != CL_SUCCESS) {
+@@ -1587,6 +1602,9 @@ clEnqueueMapImage(cl_command_queue command_queue,
+       }
+ 
+       cl_command_queue_enqueue_event(command_queue, e);
++      if (blocking_map) {
++        cl_event_wait_for_events_list(1, &e);
++      }
+     }
+ 
+     ptr = data->ptr;
+@@ -1764,7 +1782,7 @@ clEnqueueReadImage(cl_command_queue command_queue,
+     data->row_pitch = row_pitch;
+     data->slice_pitch = slice_pitch;
+ 
+-    if (e_status == CL_COMPLETE) {
++    if (cl_command_queue_allow_bypass_submit(command_queue) && (e_status == CL_COMPLETE)) {
+       // Sync mode, no need to queue event.
+       err = cl_event_exec(e, CL_COMPLETE, CL_FALSE);
+       if (err != CL_SUCCESS) {
+@@ -1776,6 +1794,9 @@ clEnqueueReadImage(cl_command_queue command_queue,
+         break;
+       }
+       cl_command_queue_enqueue_event(command_queue, e);
++      if (blocking_read) {
++        cl_event_wait_for_events_list(1, &e);
++      }
+     }
+   } while (0);
+ 
+@@ -1916,7 +1937,7 @@ clEnqueueWriteImage(cl_command_queue command_queue,
+     data->row_pitch = row_pitch;
+     data->slice_pitch = slice_pitch;
+ 
+-    if (e_status == CL_COMPLETE) {
++    if (cl_command_queue_allow_bypass_submit(command_queue) && (e_status == CL_COMPLETE)) {
+       // Sync mode, no need to queue event.
+       err = cl_event_exec(e, CL_COMPLETE, CL_FALSE);
+       if (err != CL_SUCCESS) {
+@@ -1928,6 +1949,9 @@ clEnqueueWriteImage(cl_command_queue command_queue,
+         break;
+       }
+       cl_command_queue_enqueue_event(command_queue, e);
++      if (blocking_write) {
++        cl_event_wait_for_events_list(1, &e);
++      }
+     }
+   } while (0);
+ 
+@@ -2062,7 +2086,7 @@ clEnqueueCopyImage(cl_command_queue command_queue,
+       break;
+     }
+ 
+-    err = cl_event_exec(e, e_status == CL_COMPLETE ? CL_SUBMITTED : CL_QUEUED, CL_FALSE);
++    err = cl_event_exec(e, (cl_command_queue_allow_bypass_submit(command_queue) && (e_status == CL_COMPLETE)) ? CL_SUBMITTED : CL_QUEUED, CL_FALSE);
+     if (err != CL_SUCCESS) {
+       break;
+     }
+@@ -2173,7 +2197,7 @@ clEnqueueCopyImageToBuffer(cl_command_queue command_queue,
+       break;
+     }
+ 
+-    err = cl_event_exec(e, e_status == CL_COMPLETE ? CL_SUBMITTED : CL_QUEUED, CL_FALSE);
++    err = cl_event_exec(e, (cl_command_queue_allow_bypass_submit(command_queue) && (e_status == CL_COMPLETE)) ? CL_SUBMITTED : CL_QUEUED, CL_FALSE);
+     if (err != CL_SUCCESS) {
+       break;
+     }
+@@ -2285,7 +2309,7 @@ clEnqueueCopyBufferToImage(cl_command_queue command_queue,
+       break;
+     }
+ 
+-    err = cl_event_exec(e, e_status == CL_COMPLETE ? CL_SUBMITTED : CL_QUEUED, CL_FALSE);
++    err = cl_event_exec(e, (cl_command_queue_allow_bypass_submit(command_queue) && (e_status == CL_COMPLETE)) ? CL_SUBMITTED : CL_QUEUED, CL_FALSE);
+     if (err != CL_SUCCESS) {
+       break;
+     }
+@@ -2395,7 +2419,7 @@ clEnqueueFillImage(cl_command_queue command_queue,
+       break;
+     }
+ 
+-    err = cl_event_exec(e, e_status == CL_COMPLETE ? CL_SUBMITTED : CL_QUEUED, CL_FALSE);
++    err = cl_event_exec(e, (cl_command_queue_allow_bypass_submit(command_queue) && (e_status == CL_COMPLETE)) ? CL_SUBMITTED : CL_QUEUED, CL_FALSE);
+     if (err != CL_SUCCESS) {
+       break;
+     }
+--- a/src/cl_command_queue.h
++++ b/src/cl_command_queue.h
+@@ -103,6 +103,11 @@ extern cl_int cl_command_queue_wait_finish(cl_command_queue queue);
+ extern cl_int cl_command_queue_wait_flush(cl_command_queue queue);
+ /* Note: Must call this function with queue's lock. */
+ extern cl_event *cl_command_queue_record_in_queue_events(cl_command_queue queue, cl_uint *list_num);
++/* Whether it is valid to call cl_event_exec directly, instead of cl_command_queue_enqueue_event */
++static inline cl_bool cl_command_queue_allow_bypass_submit(cl_command_queue queue){
++  return (queue->props & CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE)/* if out-of-order, always */
++    || list_empty(&queue->worker.enqueued_events);/* if in-order, only if empty */
++}
+ 
+ #endif /* __CL_COMMAND_QUEUE_H__ */
+ 
+--- a/src/cl_command_queue_enqueue.c
++++ b/src/cl_command_queue_enqueue.c
+@@ -65,6 +65,8 @@ worker_thread_function(void *Arg)
+       if (cl_event_is_ready(e) <= CL_COMPLETE) {
+         list_node_del(&e->enqueue_node);
+         list_add_tail(&ready_list, &e->enqueue_node);
++      } else if(!(queue->props & CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE)){
++        break; /* in in-order mode, can't skip over non-ready events */
+       }
+     }
+ 
+@@ -80,18 +82,20 @@ worker_thread_function(void *Arg)
+     CL_OBJECT_UNLOCK(queue);
+ 
+     /* Do the really job without lock.*/
+-    exec_status = CL_SUBMITTED;
+-    list_for_each_safe(pos, n, &ready_list)
+-    {
+-      e = list_entry(pos, _cl_event, enqueue_node);
+-      cl_event_exec(e, exec_status, CL_FALSE);
+-    }
++    if (queue->props & CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE) { /* in in-order mode, need to get each all the way to CL_COMPLETE before starting the next one */
++      exec_status = CL_SUBMITTED;
++      list_for_each_safe(pos, n, &ready_list)
++      {
++        e = list_entry(pos, _cl_event, enqueue_node);
++        cl_event_exec(e, exec_status, CL_FALSE);
++      }
+ 
+-    /* Notify all waiting for flush. */
+-    CL_OBJECT_LOCK(queue);
+-    worker->in_exec_status = CL_SUBMITTED;
+-    CL_OBJECT_NOTIFY_COND(queue);
+-    CL_OBJECT_UNLOCK(queue);
++      /* Notify all waiting for flush. */
++      CL_OBJECT_LOCK(queue);
++      worker->in_exec_status = CL_SUBMITTED;
++      CL_OBJECT_NOTIFY_COND(queue);
++      CL_OBJECT_UNLOCK(queue);
++    }
+ 
+     list_for_each_safe(pos, n, &ready_list)
+     {
+--- a/src/cl_gl_api.c
++++ b/src/cl_gl_api.c
+@@ -188,7 +188,7 @@ cl_int clEnqueueAcquireGLObjects (cl_command_queue command_queue,
+     data = &e->exec_data;
+     data->type = EnqueueReturnSuccesss;
+ 
+-    if (e_status == CL_COMPLETE) {
++    if (cl_command_queue_allow_bypass_submit(command_queue) && (e_status == CL_COMPLETE)) {
+       // Sync mode, no need to queue event.
+       err = cl_event_exec(e, CL_COMPLETE, CL_FALSE);
+       if (err != CL_SUCCESS) {
+@@ -274,7 +274,7 @@ cl_int clEnqueueReleaseGLObjects (cl_command_queue command_queue,
+     data = &e->exec_data;
+     data->type = EnqueueReturnSuccesss;
+ 
+-    if (e_status == CL_COMPLETE) {
++    if (cl_command_queue_allow_bypass_submit(command_queue) && (e_status == CL_COMPLETE)) {
+       // Sync mode, no need to queue event.
+       err = cl_event_exec(e, CL_COMPLETE, CL_FALSE);
+       if (err != CL_SUCCESS) {

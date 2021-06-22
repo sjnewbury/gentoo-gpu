@@ -1,0 +1,2934 @@
+From 9edddad0f32c906f1735ba345fe78f4de490035a Mon Sep 17 00:00:00 2001
+From: Steven Newbury <steve@snewbury.org.uk>
+Date: Wed, 11 Mar 2020 11:11:10 +0000
+Subject: [PATCH] Revert "Implement extension
+ cl_intel_device_side_avc_motion_estimation."
+
+This reverts commit 9cb7ff4c285d892616595e5a43793f4d1408eca4.
+---
+ backend/src/backend/gen/gen_mesa_disasm.c     |   24 +-
+ backend/src/backend/gen8_instruction.hpp      |   15 -
+ backend/src/backend/gen9_context.cpp          |  105 --
+ backend/src/backend/gen9_context.hpp          |    1 -
+ backend/src/backend/gen9_encoder.cpp          |   46 -
+ backend/src/backend/gen9_encoder.hpp          |    9 -
+ backend/src/backend/gen_context.cpp           |   56 +-
+ backend/src/backend/gen_context.hpp           |    1 -
+ backend/src/backend/gen_defs.hpp              |    1 -
+ backend/src/backend/gen_encoder.cpp           |    8 -
+ backend/src/backend/gen_encoder.hpp           |    4 -
+ .../backend/gen_insn_gen7_schedule_info.hxx   |    1 -
+ backend/src/backend/gen_insn_selection.cpp    |   63 -
+ backend/src/backend/gen_insn_selection.hpp    |   12 +-
+ backend/src/backend/gen_insn_selection.hxx    |    1 -
+ backend/src/ir/instruction.cpp                |   56 -
+ backend/src/ir/instruction.hpp                |   14 +-
+ backend/src/ir/instruction.hxx                |    1 -
+ backend/src/ir/liveness.cpp                   |    1 -
+ backend/src/libocl/include/ocl_misc.h         |  364 -----
+ backend/src/libocl/src/ocl_misc.cl            | 1325 -----------------
+ backend/src/llvm/llvm_gen_backend.cpp         |   36 -
+ backend/src/llvm/llvm_gen_ocl_function.hxx    |    1 -
+ backend/src/llvm/llvm_scalarize.cpp           |    1 -
+ src/cl_command_queue.c                        |    8 -
+ src/cl_device_id.c                            |    4 -
+ src/cl_extensions.c                           |    2 +-
+ src/cl_extensions.h                           |    5 +-
+ src/intel/intel_gpgpu.c                       |   70 -
+ src/intel/intel_structs.h                     |   63 -
+ utests/utest_helper.cpp                       |   18 -
+ utests/utest_helper.hpp                       |    3 -
+ 32 files changed, 36 insertions(+), 2283 deletions(-)
+
+diff --git a/backend/src/backend/gen/gen_mesa_disasm.c b/backend/src/backend/gen/gen_mesa_disasm.c
+index ca36afa1..8a2afe58 100644
+--- a/backend/src/backend/gen/gen_mesa_disasm.c
++++ b/backend/src/backend/gen/gen_mesa_disasm.c
+@@ -370,7 +370,6 @@ static const char *target_function_gen75[16] = {
+   [GEN_SFID_DATAPORT_DATA] = "data (0)",
+   [GEN_SFID_PIXEL_INTERPOLATOR] = "pix_interpolator",
+   [GEN_SFID_DATAPORT1_DATA] = "data (1)",
+-  [GEN_SFID_CHECK_REFINE] = "check_and_refine",
+ };
+ 
+ static const char *gateway_sub_function[8] = {
+@@ -528,13 +527,6 @@ static int gen_version;
+     bits;                                                       \
+   })
+ 
+-#define GEN8_BITS_FIELD(inst, gen8) \
+-  ({                                                            \
+-    int bits;                                                   \
+-      bits = ((const union Gen8NativeInstruction *)inst)->gen8; \
+-    bits;                                                       \
+-  })
+-
+ #define GEN_BITS_FIELD(inst, gen)                               \
+   ({                                                            \
+     int bits;                                                   \
+@@ -591,8 +583,6 @@ static int gen_version;
+ #define BRANCH_UIP(inst)           GEN_BITS_FIELD2(inst, bits3.gen7_branch.uip, bits2.gen8_branch.uip/8)
+ #define VME_BTI(inst)              GEN7_BITS_FIELD(inst, bits3.vme_gen7.bti)
+ #define VME_MSG_TYPE(inst)         GEN7_BITS_FIELD(inst, bits3.vme_gen7.msg_type)
+-#define IME_BTI(inst)              GEN8_BITS_FIELD(inst, bits3.ime_gen8.bti)
+-#define IME_MSG_TYPE(inst)         GEN8_BITS_FIELD(inst, bits3.ime_gen8.msg_type)
+ #define SAMPLE_BTI(inst)           GEN_BITS_FIELD(inst, bits3.sampler_gen7.bti)
+ #define SAMPLER(inst)              GEN_BITS_FIELD(inst, bits3.sampler_gen7.sampler)
+ #define SAMPLER_MSG_TYPE(inst)     GEN_BITS_FIELD(inst, bits3.sampler_gen7.msg_type)
+@@ -1520,19 +1510,9 @@ int gen_disasm (FILE *file, const void *inst, uint32_t deviceID, uint32_t compac
+     if (immbti) {
+       switch (target) {
+         case GEN_SFID_VIDEO_MOTION_EST:
+-          if(gen_version == 7)
+-            format(file, " (bti: %d, msg_type: %d)",
+-                   VME_BTI(inst),
+-                   VME_MSG_TYPE(inst));
+-          else if(gen_version == 9)
+-            format(file, " (bti: %d, msg_type: %d)",
+-                   IME_BTI(inst),
+-                   IME_MSG_TYPE(inst));
+-          break;
+-        case GEN_SFID_CHECK_REFINE:
+           format(file, " (bti: %d, msg_type: %d)",
+-                 IME_BTI(inst),
+-                 IME_MSG_TYPE(inst));
++                 VME_BTI(inst),
++                 VME_MSG_TYPE(inst));
+           break;
+         case GEN_SFID_SAMPLER:
+           format(file, " (%d, %d, %d, %d)",
+diff --git a/backend/src/backend/gen8_instruction.hpp b/backend/src/backend/gen8_instruction.hpp
+index 79e1b09b..446e7f9c 100644
+--- a/backend/src/backend/gen8_instruction.hpp
++++ b/backend/src/backend/gen8_instruction.hpp
+@@ -430,21 +430,6 @@ union Gen8NativeInstruction
+         uint32_t end_of_thread:1;
+       } sampler_gen7;
+ 
+-      struct {
+-        uint32_t bti:8;
+-        uint32_t pad0:5;
+-        uint32_t msg_type:2;
+-        uint32_t stream_out_enable:1;
+-        uint32_t stream_in_enable:1;
+-        uint32_t stream_out_enable2:1;
+-        uint32_t pad1:1;
+-        uint32_t header_present:1;
+-        uint32_t response_length:5;
+-        uint32_t msg_length:4;
+-        uint32_t pad2:2;
+-        uint32_t end_of_thread:1;
+-      } ime_gen8;
+-
+       /**
+        * Message for the Sandybridge Sampler Cache or Constant Cache Data Port.
+        *
+diff --git a/backend/src/backend/gen9_context.cpp b/backend/src/backend/gen9_context.cpp
+index c81e42f2..2ce53b68 100644
+--- a/backend/src/backend/gen9_context.cpp
++++ b/backend/src/backend/gen9_context.cpp
+@@ -62,111 +62,6 @@ namespace gbe
+     }
+   }
+ 
+-  void Gen9Context::emitImeInstruction(const SelectionInstruction &insn) {
+-    const GenRegister dst = ra->genReg(insn.dst(0));
+-    const unsigned int msg_type = insn.extra.ime_msg_type;
+-
+-    GBE_ASSERT(msg_type == 1 || msg_type == 2 || msg_type == 3);
+-    uint32_t execWidth_org = p->curr.execWidth;
+-    int virt_pld_len;
+-    int phi_pld_len = 0;
+-    int virt_rsp_len;
+-
+-#define PHI_SIC_PAYLOAD_LEN 8
+-#define PHI_IME_PAYLOAD_LEN 6
+-#define PHI_VME_WRITEBACK_LEN 7
+-
+-    if(msg_type == 1 || msg_type == 2 || msg_type == 3)
+-      virt_rsp_len = PHI_VME_WRITEBACK_LEN;
+-    if(msg_type == 1 || msg_type == 3)
+-      phi_pld_len = PHI_SIC_PAYLOAD_LEN;
+-    else if(msg_type == 2)
+-      phi_pld_len = PHI_IME_PAYLOAD_LEN;
+-    if(execWidth_org == 8)
+-      virt_pld_len = phi_pld_len;
+-    else if(execWidth_org == 16)
+-      virt_pld_len = (phi_pld_len + 1) / 2;
+-    p->push();
+-    p->curr.predicate = GEN_PREDICATE_NONE;
+-    p->curr.noMask = 1;
+-    p->curr.execWidth = 1;
+-    /* Now cl_intel_device_side_avc_motion_estimation is impelemented based on simd16 mode.
+-     * So fall back to simd8 is not acceptable now.
+-     * */
+-    GBE_ASSERT(execWidth_org == 16);
+-    /* Use MOV to Setup bits of payload: mov payload value stored in insn.src(x) to
+-     * consecutive payload grf.
+-     * In simd8 mode, one virtual grf register map to one physical grf register. But
+-     * in simd16 mode, one virtual grf register map to two physical grf registers.
+-     * So we should treat them differently.
+-     * */
+-    if(execWidth_org == 8){
+-      for(int i=0; i < virt_pld_len; i++){
+-        GenRegister payload_grf = ra->genReg(insn.dst(virt_rsp_len+i));
+-        payload_grf.vstride = GEN_VERTICAL_STRIDE_0;
+-        payload_grf.width = GEN_WIDTH_1;
+-        payload_grf.hstride = GEN_HORIZONTAL_STRIDE_0;
+-        payload_grf.subphysical = 1;
+-        for(int j=0; j < 8; j++){
+-          payload_grf.subnr = (7 - j) * typeSize(GEN_TYPE_UD);
+-          GenRegister payload_val = ra->genReg(insn.src(i*8+j));
+-          payload_val.vstride = GEN_VERTICAL_STRIDE_0;
+-          payload_val.width = GEN_WIDTH_1;
+-          payload_val.hstride = GEN_HORIZONTAL_STRIDE_0;
+-
+-          p->MOV(payload_grf, payload_val);
+-        }
+-      }
+-    }
+-    else if(execWidth_org == 16){
+-      for(int i=0; i < virt_pld_len; i++){
+-        int nr_num = 2;
+-        if( (i == virt_pld_len-1) && (phi_pld_len%2 == 1) )
+-          nr_num = 1;
+-        for(int k = 0; k < nr_num; k++){
+-          GenRegister payload_grf = ra->genReg(insn.dst(virt_rsp_len+i));
+-          payload_grf.nr += k;
+-          payload_grf.vstride = GEN_VERTICAL_STRIDE_0;
+-          payload_grf.width = GEN_WIDTH_1;
+-          payload_grf.hstride = GEN_HORIZONTAL_STRIDE_0;
+-          payload_grf.subphysical = 1;
+-          for(int j=0; j < 8; j++){
+-            payload_grf.subnr = (7 - j) * typeSize(GEN_TYPE_UD);
+-            GenRegister payload_val = ra->genReg(insn.src(i*16+k*8+j));
+-            payload_val.vstride = GEN_VERTICAL_STRIDE_0;
+-            payload_val.width = GEN_WIDTH_1;
+-            payload_val.hstride = GEN_HORIZONTAL_STRIDE_0;
+-
+-            p->MOV(payload_grf, payload_val);
+-          }
+-        }
+-      }
+-    }
+-    p->pop();
+-
+-#undef PHI_SIC_PAYLOAD_LEN
+-#undef PHI_IME_PAYLOAD_LEN
+-#undef PHI_VME_WRITEBACK_LEN
+-
+-    p->push();
+-    p->curr.predicate = GEN_PREDICATE_NONE;
+-    p->curr.noMask = 1;
+-    p->curr.execWidth = 1;
+-    GenRegister payload_did = GenRegister::retype(ra->genReg(insn.dst(virt_rsp_len)), GEN_TYPE_UB);
+-    payload_did.vstride = GEN_VERTICAL_STRIDE_0;
+-    payload_did.width = GEN_WIDTH_1;
+-    payload_did.hstride = GEN_HORIZONTAL_STRIDE_0;
+-    payload_did.subphysical = 1;
+-    payload_did.subnr = 20 * typeSize(GEN_TYPE_UB);
+-    GenRegister grf0 = GenRegister::ub1grf(0, 20);
+-    p->MOV(payload_did, grf0);
+-    p->pop();
+-
+-    const GenRegister msgPayload = ra->genReg(insn.dst(virt_rsp_len));
+-    const unsigned char bti = insn.getbti();
+-    p->IME(bti, dst, msgPayload, msg_type);
+-  }
+-
+   void BxtContext::newSelection(void) {
+     this->sel = GBE_NEW(SelectionBxt, *this);
+   }
+diff --git a/backend/src/backend/gen9_context.hpp b/backend/src/backend/gen9_context.hpp
+index 95a8ec32..04766616 100644
+--- a/backend/src/backend/gen9_context.hpp
++++ b/backend/src/backend/gen9_context.hpp
+@@ -37,7 +37,6 @@ namespace gbe
+             : Gen8Context(unit, name, deviceID, relaxMath) {
+     };
+     virtual void emitBarrierInstruction(const SelectionInstruction &insn);
+-    virtual void emitImeInstruction(const SelectionInstruction &insn);
+ 
+   protected:
+     virtual GenEncoder* generateEncoder(void) {
+diff --git a/backend/src/backend/gen9_encoder.cpp b/backend/src/backend/gen9_encoder.cpp
+index cf6009a9..b37fd981 100644
+--- a/backend/src/backend/gen9_encoder.cpp
++++ b/backend/src/backend/gen9_encoder.cpp
+@@ -75,52 +75,6 @@ namespace gbe
+                        simd_mode, return_format);
+   }
+ 
+-  void Gen9Encoder::setImeMessage(GenNativeInstruction *insn,
+-                                unsigned char bti,
+-                                uint32_t response_length,
+-                                uint32_t msg_length,
+-                                uint32_t msg_type)
+-  {
+-
+-     GenMessageTarget sfid = GEN_SFID_NULL;
+-     if(msg_type == 1 || msg_type == 3)
+-       // 0Dh Check and Refinement Engine SFID_CRE    SKL+ (SIC and FBR blong to SFID_CRE on SKL+)
+-       sfid = GEN_SFID_CHECK_REFINE;
+-     else if(msg_type == 2)
+-       sfid = GEN_SFID_VIDEO_MOTION_EST;
+-     setMessageDescriptor(insn, sfid, msg_length, response_length, true);
+-     Gen8NativeInstruction *gen8_insn = &insn->gen8_insn;
+-     gen8_insn->bits3.ime_gen8.bti = bti;
+-     gen8_insn->bits3.ime_gen8.msg_type = msg_type;
+-     gen8_insn->bits3.ime_gen8.stream_out_enable = 0;
+-     gen8_insn->bits3.ime_gen8.stream_in_enable = 0;
+-     gen8_insn->bits3.ime_gen8.stream_out_enable2 = 0;
+-
+-  }
+-
+-  void Gen9Encoder::IME(unsigned char bti,
+-                       GenRegister dest,
+-                       GenRegister msg,
+-                       uint32_t msg_type)
+-  {
+-    GBE_ASSERT(msg_type == 1 || msg_type == 2 || msg_type == 3);
+-    uint32_t msg_length, response_length;
+-    if(msg_type == 1 || msg_type == 3){
+-      msg_length = 8;
+-      response_length = 7;
+-    }
+-    if(msg_type == 2){
+-      msg_length = 6;
+-      response_length = 7;
+-    }
+-    GenNativeInstruction *insn = this->next(GEN_OPCODE_SEND);
+-    this->setHeader(insn);
+-    this->setDst(insn, dest);
+-    this->setSrc0(insn, msg);
+-    this->setSrc1(insn, GenRegister::immud(0));
+-    setImeMessage(insn, bti, response_length, msg_length, msg_type);
+-  }
+-
+   void Gen9Encoder::setSendsOperands(Gen9NativeInstruction *gen9_insn, GenRegister dst, GenRegister src0, GenRegister src1)
+   {
+     assert(dst.subnr == 0 && src0.subnr == 0 && src1.subnr == 0);
+diff --git a/backend/src/backend/gen9_encoder.hpp b/backend/src/backend/gen9_encoder.hpp
+index b8626495..2eaa5381 100644
+--- a/backend/src/backend/gen9_encoder.hpp
++++ b/backend/src/backend/gen9_encoder.hpp
+@@ -47,15 +47,6 @@ namespace gbe
+                 uint32_t return_format,
+                 bool isLD,
+                 bool isUniform);
+-    virtual void IME(unsigned char bti,
+-                         GenRegister dest,
+-                         GenRegister msg,
+-                         uint32_t msg_type);
+-    void setImeMessage(GenNativeInstruction *insn,
+-                          unsigned char bti,
+-                          uint32_t response_length,
+-                          uint32_t msg_length,
+-                          uint32_t msg_type);
+     void setSendsOperands(Gen9NativeInstruction *gen9_insn, GenRegister dst, GenRegister src0, GenRegister src1);
+     virtual void UNTYPED_WRITE(GenRegister addr, GenRegister data, GenRegister bti, uint32_t elemNum, bool useSends);
+     virtual void TYPED_WRITE(GenRegister header, GenRegister data, bool header_present, unsigned char bti, bool useSends);
+diff --git a/backend/src/backend/gen_context.cpp b/backend/src/backend/gen_context.cpp
+index 6fc3159b..c89163fa 100644
+--- a/backend/src/backend/gen_context.cpp
++++ b/backend/src/backend/gen_context.cpp
+@@ -2349,20 +2349,10 @@ namespace gbe
+     const unsigned int msg_type = insn.extra.msg_type;
+ 
+     GBE_ASSERT(msg_type == 1);
++    int rsp_len;
++    if(msg_type == 1)
++      rsp_len = 6;
+     uint32_t execWidth_org = p->curr.execWidth;
+-    int virt_pld_len;
+-    int virt_rsp_len;
+-
+-#define PHI_VME_PAYLOAD_LEN 5
+-#define PHI_VME_WRITEBACK_LEN 6
+-
+-    if(msg_type == 1){
+-      virt_rsp_len = PHI_VME_WRITEBACK_LEN;
+-      if(execWidth_org == 8)
+-        virt_pld_len = PHI_VME_PAYLOAD_LEN;
+-      else if(execWidth_org == 16)
+-        virt_pld_len = (PHI_VME_PAYLOAD_LEN + 1) / 2;
+-    }
+     p->push();
+     p->curr.predicate = GEN_PREDICATE_NONE;
+     p->curr.noMask = 1;
+@@ -2374,8 +2364,8 @@ namespace gbe
+      * So we should treat them differently.
+      * */
+     if(execWidth_org == 8){
+-      for(int i=0; i < virt_pld_len; i++){
+-        GenRegister payload_grf = ra->genReg(insn.dst(virt_rsp_len+i));
++      for(int i=0; i < 5; i++){
++        GenRegister payload_grf = ra->genReg(insn.dst(rsp_len+i));
+         payload_grf.vstride = GEN_VERTICAL_STRIDE_0;
+         payload_grf.width = GEN_WIDTH_1;
+         payload_grf.hstride = GEN_HORIZONTAL_STRIDE_0;
+@@ -2392,12 +2382,9 @@ namespace gbe
+       }
+     }
+     else if(execWidth_org == 16){
+-      for(int i=0; i < virt_pld_len; i++){
+-        int nr_num = 2;
+-        if( (i == virt_pld_len-1) && (PHI_VME_PAYLOAD_LEN%2 == 1) )
+-          nr_num = 1;
+-        for(int k = 0; k < nr_num; k++){
+-          GenRegister payload_grf = ra->genReg(insn.dst(virt_rsp_len+i));
++      for(int i=0; i < 2; i++){
++        for(int k = 0; k < 2; k++){
++          GenRegister payload_grf = ra->genReg(insn.dst(rsp_len+i));
+           payload_grf.nr += k;
+           payload_grf.vstride = GEN_VERTICAL_STRIDE_0;
+           payload_grf.width = GEN_WIDTH_1;
+@@ -2414,16 +2401,31 @@ namespace gbe
+           }
+         }
+       }
++      {
++        int i = 2;
++        GenRegister payload_grf = ra->genReg(insn.dst(rsp_len+i));
++        payload_grf.vstride = GEN_VERTICAL_STRIDE_0;
++        payload_grf.width = GEN_WIDTH_1;
++        payload_grf.hstride = GEN_HORIZONTAL_STRIDE_0;
++        payload_grf.subphysical = 1;
++        for(int j=0; j < 8; j++){
++          payload_grf.subnr = (7 - j) * typeSize(GEN_TYPE_UD);
++          GenRegister payload_val = ra->genReg(insn.src(i*16+j));
++          payload_val.vstride = GEN_VERTICAL_STRIDE_0;
++          payload_val.width = GEN_WIDTH_1;
++          payload_val.hstride = GEN_HORIZONTAL_STRIDE_0;
++
++          p->MOV(payload_grf, payload_val);
++        }
++      }
+     }
+     p->pop();
+-#undef PHI_VME_PAYLOAD_LEN
+-#undef PHI_VME_WRITEBACK_LEN
+ 
+     p->push();
+     p->curr.predicate = GEN_PREDICATE_NONE;
+     p->curr.noMask = 1;
+     p->curr.execWidth = 1;
+-    GenRegister payload_did = GenRegister::retype(ra->genReg(insn.dst(virt_rsp_len)), GEN_TYPE_UB);
++    GenRegister payload_did = GenRegister::retype(ra->genReg(insn.dst(rsp_len)), GEN_TYPE_UB);
+     payload_did.vstride = GEN_VERTICAL_STRIDE_0;
+     payload_did.width = GEN_WIDTH_1;
+     payload_did.hstride = GEN_HORIZONTAL_STRIDE_0;
+@@ -2433,17 +2435,13 @@ namespace gbe
+     p->MOV(payload_did, grf0);
+     p->pop();
+ 
+-    const GenRegister msgPayload = ra->genReg(insn.dst(virt_rsp_len));
++    const GenRegister msgPayload = ra->genReg(insn.dst(rsp_len));
+     const unsigned char bti = insn.getbti();
+     const unsigned int vme_search_path_lut = insn.extra.vme_search_path_lut;
+     const unsigned int lut_sub = insn.extra.lut_sub;
+     p->VME(bti, dst, msgPayload, msg_type, vme_search_path_lut, lut_sub);
+   }
+ 
+-  void GenContext::emitImeInstruction(const SelectionInstruction &insn) {
+-    GBE_ASSERT(0);
+-  }
+-
+   void GenContext::scratchWrite(const GenRegister header, uint32_t offset, uint32_t reg_num, uint32_t reg_type, uint32_t channel_mode) {
+     p->push();
+     uint32_t simdWidth = p->curr.execWidth;
+diff --git a/backend/src/backend/gen_context.hpp b/backend/src/backend/gen_context.hpp
+index fa24bfe5..7fd40d1b 100644
+--- a/backend/src/backend/gen_context.hpp
++++ b/backend/src/backend/gen_context.hpp
+@@ -178,7 +178,6 @@ namespace gbe
+     void emitDWordGatherInstruction(const SelectionInstruction &insn);
+     void emitSampleInstruction(const SelectionInstruction &insn);
+     void emitVmeInstruction(const SelectionInstruction &insn);
+-    virtual void emitImeInstruction(const SelectionInstruction &insn);
+     void emitTypedWriteInstruction(const SelectionInstruction &insn);
+     void emitSpillRegInstruction(const SelectionInstruction &insn);
+     void emitUnSpillRegInstruction(const SelectionInstruction &insn);
+diff --git a/backend/src/backend/gen_defs.hpp b/backend/src/backend/gen_defs.hpp
+index 90de946f..c34e1bb6 100644
+--- a/backend/src/backend/gen_defs.hpp
++++ b/backend/src/backend/gen_defs.hpp
+@@ -219,7 +219,6 @@ enum GenMessageTarget {
+   GEN_SFID_DATAPORT_DATA            = 10,
+   GEN_SFID_PIXEL_INTERPOLATOR       = 11,
+   GEN_SFID_DATAPORT1_DATA           = 12, /* New for HSW and BDW. */
+-  GEN_SFID_CHECK_REFINE             = 13, /* New for SLK+*/
+ };
+ 
+ #define GEN_PREDICATE_NONE                    0
+diff --git a/backend/src/backend/gen_encoder.cpp b/backend/src/backend/gen_encoder.cpp
+index abd0d062..217a2d85 100644
+--- a/backend/src/backend/gen_encoder.cpp
++++ b/backend/src/backend/gen_encoder.cpp
+@@ -1276,14 +1276,6 @@ namespace gbe
+                   msg_type, vme_search_path_lut, lut_sub);
+   }
+ 
+-  void GenEncoder::IME(unsigned char bti,
+-                       GenRegister dest,
+-                       GenRegister msg,
+-                       uint32_t msg_type)
+-  {
+-    GBE_ASSERT(0);
+-  }
+-
+   void GenEncoder::TYPED_WRITE(GenRegister msg, GenRegister data, bool header_present, unsigned char bti, bool useSends)
+   {
+     GenNativeInstruction *insn = this->next(GEN_OPCODE_SEND);
+diff --git a/backend/src/backend/gen_encoder.hpp b/backend/src/backend/gen_encoder.hpp
+index fae8da1b..040b94a2 100644
+--- a/backend/src/backend/gen_encoder.hpp
++++ b/backend/src/backend/gen_encoder.hpp
+@@ -231,10 +231,6 @@ namespace gbe
+                           uint32_t msg_type,
+                           unsigned char vme_search_path_lut,
+                           unsigned char lut_sub);
+-    virtual void IME(unsigned char bti,
+-                         GenRegister dest,
+-                         GenRegister msg,
+-                         uint32_t msg_type);
+     virtual void FLUSH_SAMPLERCACHE(GenRegister dst);
+ 
+     /*! TypedWrite instruction for texture */
+diff --git a/backend/src/backend/gen_insn_gen7_schedule_info.hxx b/backend/src/backend/gen_insn_gen7_schedule_info.hxx
+index d15547db..c75557ca 100644
+--- a/backend/src/backend/gen_insn_gen7_schedule_info.hxx
++++ b/backend/src/backend/gen_insn_gen7_schedule_info.hxx
+@@ -43,7 +43,6 @@ DECL_GEN7_SCHEDULE(PackLong,        40,        1,        1)
+ DECL_GEN7_SCHEDULE(UnpackLong,      40,        1,        1)
+ DECL_GEN7_SCHEDULE(Sample,          160,       1,        1)
+ DECL_GEN7_SCHEDULE(Vme,             320,       1,        1)
+-DECL_GEN7_SCHEDULE(Ime,             320,       1,        1)
+ DECL_GEN7_SCHEDULE(TypedWrite,      80,        1,        1)
+ DECL_GEN7_SCHEDULE(SpillReg,        20,        1,        1)
+ DECL_GEN7_SCHEDULE(UnSpillReg,      160,       1,        1)
+diff --git a/backend/src/backend/gen_insn_selection.cpp b/backend/src/backend/gen_insn_selection.cpp
+index 95d10aba..4d3fa827 100644
+--- a/backend/src/backend/gen_insn_selection.cpp
++++ b/backend/src/backend/gen_insn_selection.cpp
+@@ -193,7 +193,6 @@ namespace gbe
+            this->opcode == SEL_OP_BYTE_GATHERA64  ||
+            this->opcode == SEL_OP_SAMPLE ||
+            this->opcode == SEL_OP_VME ||
+-           this->opcode == SEL_OP_IME ||
+            this->opcode == SEL_OP_DWORD_GATHER ||
+            this->opcode == SEL_OP_OBREAD ||
+            this->opcode == SEL_OP_MBREAD;
+@@ -741,7 +740,6 @@ namespace gbe
+     void SAMPLE(GenRegister *dst, uint32_t dstNum, GenRegister *msgPayloads, uint32_t msgNum, uint32_t bti, uint32_t sampler, bool isLD, bool isUniform);
+     /*! Encode vme instructions */
+     void VME(uint32_t bti, GenRegister *dst, GenRegister *payloadVal, uint32_t dstNum, uint32_t srcNum, uint32_t msg_type, uint32_t vme_search_path_lut, uint32_t lut_sub);
+-    void IME(uint32_t bti, GenRegister *dst, GenRegister *payloadVal, uint32_t dstNum, uint32_t srcNum, uint32_t msg_type);
+     /*! Encode typed write instructions */
+     void TYPED_WRITE(GenRegister *msgs, uint32_t msgNum, uint32_t bti, bool is3D);
+     /*! Get image information */
+@@ -2735,25 +2733,6 @@ extern bool OCL_DEBUGINFO; // first defined by calling BVAR in program.cpp
+     insn->extra.lut_sub = lut_sub;
+   }
+ 
+-  void Selection::Opaque::IME(uint32_t bti, GenRegister *dst, GenRegister *payloadVal,
+-                              uint32_t dstNum, uint32_t srcNum, uint32_t msg_type) {
+-    SelectionInstruction *insn = this->appendInsn(SEL_OP_IME, dstNum, srcNum);
+-    SelectionVector *dstVector = this->appendVector();
+-
+-    for (uint32_t elemID = 0; elemID < dstNum; ++elemID)
+-      insn->dst(elemID) = dst[elemID];
+-    for (uint32_t elemID = 0; elemID < srcNum; ++elemID)
+-      insn->src(elemID) = payloadVal[elemID];
+-
+-    dstVector->regNum = dstNum;
+-    dstVector->isSrc = 0;
+-    dstVector->offsetID = 0;
+-    dstVector->reg = &insn->dst(0);
+-
+-    insn->setbti(bti);
+-    insn->extra.ime_msg_type = msg_type;
+-  }
+-
+   ///////////////////////////////////////////////////////////////////////////
+   // Code selection public implementation
+   ///////////////////////////////////////////////////////////////////////////
+@@ -7066,47 +7045,6 @@ extern bool OCL_DEBUGINFO; // first defined by calling BVAR in program.cpp
+     DECL_CTOR(VmeInstruction, 1, 1);
+   };
+ 
+-  DECL_PATTERN(ImeInstruction)
+-  {
+-    INLINE bool emitOne(Selection::Opaque &sel, const ir::ImeInstruction &insn, bool &markChildren) const
+-    {
+-      using namespace ir;
+-      uint32_t msg_type;
+-      msg_type = insn.getMsgType();
+-      GBE_ASSERT(msg_type == 1 || msg_type == 2 || msg_type == 3);
+-      uint32_t payloadLen = 0;
+-      if(msg_type == 2){
+-        payloadLen = 6;
+-      }
+-      else if(msg_type == 1 || msg_type == 3){
+-        payloadLen = 8;
+-      }
+-      uint32_t selDstNum = insn.getDstNum() + payloadLen;
+-      uint32_t srcNum = insn.getSrcNum();
+-      vector<GenRegister> dst(selDstNum);
+-      vector<GenRegister> payloadVal(srcNum);
+-      uint32_t valueID = 0;
+-      for (valueID = 0; valueID < insn.getDstNum(); ++valueID)
+-        dst[valueID] = sel.selReg(insn.getDst(valueID), insn.getDstType());
+-      for (valueID = insn.getDstNum(); valueID < selDstNum; ++valueID)
+-        dst[valueID] = sel.selReg(sel.reg(FAMILY_DWORD), TYPE_U32);
+-
+-      for (valueID = 0; valueID < srcNum; ++valueID)
+-        payloadVal[valueID] = sel.selReg(insn.getSrc(valueID), insn.getSrcType());
+-
+-      uint32_t bti = insn.getImageIndex() + BTI_WORKAROUND_IMAGE_OFFSET;
+-      if (bti > BTI_MAX_ID) {
+-        std::cerr << "Too large bti " << bti;
+-        return false;
+-      }
+-
+-      sel.IME(bti, dst.data(), payloadVal.data(), selDstNum, srcNum, msg_type);
+-
+-      return true;
+-    }
+-    DECL_CTOR(ImeInstruction, 1, 1);
+-  };
+-
+   /*! Typed write instruction pattern. */
+   DECL_PATTERN(TypedWriteInstruction)
+   {
+@@ -8263,7 +8201,6 @@ extern bool OCL_DEBUGINFO; // first defined by calling BVAR in program.cpp
+     this->insert<SelectModifierInstructionPattern>();
+     this->insert<SampleInstructionPattern>();
+     this->insert<VmeInstructionPattern>();
+-    this->insert<ImeInstructionPattern>();
+     this->insert<GetImageInfoInstructionPattern>();
+     this->insert<ReadARFInstructionPattern>();
+     this->insert<RegionInstructionPattern>();
+diff --git a/backend/src/backend/gen_insn_selection.hpp b/backend/src/backend/gen_insn_selection.hpp
+index 664a9fad..aa433883 100644
+--- a/backend/src/backend/gen_insn_selection.hpp
++++ b/backend/src/backend/gen_insn_selection.hpp
+@@ -96,8 +96,8 @@ namespace gbe
+     const GenRegister &src(uint32_t srcID) const { return regs[dstNum+srcID]; }
+     /*! Set debug infomation to selection */
+     void setDBGInfo(DebugInfo in) { DBGInfo = in; }
+-    /*! No more than 64 sources (48 sources are used by vme for payload passing and setting) */
+-    enum { MAX_SRC_NUM = 64 };
++    /*! No more than 40 sources (40 sources are used by vme for payload passing and setting) */
++    enum { MAX_SRC_NUM = 40 };
+     /*! No more than 17 destinations (17 used by image block read8) */
+     enum { MAX_DST_NUM = 17 };
+     /*! State of the instruction (extra fields neeed for the encoding) */
+@@ -143,10 +143,6 @@ namespace gbe
+         uint16_t vme_search_path_lut:3;
+         uint16_t lut_sub:2;
+       };
+-      struct {
+-        uint16_t ime_bti:8;
+-        uint16_t ime_msg_type:2;
+-      };
+       uint32_t barrierType;
+       uint32_t waitType;
+       bool longjmp;
+@@ -176,7 +172,7 @@ namespace gbe
+     /*! Number of destinations */
+     uint8_t dstNum:5;
+     /*! Number of sources */
+-    uint8_t srcNum:7;
++    uint8_t srcNum:6;
+     /*! To store various indices */
+     uint32_t index;
+     /*! For BRC/IF to store the UIP */
+@@ -196,7 +192,6 @@ namespace gbe
+         case SEL_OP_DWORD_GATHER: return extra.function;
+         case SEL_OP_SAMPLE: return extra.rdbti;
+         case SEL_OP_VME: return extra.vme_bti;
+-        case SEL_OP_IME: return extra.ime_bti;
+         case SEL_OP_TYPED_WRITE: return extra.bti;
+         default:
+           GBE_ASSERT(0);
+@@ -214,7 +209,6 @@ namespace gbe
+         case SEL_OP_DWORD_GATHER: extra.function = bti; return;
+         case SEL_OP_SAMPLE: extra.rdbti = bti; return;
+         case SEL_OP_VME: extra.vme_bti = bti; return;
+-        case SEL_OP_IME: extra.ime_bti = bti; return;
+         case SEL_OP_TYPED_WRITE: extra.bti = bti; return;
+         default:
+           GBE_ASSERT(0);
+diff --git a/backend/src/backend/gen_insn_selection.hxx b/backend/src/backend/gen_insn_selection.hxx
+index 24dd040a..5d96e9e4 100644
+--- a/backend/src/backend/gen_insn_selection.hxx
++++ b/backend/src/backend/gen_insn_selection.hxx
+@@ -72,7 +72,6 @@ DECL_SELECTION_IR(PACK_LONG, PackLongInstruction)
+ DECL_SELECTION_IR(UNPACK_LONG, UnpackLongInstruction)
+ DECL_SELECTION_IR(SAMPLE, SampleInstruction)
+ DECL_SELECTION_IR(VME, VmeInstruction)
+-DECL_SELECTION_IR(IME, ImeInstruction)
+ DECL_SELECTION_IR(TYPED_WRITE, TypedWriteInstruction)
+ DECL_SELECTION_IR(SPILL_REG, SpillRegInstruction)
+ DECL_SELECTION_IR(UNSPILL_REG, UnSpillRegInstruction)
+diff --git a/backend/src/ir/instruction.cpp b/backend/src/ir/instruction.cpp
+index 75e1eec4..48590fd1 100644
+--- a/backend/src/ir/instruction.cpp
++++ b/backend/src/ir/instruction.cpp
+@@ -682,50 +682,6 @@ namespace ir {
+       uint32_t dstNum;
+     };
+ 
+-    class ALIGNED_INSTRUCTION ImeInstruction :
+-      public BasePolicy,
+-      public TupleSrcPolicy<ImeInstruction>,
+-      public TupleDstPolicy<ImeInstruction>
+-    {
+-    public:
+-      ImeInstruction(uint8_t imageIdx, Tuple dstTuple, Tuple srcTuple,
+-                     uint32_t dstNum, uint32_t srcNum, int msg_type) {
+-        this->opcode = OP_IME;
+-        this->dst = dstTuple;
+-        this->src = srcTuple;
+-        this->dstNum = dstNum;
+-        this->srcNum = srcNum;
+-        this->imageIdx = imageIdx;
+-        this->msg_type = msg_type;
+-      }
+-      INLINE bool wellFormed(const Function &fn, std::string &why) const;
+-      INLINE void out(std::ostream &out, const Function &fn) const {
+-        this->outOpcode(out);
+-        out << " src_surface id " << (int)this->getImageIndex()
+-            << " ref_surface id " << (int)this->getImageIndex() + 1;
+-        for(uint32_t i = 0; i < dstNum; i++){
+-          out<< " %" << this->getDst(fn, i);
+-        }
+-        for(uint32_t i = 0; i < srcNum; i++){
+-          out<< " %" << this->getSrc(fn, i);
+-        }
+-        out
+-            << " msg_type " << (int)this->getMsgType();
+-      }
+-      Tuple src;
+-      Tuple dst;
+-
+-      INLINE uint8_t getImageIndex(void) const { return this->imageIdx; }
+-      INLINE uint8_t getMsgType(void) const { return this->msg_type; }
+-
+-      INLINE Type getSrcType(void) const { return TYPE_U32; }
+-      INLINE Type getDstType(void) const { return TYPE_U32; }
+-      uint8_t imageIdx;
+-      uint8_t msg_type;
+-      uint32_t srcNum;
+-      uint32_t dstNum;
+-    };
+-
+ 
+     class ALIGNED_INSTRUCTION TypedWriteInstruction : // TODO
+       public BasePolicy,
+@@ -1498,8 +1454,6 @@ namespace ir {
+     { return true; }
+     INLINE bool VmeInstruction::wellFormed(const Function &fn, std::string &why) const
+     { return true; }
+-    INLINE bool ImeInstruction::wellFormed(const Function &fn, std::string &why) const
+-    { return true; }
+     INLINE bool TypedWriteInstruction::wellFormed(const Function &fn, std::string &why) const
+     { return true; }
+     INLINE bool GetImageInfoInstruction::wellFormed(const Function &fn, std::string &why) const
+@@ -2228,9 +2182,6 @@ END_INTROSPECTION(WaitInstruction)
+ START_INTROSPECTION(VmeInstruction)
+ #include "ir/instruction.hxx"
+ END_INTROSPECTION(VmeInstruction)
+-START_INTROSPECTION(ImeInstruction)
+-#include "ir/instruction.hxx"
+-END_INTROSPECTION(ImeInstruction)
+ 
+ START_INTROSPECTION(WorkGroupInstruction)
+ #include "ir/instruction.hxx"
+@@ -2453,10 +2404,6 @@ DECL_MEM_FN(VmeInstruction, Type, getSrcType(void), getSrcType())
+ DECL_MEM_FN(VmeInstruction, Type, getDstType(void), getDstType())
+ DECL_MEM_FN(VmeInstruction, uint8_t, getImageIndex(void), getImageIndex())
+ DECL_MEM_FN(VmeInstruction, uint8_t, getMsgType(void), getMsgType())
+-DECL_MEM_FN(ImeInstruction, Type, getSrcType(void), getSrcType())
+-DECL_MEM_FN(ImeInstruction, Type, getDstType(void), getDstType())
+-DECL_MEM_FN(ImeInstruction, uint8_t, getImageIndex(void), getImageIndex())
+-DECL_MEM_FN(ImeInstruction, uint8_t, getMsgType(void), getMsgType())
+ DECL_MEM_FN(TypedWriteInstruction, Type, getSrcType(void), getSrcType())
+ DECL_MEM_FN(TypedWriteInstruction, Type, getCoordType(void), getCoordType())
+ DECL_MEM_FN(TypedWriteInstruction, uint8_t, getImageIndex(void), getImageIndex())
+@@ -2762,9 +2709,6 @@ DECL_MEM_FN(MemInstruction, void,     setBtiReg(Register reg), setBtiReg(reg))
+   Instruction VME(uint8_t imageIndex, Tuple dst, Tuple src, uint32_t dstNum, uint32_t srcNum, int msg_type, int vme_search_path_lut, int lut_sub) {
+     return internal::VmeInstruction(imageIndex, dst, src, dstNum, srcNum, msg_type, vme_search_path_lut, lut_sub).convert();
+   }
+-  Instruction IME(uint8_t imageIndex, Tuple dst, Tuple src, uint32_t dstNum, uint32_t srcNum, int msg_type) {
+-    return internal::ImeInstruction(imageIndex, dst, src, dstNum, srcNum, msg_type).convert();
+-  }
+ 
+   Instruction TYPED_WRITE(uint8_t imageIndex, Tuple src, uint8_t srcNum, Type srcType, Type coordType) {
+     return internal::TypedWriteInstruction(imageIndex, src, srcNum, srcType, coordType).convert();
+diff --git a/backend/src/ir/instruction.hpp b/backend/src/ir/instruction.hpp
+index ab8bc1f9..05c3e649 100644
+--- a/backend/src/ir/instruction.hpp
++++ b/backend/src/ir/instruction.hpp
+@@ -217,8 +217,7 @@ namespace ir {
+       return T::isClassOf(*this);
+     }
+     /*! max_src used by vme for payload passing and setting */
+-    //static const uint32_t MAX_SRC_NUM = 48;
+-    static const uint32_t MAX_SRC_NUM = 64;
++    static const uint32_t MAX_SRC_NUM = 40;
+     static const uint32_t MAX_DST_NUM = 32;
+     DebugInfo DBGInfo;
+   protected:
+@@ -430,16 +429,6 @@ namespace ir {
+     static bool isClassOf(const Instruction &insn);
+   };
+ 
+-  class ImeInstruction : public Instruction {
+-  public:
+-    uint8_t getImageIndex() const;
+-    uint8_t getMsgType() const;
+-    Type getSrcType(void) const;
+-    Type getDstType(void) const;
+-    /*! Return true if the given instruction is an instance of this class */
+-    static bool isClassOf(const Instruction &insn);
+-  };
+-
+   typedef union _ImageInfoKey{
+     _ImageInfoKey(uint8_t i, uint8_t t) : index(i), type(t) {};
+     _ImageInfoKey(int key) : data(key) {};
+@@ -891,7 +880,6 @@ namespace ir {
+   Instruction SAMPLE(uint8_t imageIndex, Tuple dst, Tuple src, uint8_t srcNum, bool dstIsFloat, bool srcIsFloat, uint8_t sampler, uint8_t samplerOffset);
+   /*! video motion estimation */
+   Instruction VME(uint8_t imageIndex, Tuple dst, Tuple src, uint32_t dstNum, uint32_t srcNum, int msg_type, int vme_search_path_lut, int lut_sub);
+-  Instruction IME(uint8_t imageIndex, Tuple dst, Tuple src, uint32_t dstNum, uint32_t srcNum, int msg_type);
+   /*! get image information , such as width/height/depth/... */
+   Instruction GET_IMAGE_INFO(int infoType, Register dst, uint8_t imageIndex, Register infoReg);
+   /*! label labelIndex */
+diff --git a/backend/src/ir/instruction.hxx b/backend/src/ir/instruction.hxx
+index 2054b9c2..81618eb9 100644
+--- a/backend/src/ir/instruction.hxx
++++ b/backend/src/ir/instruction.hxx
+@@ -86,7 +86,6 @@ DECL_INSN(LABEL, LabelInstruction)
+ DECL_INSN(READ_ARF, ReadARFInstruction)
+ DECL_INSN(REGION, RegionInstruction)
+ DECL_INSN(VME, VmeInstruction)
+-DECL_INSN(IME, ImeInstruction)
+ DECL_INSN(INDIRECT_MOV, IndirectMovInstruction)
+ DECL_INSN(GET_IMAGE_INFO, GetImageInfoInstruction)
+ DECL_INSN(MUL_HI, BinaryInstruction)
+diff --git a/backend/src/ir/liveness.cpp b/backend/src/ir/liveness.cpp
+index 1d385ee3..dbb5c33f 100644
+--- a/backend/src/ir/liveness.cpp
++++ b/backend/src/ir/liveness.cpp
+@@ -142,7 +142,6 @@ namespace ir {
+               opCode != ir::OP_RHADD &&
+               opCode != ir::OP_READ_ARF &&
+               opCode != ir::OP_ADDSAT &&
+-              opCode != ir::OP_IME &&
+               (dstNum == 1 || insn.getOpcode() != ir::OP_LOAD) &&
+               !extentRegs->contains(reg)
+              )
+diff --git a/backend/src/libocl/include/ocl_misc.h b/backend/src/libocl/include/ocl_misc.h
+index a6a29e39..79b8cc8a 100644
+--- a/backend/src/libocl/include/ocl_misc.h
++++ b/backend/src/libocl/include/ocl_misc.h
+@@ -19,10 +19,6 @@
+ #define __OCL_MISC_H__
+ 
+ #include "ocl_types.h"
+-#include "ocl_workitem.h"
+-#include "ocl_simd.h"
+-#include "ocl_printf.h"
+-#include "ocl_as.h"
+ 
+ #define DEC2(TYPE, XTYPE, MASKTYPE) \
+   OVERLOADABLE TYPE##2 shuffle(XTYPE x, MASKTYPE##2 mask);
+@@ -144,232 +140,6 @@ struct time_stamp {
+   uint event;
+ };
+ 
+-//Interlaced image field polarity values:
+-#define CLK_AVC_ME_INTERLACED_SCAN_TOP_FIELD_INTEL    0x0
+-#define CLK_AVC_ME_INTERLACED_SCAN_BOTTOM_FIELD_INTEL 0x1
+-
+-//Inter macro-block major shape values:
+-#define CLK_AVC_ME_MAJOR_16x16_INTEL 0x0
+-#define CLK_AVC_ME_MAJOR_16x8_INTEL  0x1
+-#define CLK_AVC_ME_MAJOR_8x16_INTEL  0x2
+-#define CLK_AVC_ME_MAJOR_8x8_INTEL   0x3
+-
+-//Inter macro-block minor shape values:
+-#define CLK_AVC_ME_MINOR_8x8_INTEL 0x0
+-#define CLK_AVC_ME_MINOR_8x4_INTEL 0x1
+-#define CLK_AVC_ME_MINOR_4x8_INTEL 0x2
+-#define CLK_AVC_ME_MINOR_4x4_INTEL 0x3
+-
+-//Inter macro-block major direction values:
+-#define CLK_AVC_ME_MAJOR_FORWARD_INTEL       0x0
+-#define CLK_AVC_ME_MAJOR_BACKWARD_INTEL      0x1
+-#define CLK_AVC_ME_MAJOR_BIDIRECTIONAL_INTEL 0x2
+-
+-//Inter (IME) partition mask values:
+-#define CLK_AVC_ME_PARTITION_MASK_ALL_INTEL   0x0
+-#define CLK_AVC_ME_PARTITION_MASK_16x16_INTEL 0x7E
+-#define CLK_AVC_ME_PARTITION_MASK_16x8_INTEL  0x7D
+-#define CLK_AVC_ME_PARTITION_MASK_8x16_INTEL  0x7B
+-#define CLK_AVC_ME_PARTITION_MASK_8x8_INTEL   0x77
+-#define CLK_AVC_ME_PARTITION_MASK_8x4_INTEL   0x6F
+-#define CLK_AVC_ME_PARTITION_MASK_4x8_INTEL   0x5F
+-#define CLK_AVC_ME_PARTITION_MASK_4x4_INTEL   0x3F
+-
+-//Slice type values:
+-#define CLK_AVC_ME_SLICE_TYPE_PRED_INTEL  0x0
+-#define CLK_AVC_ME_SLICE_TYPE_BPRED_INTEL 0x1
+-#define CLK_AVC_ME_SLICE_TYPE_INTRA_INTEL 0x2
+-
+-//Search window configuration:
+-#define CLK_AVC_ME_SEARCH_WINDOW_EXHAUSTIVE_INTEL    0x0
+-#define CLK_AVC_ME_SEARCH_WINDOW_SMALL_INTEL         0x1
+-#define CLK_AVC_ME_SEARCH_WINDOW_TINY_INTEL          0x2
+-#define CLK_AVC_ME_SEARCH_WINDOW_EXTRA_TINY_INTEL    0x3
+-#define CLK_AVC_ME_SEARCH_WINDOW_DIAMOND_INTEL       0x4
+-#define CLK_AVC_ME_SEARCH_WINDOW_LARGE_DIAMOND_INTEL 0x5
+-#define CLK_AVC_ME_SEARCH_WINDOW_RESERVED0_INTEL     0x6
+-#define CLK_AVC_ME_SEARCH_WINDOW_RESERVED1_INTEL     0x7
+-
+-//SAD adjustment mode:
+-#define CLK_AVC_ME_SAD_ADJUST_MODE_NONE_INTEL 0x0
+-#define CLK_AVC_ME_SAD_ADJUST_MODE_HAAR_INTEL 0x2
+-
+-//Pixel resolution:
+-#define CLK_AVC_ME_SUBPIXEL_MODE_INTEGER_INTEL 0x0
+-#define CLK_AVC_ME_SUBPIXEL_MODE_HPEL_INTEL    0x1
+-#define CLK_AVC_ME_SUBPIXEL_MODE_QPEL_INTEL    0x3
+-
+-//Cost precision values:
+-#define CLK_AVC_ME_COST_PRECISION_QPEL_INTEL 0x0
+-#define CLK_AVC_ME_COST_PRECISION_HPEL_INTEL 0x1
+-#define CLK_AVC_ME_COST_PRECISION_PEL_INTEL  0x2
+-#define CLK_AVC_ME_COST_PRECISION_DPEL_INTEL 0x3
+-
+-//Inter bidirectional weights:
+-#define CLK_AVC_ME_BIDIR_WEIGHT_QUARTER_INTEL       0x10
+-#define CLK_AVC_ME_BIDIR_WEIGHT_THIRD_INTEL         0x15
+-#define CLK_AVC_ME_BIDIR_WEIGHT_HALF_INTEL          0x20
+-#define CLK_AVC_ME_BIDIR_WEIGHT_TWO_THIRD_INTEL     0x2B
+-#define CLK_AVC_ME_BIDIR_WEIGHT_THREE_QUARTER_INTEL 0x30
+-
+-//Inter border reached values:
+-#define CLK_AVC_ME_BORDER_REACHED_LEFT_INTEL   0x0
+-#define CLK_AVC_ME_BORDER_REACHED_RIGHT_INTEL  0x2
+-#define CLK_AVC_ME_BORDER_REACHED_TOP_INTEL    0x4
+-#define CLK_AVC_ME_BORDER_REACHED_BOTTOM_INTEL 0x8
+-
+-//Intra macro-block shape values:
+-#define CLK_AVC_ME_INTRA_16x16_INTEL  0x0
+-#define CLK_AVC_ME_INTRA_8x8_INTEL    0x1
+-#define CLK_AVC_ME_INTRA_4x4_INTEL    0x2
+-
+-//Inter skip block partition type:
+-#define CLK_AVC_ME_SKIP_BLOCK_PARTITION_16x16_INTEL 0x0
+-#define CLK_AVC_ME_SKIP_BLOCK_PARTITION_8x8_INTEL   0x04000
+-
+-//Inter skip motion vector mask:
+-#define CLK_AVC_ME_SKIP_BLOCK_16x16_FORWARD_ENABLE_INTEL   (0x1<<24)
+-#define CLK_AVC_ME_SKIP_BLOCK_16x16_BACKWARD_ ENABLE_INTEL (0x2<<24)
+-#define CLK_AVC_ME_SKIP_BLOCK_16x16_DUAL_ENABLE_INTEL      (0x3<<24)
+-#define CLK_AVC_ME_SKIP_BLOCK_8x8_FORWARD_ENABLE_INTEL     (0x55<<24)
+-#define CLK_AVC_ME_SKIP_BLOCK_8x8_BACKWARD_ENABLE_INTEL    (0xAA<<24)
+-#define CLK_AVC_ME_SKIP_BLOCK_8x8_DUAL_ENABLE_INTEL        (0xFF<<24)
+-#define CLK_AVC_ME_SKIP_BLOCK_8x8_0_FORWARD_ENABLE_INTEL   (0x1<<24)
+-#define CLK_AVC_ME_SKIP_BLOCK_8x8_0_BACKWARD_ENABLE_INTEL  (0x2<<24)
+-#define CLK_AVC_ME_SKIP_BLOCK_8x8_1_FORWARD_ENABLE_INTEL   (0x1<<26)
+-#define CLK_AVC_ME_SKIP_BLOCK_8x8_1_BACKWARD_ENABLE_INTEL  (0x2<<26)
+-#define CLK_AVC_ME_SKIP_BLOCK_8x8_2_FORWARD_ENABLE_INTEL   (0x1<<28)
+-#define CLK_AVC_ME_SKIP_BLOCK_8x8_2_BACKWARD_ENABLE_INTEL  (0x2<<28)
+-#define CLK_AVC_ME_SKIP_BLOCK_8x8_3_FORWARD_ENABLE_INTEL   (0x1<<30)
+-#define CLK_AVC_ME_SKIP_BLOCK_8x8_3_BACKWARD_ENABLE_INTEL  (0x2<<30)
+-
+-//Block based skip type values:
+-#define CLK_AVC_ME_BLOCK_BASED_SKIP_4x4_INTEL 0x0
+-#define CLK_AVC_ME_BLOCK_BASED_SKIP_8x8_INTEL 0x80
+-
+-//Luma intra partition mask values:
+-#define CLK_AVC_ME_INTRA_LUMA_PARTITION_MASK_ALL_INTEL   0x0
+-#define CLK_AVC_ME_INTRA_LUMA_PARTITION_MASK_16x16_INTEL 0x6
+-#define CLK_AVC_ME_INTRA_LUMA_PARTITION_MASK_8x8_INTEL   0x5
+-#define CLK_AVC_ME_INTRA_LUMA_PARTITION_MASK_4x4_INTEL   0x3
+-
+-//Intra neighbor availability mask values:
+-#define CLK_AVC_ME_INTRA_NEIGHBOR_LEFT_MASK_ENABLE_INTEL        0x60
+-#define CLK_AVC_ME_INTRA_NEIGHBOR_UPPER_MASK_ENABLE_INTEL       0x10
+-#define CLK_AVC_ME_INTRA_NEIGHBOR_UPPER_RIGHT_MASK_ENABLE_INTEL 0x8
+-#define CLK_AVC_ME_INTRA_NEIGHBOR_UPPER_LEFT_MASK_ENABLE_INTEL  0x4
+-
+-//Luma intra modes:
+-#define CLK_AVC_ME_LUMA_PREDICTOR_MODE_VERTICAL_INTEL            0x0
+-#define CLK_AVC_ME_LUMA_PREDICTOR_MODE_HORIZONTAL_INTEL          0x1
+-#define CLK_AVC_ME_LUMA_PREDICTOR_MODE_DC_INTEL                  0x2
+-#define CLK_AVC_ME_LUMA_PREDICTOR_MODE_DIAGONAL_DOWN_LEFT_INTEL  0x3
+-#define CLK_AVC_ME_LUMA_PREDICTOR_MODE_DIAGONAL_DOWN_RIGHT_INTEL 0x4
+-#define CLK_AVC_ME_LUMA_PREDICTOR_MODE_PLANE_INTEL               0x4
+-#define CLK_AVC_ME_LUMA_PREDICTOR_MODE_VERTICAL_RIGHT_INTEL      0x5
+-#define CLK_AVC_ME_LUMA_PREDICTOR_MODE_HORIZONTAL_DOWN_INTEL     0x6
+-#define CLK_AVC_ME_LUMA_PREDICTOR_MODE_VERTICAL_LEFT_INTEL       0x7
+-#define CLK_AVC_ME_LUMA_PREDICTOR_MODE_HORIZONTAL_UP_INTEL       0x8
+-
+-//Chroma intra modes:
+-#define CLK_AVC_ME_CHROMA_PREDICTOR_MODE_DC_INTEL         0x0
+-#define CLK_AVC_ME_CHROMA_PREDICTOR_MODE_HORIZONTAL_INTEL 0x1
+-#define CLK_AVC_ME_CHROMA_PREDICTOR_MODE_VERTICAL_INTEL   0x2
+-#define CLK_AVC_ME_CHROMA_PREDICTOR_MODE_PLANE_INTEL      0x3
+-
+-//Reference image select values:
+-#define CLK_AVC_ME_FRAME_FORWARD_INTEL  0x1
+-#define CLK_AVC_ME_FRAME_BACKWARD_INTEL 0x2
+-#define CLK_AVC_ME_FRAME_DUAL_INTEL     0x3
+-
+-//VME media sampler initialization value:
+-#define CLK_AVC_ME_INITIALIZE_INTEL 0x0
+-
+-//Default IME payload initialization:
+-#define CLK_AVC_IME_PAYLOAD_INITIALIZE_INTEL {0x0}
+-
+-//Default REF payload initialization:
+-#define CLK_AVC_REF_PAYLOAD_INITIALIZE_INTEL {0x0}
+-
+-//Default SIC payload initialization:
+-#define CLK_AVC_SIC_PAYLOAD_INITIALIZE_INTEL {0x0}
+-
+-//Default IME result initialization:
+-#define CLK_AVC_IME_RESULT_INITIALIZE_INTEL  {0x0}
+-
+-//Default REF result initialization:
+-#define CLK_AVC_REF_RESULT_INITIALIZE_INTEL  {0x0}
+-
+-//Default SIC result initialization:
+-#define CLK_AVC_SIC_RESULT_INITIALIZE_INTEL  {0x0}
+-
+-typedef struct{
+-  ushort2 srcCoord;
+-  short2 ref_offset;
+-  uchar partition_mask;
+-  uchar sad_adjustment;
+-  uchar search_window_config;
+-  ulong cc0;
+-  ulong cc1;
+-  ulong cc2;
+-  ulong cc3;
+-  uint2 packed_cost_table;
+-  uchar cost_precision;
+-  ulong packed_shape_cost;
+-}intel_sub_group_avc_ime_payload_t;
+-
+-typedef uint8 intel_sub_group_avc_ime_result_t;
+-
+-#define REF_ENABLE_COST_PENALTY 1
+-
+-typedef struct{
+-  ushort2 srcCoord;
+-  long mv;
+-  uchar major_shape;
+-  uchar minor_shapes;
+-  uchar directions;
+-  uchar pixel_mode;
+-  uchar sad_adjustment;
+-#if REF_ENABLE_COST_PENALTY 
+-  ulong cc0;
+-  ulong cc1;
+-  ulong cc2;
+-  ulong cc3;
+-  uint2 packed_cost_table;
+-  uchar cost_precision;
+-  ulong packed_shape_cost;
+-#endif
+-}intel_sub_group_avc_ref_payload_t;
+-
+-typedef struct{
+-  ushort2 srcCoord;
+-  uint skip_block_partition_type;
+-  uint skip_motion_vector_mask;
+-  char bidirectional_weight;
+-  uchar skip_sad_adjustment;
+-  long mv;
+-
+-  uchar luma_intra_partition_mask;
+-  uchar intra_neighbour_availabilty;
+-  uint l_0_3;
+-  uint l_4_7;
+-  uint l_8_11;
+-  uint l_12_15;
+-  uint u_0_3;
+-  uint u_4_7;
+-  uint u_8_11;
+-  uint u_12_15;
+-  uint ur_16_19;
+-  uint ur_20_23;
+-  uchar upper_left_corner_luma_pixel;
+-  uchar intra_sad_adjustment;
+-  uint intra_shape_cost;
+-}intel_sub_group_avc_sic_payload_t;
+-
+-typedef uint8 intel_sub_group_avc_ref_result_t;
+-
+-typedef uint8 intel_sub_group_avc_sic_result_t;
+-
+ uint __gen_ocl_region(ushort offset, uint data);
+ 
+ struct time_stamp __gen_ocl_get_timestamp(void);
+@@ -387,140 +157,6 @@ uint8 __gen_ocl_vme(image2d_t, image2d_t,
+                    uint, uint, uint, uint,
+                    int, int, int);
+ 
+-intel_sub_group_avc_ime_result_t
+-__gen_ocl_ime(image2d_t, image2d_t,
+-             uint, uint, uint, uint,
+-             uint, uint, uint, uint,
+-             uint, uint, uint, uint,
+-             uint, uint, uint, uint,
+-             uint, uint, uint, uint,
+-             uint, uint, uint, uint,
+-             uint, uint, uint, uint,
+-             uint, uint, uint, uint,
+-             uint, uint, uint, uint,
+-             uint, uint, uint, uint,
+-             uint, uint, uint, uint,
+-             uint, uint, uint, uint,
+-             uint, uint, uint, uint,
+-             uint, uint, uint, uint,
+-             uint, uint, uint, uint,
+-             uint, uint, uint, uint,
+-             int);
+-
+-intel_sub_group_avc_ime_payload_t
+-intel_sub_group_avc_ime_initialize(ushort2 src_coord,
+-                                  uchar partition_mask,
+-                                  uchar sad_adjustment);
+-
+-intel_sub_group_avc_ime_payload_t
+-intel_sub_group_avc_ime_set_single_reference(short2 ref_offset,
+-                                            uchar search_window_config,
+-                                            intel_sub_group_avc_ime_payload_t payload);
+-
+-intel_sub_group_avc_ime_result_t
+-intel_sub_group_avc_ime_evaluate_with_single_reference(read_only image2d_t src_image,
+-                                                      read_only image2d_t ref_image,
+-                                                      sampler_t vme_media_sampler,
+-                                                      intel_sub_group_avc_ime_payload_t payload);
+-
+-ulong intel_sub_group_avc_ime_get_motion_vectors(intel_sub_group_avc_ime_result_t result);
+-
+-ushort intel_sub_group_avc_ime_get_inter_distortions(intel_sub_group_avc_ime_result_t result);
+-
+-ushort intel_sub_group_avc_ime_get_inter_distortions(intel_sub_group_avc_ime_result_t result);
+-
+-uchar intel_sub_group_avc_ime_get_inter_major_shape(intel_sub_group_avc_ime_result_t result);
+-
+-uchar intel_sub_group_avc_ime_get_inter_minor_shapes(intel_sub_group_avc_ime_result_t result);
+-
+-uchar intel_sub_group_avc_ime_get_inter_directions(intel_sub_group_avc_ime_result_t result);
+-
+-intel_sub_group_avc_ref_payload_t
+-intel_sub_group_avc_fme_initialize(ushort2 src_coord,
+-                                  ulong motion_vectors,
+-                                  uchar major_shapes,
+-                                  uchar minor_shapes,
+-                                  uchar directions,
+-                                  uchar pixel_resolution,
+-                                  uchar sad_adjustment );
+-
+-intel_sub_group_avc_ref_result_t
+-intel_sub_group_avc_ref_evaluate_with_single_reference(read_only image2d_t src_image,
+-                                                      read_only image2d_t ref_image,
+-                                                      sampler_t vme_media_sampler,
+-                                                      intel_sub_group_avc_ref_payload_t payload);
+-
+-ulong intel_sub_group_avc_ref_get_motion_vectors(intel_sub_group_avc_ref_result_t result);
+-
+-ushort intel_sub_group_avc_ref_get_inter_distortions(intel_sub_group_avc_ref_result_t result);
+-
+-uint2 intel_sub_group_avc_mce_get_default_medium_penalty_cost_table(void);
+-
+-intel_sub_group_avc_ime_payload_t
+-intel_sub_group_avc_ime_set_motion_vector_cost_function(ulong packed_cost_center_delta,
+-                                                        uint2 packed_cost_table,
+-                                                        uchar cost_precision,
+-                                                        intel_sub_group_avc_ime_payload_t payload);
+-
+-#if REF_ENABLE_COST_PENALTY 
+-intel_sub_group_avc_ref_payload_t
+-intel_sub_group_avc_ref_set_motion_vector_cost_function(ulong packed_cost_center_delta,
+-                                                        uint2 packed_cost_table,
+-                                                        uchar cost_precision,
+-                                                        intel_sub_group_avc_ref_payload_t payload);
+-#endif
+-
+-intel_sub_group_avc_ime_payload_t
+-intel_sub_group_avc_ime_set_inter_shape_penalty(ulong packed_shape_cost,
+-                                                intel_sub_group_avc_ime_payload_t payload);
+-
+-intel_sub_group_avc_sic_result_t
+-intel_sub_group_avc_sic_evaluate_ipe(read_only image2d_t src_image,
+-                                     sampler_t vme_media_sampler,
+-                                     intel_sub_group_avc_sic_payload_t payload);
+-
+-intel_sub_group_avc_sic_payload_t
+-intel_sub_group_avc_sic_initialize(ushort2 src_coord );
+-
+-intel_sub_group_avc_sic_payload_t
+-intel_sub_group_avc_sic_configure_ipe(uchar luma_intra_partition_mask,
+-                                      uchar intra_neighbour_availabilty,
+-                                      uchar left_edge_luma_pixels,
+-                                      uchar upper_left_corner_luma_pixel,
+-                                      uchar upper_edge_luma_pixels,
+-                                      uchar upper_right_edge_luma_pixels,
+-                                      uchar intra_sad_adjustment,
+-                                      intel_sub_group_avc_sic_payload_t payload );
+-intel_sub_group_avc_sic_payload_t
+-intel_sub_group_avc_sic_set_intra_luma_shape_penalty(uint packed_shape_cost,
+-                                                     intel_sub_group_avc_sic_payload_t payload );
+-
+-uchar
+-intel_sub_group_avc_sic_get_ipe_luma_shape(intel_sub_group_avc_sic_result_t result);
+-
+-ushort
+-intel_sub_group_avc_sic_get_best_ipe_luma_distortion(intel_sub_group_avc_sic_result_t result);
+-
+-ulong intel_sub_group_avc_sic_get_packed_ipe_luma_modes(intel_sub_group_avc_sic_result_t result);
+-
+-
+-intel_sub_group_avc_sic_result_t
+-intel_sub_group_avc_sic_evaluate_with_single_reference(read_only image2d_t src_image,
+-                                                      read_only image2d_t ref_image,
+-                                                      sampler_t vme_media_sampler,
+-                                                      intel_sub_group_avc_sic_payload_t payload);
+-
+-intel_sub_group_avc_sic_payload_t
+-intel_sub_group_avc_sic_configure_skc(uint skip_block_partition_type,
+-                                      uint skip_motion_vector_mask,
+-                                      ulong motion_vectors,
+-                                      char bidirectional_weight,
+-                                      uchar skip_sad_adjustment,
+-                                      intel_sub_group_avc_sic_payload_t payload);
+-
+-ushort
+-intel_sub_group_avc_sic_get_inter_distortions(intel_sub_group_avc_sic_result_t result);
+-
+ bool __gen_ocl_in_local(size_t p);
+ bool __gen_ocl_in_private(size_t p);
+ 
+diff --git a/backend/src/libocl/src/ocl_misc.cl b/backend/src/libocl/src/ocl_misc.cl
+index f104f4ff..44fde203 100644
+--- a/backend/src/libocl/src/ocl_misc.cl
++++ b/backend/src/libocl/src/ocl_misc.cl
+@@ -234,1331 +234,6 @@ struct time_stamp __gen_ocl_get_timestamp(void) {
+   return val;
+ };
+ 
+-intel_sub_group_avc_ime_payload_t
+-intel_sub_group_avc_ime_initialize(ushort2 src_coord,
+-                                uchar partition_mask,
+-                                uchar sad_adjustment){
+-  intel_sub_group_avc_ime_payload_t pl;
+-  pl.srcCoord = src_coord;
+-  pl.partition_mask = partition_mask;
+-  pl.sad_adjustment = sad_adjustment;
+-  pl.ref_offset = (short2)(0, 0);
+-  pl.search_window_config = 0;
+-  pl.cc0 = 0;
+-  pl.cc1 = 0;
+-  pl.cc2 = 0;
+-  pl.cc3 = 0;
+-  pl.packed_cost_table = (uint2)(0, 0);
+-  pl.cost_precision = 2;
+-  pl.packed_shape_cost = 0;
+-  return pl;
+-}
+-
+-intel_sub_group_avc_ime_payload_t
+-intel_sub_group_avc_ime_set_single_reference(short2 ref_offset,
+-                                            uchar search_window_config,
+-                                            intel_sub_group_avc_ime_payload_t payload){
+-  intel_sub_group_avc_ime_payload_t pl = payload;
+-  pl.ref_offset = ref_offset;
+-  pl.search_window_config = search_window_config;
+-  return pl;
+-}
+-
+-intel_sub_group_avc_ime_result_t
+-intel_sub_group_avc_ime_evaluate_with_single_reference(read_only image2d_t src_image,
+-                                                      read_only image2d_t ref_image,
+-                                                      sampler_t vme_media_sampler,
+-                                                      intel_sub_group_avc_ime_payload_t payload){
+-  uint src_grf0_dw7;
+-  uint src_grf0_dw6;
+-  uint src_grf0_dw5;
+-  uint src_grf0_dw4;
+-  uint src_grf0_dw3;
+-  uint src_grf0_dw2;
+-  uint src_grf0_dw1;
+-  uint src_grf0_dw0;
+-  uint src_grf1_dw7;
+-  uint src_grf1_dw6;
+-  uint src_grf1_dw5;
+-  uint src_grf1_dw4;
+-  uint src_grf1_dw3;
+-  uint src_grf1_dw2;
+-  uint src_grf1_dw1;
+-  uint src_grf1_dw0;
+-  uint src_grf2_dw7;
+-  uint src_grf2_dw6;
+-  uint src_grf2_dw5;
+-  uint src_grf2_dw4;
+-  uint src_grf2_dw3;
+-  uint src_grf2_dw2;
+-  uint src_grf2_dw1;
+-  uint src_grf2_dw0;
+-  uint src_grf3_dw7;
+-  uint src_grf3_dw6;
+-  uint src_grf3_dw5;
+-  uint src_grf3_dw4;
+-  uint src_grf3_dw3;
+-  uint src_grf3_dw2;
+-  uint src_grf3_dw1;
+-  uint src_grf3_dw0;
+-  uint src_grf4_dw7;
+-  uint src_grf4_dw6;
+-  uint src_grf4_dw5;
+-  uint src_grf4_dw4;
+-  uint src_grf4_dw3;
+-  uint src_grf4_dw2;
+-  uint src_grf4_dw1;
+-  uint src_grf4_dw0;
+-  uint src_grf5_dw7;
+-  uint src_grf5_dw6;
+-  uint src_grf5_dw5;
+-  uint src_grf5_dw4;
+-  uint src_grf5_dw3;
+-  uint src_grf5_dw2;
+-  uint src_grf5_dw1;
+-  uint src_grf5_dw0;
+-  uint src_grf6_dw7;
+-  uint src_grf6_dw6;
+-  uint src_grf6_dw5;
+-  uint src_grf6_dw4;
+-  uint src_grf6_dw3;
+-  uint src_grf6_dw2;
+-  uint src_grf6_dw1;
+-  uint src_grf6_dw0;
+-  uint src_grf7_dw7;
+-  uint src_grf7_dw6;
+-  uint src_grf7_dw5;
+-  uint src_grf7_dw4;
+-  uint src_grf7_dw3;
+-  uint src_grf7_dw2;
+-  uint src_grf7_dw1;
+-  uint src_grf7_dw0;
+-
+-
+-  //src_grf0_dw7 = Debug;
+-  src_grf0_dw7 = 0;
+-  //src_grf0_dw6 = Debug;
+-  src_grf0_dw6 = 0;
+-  //src_grf0_dw4 = Ignored;
+-  src_grf0_dw4 = 0;
+-
+-  short2 predict_mv = payload.ref_offset;
+-  //CL_ME_SEARCH_PATH_RADIUS_2_2_INTEL
+-  //src_grf0_dw5 = (Ref_Height << 24) | (Ref_Width << 16) | (Ignored << 8) | (Dispatch_Id);
+-  src_grf0_dw5 =   (20 << 24)         | (20 << 16)        | (0 << 8)       | (0);
+-  //src_grf0_dw1 = (Ref1Y << 16)  | (Ref1X);
+-  src_grf0_dw1 =   ((-2 + predict_mv.y) << 16 ) | ((-2 + predict_mv.x) & 0x0000ffff);
+-  //src_grf0_dw0 = (Ref0Y << 16)  | (Ref0X);
+-  src_grf0_dw0 =   ((-2 + predict_mv.y) << 16 ) | ((-2 + predict_mv.x) & 0x0000ffff);
+-
+-  //src_grf0_dw3 = (Reserved << 31)                | (Sub_Mb_Part_Mask << 24)       | (Intra_SAD << 22)
+-  src_grf0_dw3 =   (0 << 31)                       | (payload.partition_mask << 24) | (0 << 22)
+-                 //| (Inter_SAD << 20)             | (BB_Skip_Enabled << 19)        | (Reserverd << 18)
+-                   | (payload.sad_adjustment << 20)| (0 << 19)                      | (0 << 18)
+-                 //| (Dis_Aligned_Src_Fetch << 17) | (Dis_Aligned_Ref_Fetch << 16)  | (Dis_Field_Cache_Alloc << 15)
+-                   | (0 << 17)                     | (0 << 16)                      | (0 << 15)
+-                 //| (Skip_Type << 14)             | (Sub_Pel_Mode << 12)           | (Dual_Search_Path_Opt << 11)
+-                   | (0 << 14)                     | (0 << 12)                      | (0 << 11)
+-                 //| (Search_Ctrl << 8)            | (Ref_Access << 7)              | (SrcAccess << 6)
+-                   | (0 << 8)                      | (0 << 7)                       | (0 << 6)
+-                 //| (Mb_Type_Remap << 4)          | (Reserved_Workaround << 3)     | (Reserved_Workaround << 2)
+-                   | (0 << 4)                      | (0 << 3)                       | (0 << 2)
+-                 //| (Src_Size);
+-                   | (0);
+-
+-  //src_grf0_dw2 = (SrcY << 16) | (SrcX);
+-  src_grf0_dw2 = (payload.srcCoord.y << 16)  | (payload.srcCoord.x);
+-
+-  /*src_grf1_dw7 = (Skip_Center_Mask << 24)         | (Reserved << 22)               | (Ref1_Field_Polarity << 21)
+-                 | (Ref0_Field_Polarity << 20)   | (Src_Field_Polarity << 19)     | (Bilinear_Enable << 18)
+-                 | (MV_Cost_Scale_Factor << 16)  | (Mb_Intra_Struct << 8)         | (Intra_Corner_Swap << 7)
+-                 | (Non_Skip_Mode_Added << 6)    | (Non_Skip_ZMv_Added << 5)      | (IntraPartMask);*/
+-  src_grf1_dw7 = (payload.cost_precision << 16);
+-  //src_grf1_dw6 = Reserved;
+-  src_grf1_dw6 = 0;
+-  /*src_grf1_dw5 = Reseverd for BDW+
+-  src_grf1_dw4 = Reseverd for BDW+*/
+-  src_grf1_dw5 = 0;
+-  src_grf1_dw4 = 0;
+-  //src_grf1_dw3 = Weighted SAD Control Sub-block 0...15
+-  src_grf1_dw3 = 0;
+-  //XXX: should set src_grf1_dw2
+-  //src_grf1_dw2 = (Start1Y << 28)                  | (Start1X << 24)                | (Start0Y << 20)
+-  src_grf1_dw2 =   (0 << 28)                        | (0 << 24)                      | (0 << 20)
+-                 //| (Start0X << 16)               | (Max_Num_SU << 8)              | (LenSP);
+-                   | (0 << 16)                     | (2 << 8)                       | (2);
+-  /*src_grf1_dw1 = (RepartEn << 31)                 | (FBPrunEn << 30)               | (AdaptiveValidationControl << 29)
+-                 | (Uni_Mix_Disable << 28)       | (Bi_Sub_Mb_Part_Mask << 24)    | (Reserverd << 22)
+-                 | (Bi_Weight << 16)             | (Reserved << 6)                | (MaxNumMVs);*/
+-  src_grf1_dw1 = (0 << 24) | (16);
+-  /*src_grf1_dw0 = (Early_Ime_Stop << 24)           | (Early_Fme_Success << 16)      | (Skip_Success << 8)
+-                 | (T8x8_Flag_For_Inter_En << 7) | (Quit_Inter_En << 6)           | (Early_Ime_Success_En << 5)
+-                 | (Early_Success_En << 4)       | (Part_Candidate_En << 3)       | (Bi_Mix_Dis << 2)
+-                 | (Adaptive_En  << 1)           | (SkipModeEn);*/
+-  src_grf1_dw0 = 0;
+-
+-  //src_grf2_dw7 = SIC Forward Transform Coeff Threshold Matrix[3...6]
+-  src_grf2_dw7 = 0;
+-  //src_grf2_dw6 = SIC Forward Transform Coeff Threshold Matrix[0...2]
+-  src_grf2_dw6 = 0;
+-  //src_grf2_dw5 = (Reserved << 24) | (FBR_SubPredMode_Input << 16) | (FBR_SubMBShape_Input << 8) | (Reserved << 2) | (FBR_MbMode_Input);
+-  src_grf2_dw5 = 0;
+-  //src_grf2_dw4 = MV_4_Cost ... MV_7_Cost;
+-  src_grf2_dw4 = payload.packed_cost_table.s1;
+-  //src_grf2_dw3 = MV_0_Cost ... MV_3_Cost;
+-  src_grf2_dw3 = payload.packed_cost_table.s0;
+-  //src_grf2_dw2 = ... Mode 8 Cost;
+-  src_grf2_dw2 = (payload.packed_shape_cost >> 32) & 0x000000ff;
+-  //src_grf2_dw1 = Mode 4 Cost ... Mode 7 Cost
+-  src_grf2_dw1 = payload.packed_shape_cost;
+-  src_grf2_dw0 = 0;
+-  //src_grf3_dw7 = (BWDCostCenter3Y << 16) | (BWDCostCenter3X) ;
+-  src_grf3_dw7 = payload.cc3 >> 32;
+-  //src_grf3_dw6 = (FWDCostCenter3Y << 16) | (FWDCostCenter3X) ;
+-  src_grf3_dw6 = payload.cc3;
+-  //src_grf3_dw5 = (BWDCostCenter2Y << 16) | (BWDCostCenter2X) ;
+-  src_grf3_dw5 = payload.cc2 >> 32;
+-  //src_grf3_dw4 = (FWDCostCenter2Y << 16) | (FWDCostCenter2X) ;
+-  src_grf3_dw4 = payload.cc2;
+-  //src_grf3_dw3 = (BWDCostCenter1Y << 16) | (BWDCostCenter1X) ;
+-  src_grf3_dw3 = payload.cc1 >> 32;
+-  //src_grf3_dw2 = (FWDCostCenter1Y << 16) | (FWDCostCenter1X) ;
+-  src_grf3_dw2 = payload.cc1;
+-  //src_grf3_dw1 = (BWDCostCenter0Y << 16) | (BWDCostCenter0X) ;
+-  src_grf3_dw1 = payload.cc0 >> 32;
+-  //src_grf3_dw0 = (FWDCostCenter0Y << 16) | (FWDCostCenter0X) ;
+-  src_grf3_dw0 = payload.cc0;
+-
+-  //XXX: TODO: set search path
+-  src_grf4_dw7 = 0;
+-  src_grf4_dw6 = 0;
+-  src_grf4_dw5 = 0;
+-  src_grf4_dw4 = 0;
+-  src_grf4_dw3 = 0;
+-  src_grf4_dw2 = 0;
+-  src_grf4_dw1 = 0;
+-  src_grf4_dw0 = 0;
+-  src_grf5_dw7 = 0;
+-  src_grf5_dw6 = 0;
+-  src_grf5_dw5 = 0;
+-  src_grf5_dw4 = 0;
+-  src_grf5_dw3 = 0;
+-  src_grf5_dw2 = 0;
+-  src_grf5_dw1 = 0;
+-  src_grf5_dw0 = 0;
+-
+-  intel_sub_group_avc_ime_result_t ime_result;
+-  ime_result = __gen_ocl_ime(src_image, ref_image,
+-                src_grf0_dw7, src_grf0_dw6, src_grf0_dw5, src_grf0_dw4,
+-                src_grf0_dw3, src_grf0_dw2, src_grf0_dw1, src_grf0_dw0,
+-                src_grf1_dw7, src_grf1_dw6, src_grf1_dw5, src_grf1_dw4,
+-                src_grf1_dw3, src_grf1_dw2, src_grf1_dw1, src_grf1_dw0,
+-                src_grf2_dw7, src_grf2_dw6, src_grf2_dw5, src_grf2_dw4,
+-                src_grf2_dw3, src_grf2_dw2, src_grf2_dw1, src_grf2_dw0,
+-                src_grf3_dw7, src_grf3_dw6, src_grf3_dw5, src_grf3_dw4,
+-                src_grf3_dw3, src_grf3_dw2, src_grf3_dw1, src_grf3_dw0,
+-                src_grf4_dw7, src_grf4_dw6, src_grf4_dw5, src_grf4_dw4,
+-                src_grf4_dw3, src_grf4_dw2, src_grf4_dw1, src_grf4_dw0,
+-                src_grf5_dw7, src_grf5_dw6, src_grf5_dw5, src_grf5_dw4,
+-                src_grf5_dw3, src_grf5_dw2, src_grf5_dw1, src_grf5_dw0,
+-                src_grf6_dw7, src_grf6_dw6, src_grf6_dw5, src_grf6_dw4,
+-                src_grf6_dw3, src_grf6_dw2, src_grf6_dw1, src_grf6_dw0,
+-                src_grf7_dw7, src_grf7_dw6, src_grf7_dw5, src_grf7_dw4,
+-                src_grf7_dw3, src_grf7_dw2, src_grf7_dw1, src_grf7_dw0,
+-                //msg_type
+-                2);
+-
+-  return ime_result;
+-}
+-
+-ulong intel_sub_group_avc_ime_get_motion_vectors(intel_sub_group_avc_ime_result_t result){
+-  uint lid_x = get_sub_group_local_id();
+-  uint fwd_mv, bwd_mv;
+-  if(lid_x < 4){
+-    fwd_mv = intel_sub_group_shuffle(result.s0, 8 + lid_x*2);
+-    bwd_mv = intel_sub_group_shuffle(result.s0, 9 + lid_x*2);
+-  }
+-  else if(lid_x >= 4 && lid_x <= 12){
+-    fwd_mv = intel_sub_group_shuffle(result.s1, 0 + (lid_x-4)*2);
+-    bwd_mv = intel_sub_group_shuffle(result.s1, 1 + (lid_x-4)*2);
+-  }
+-  else if(lid_x < 16){
+-    fwd_mv = intel_sub_group_shuffle(result.s2, 0 + (lid_x-12)*2);
+-    bwd_mv = intel_sub_group_shuffle(result.s2, 1 + (lid_x-12)*2);
+-  }
+-  
+-  ulong res = (bwd_mv << 32) | (fwd_mv & 0x00000000ffffffff);
+-  return res;
+-}
+-
+-ushort intel_sub_group_avc_ime_get_inter_distortions(intel_sub_group_avc_ime_result_t result){
+-  uint lid_x = get_sub_group_local_id();
+-  uint write_back_dw = intel_sub_group_shuffle(result.s2, 8 + lid_x/2);
+-  int start_bit = lid_x%2 * 16;
+-  ushort distortion = (write_back_dw >> start_bit);
+-  return distortion;
+-}
+-
+-uchar intel_sub_group_avc_ime_get_inter_major_shape(intel_sub_group_avc_ime_result_t result){
+-  uint write_back_dw00 = intel_sub_group_shuffle(result.s0, 0);
+-  uchar major_shape = write_back_dw00 & 0x03;
+-  return major_shape;
+-}
+-
+-uchar intel_sub_group_avc_ime_get_inter_minor_shapes(intel_sub_group_avc_ime_result_t result){
+-  uint write_back_dw06 = intel_sub_group_shuffle(result.s0, 6);
+-  uchar minor_shape = (write_back_dw06 >> 8) & 0xff;
+-  return minor_shape;
+-}
+-
+-uchar intel_sub_group_avc_ime_get_inter_directions(intel_sub_group_avc_ime_result_t result){
+-  uint write_back_dw06 = intel_sub_group_shuffle(result.s0, 6);
+-  uchar direction = (write_back_dw06 >> 16) & 0xff;
+-  return direction;
+-}
+-
+-intel_sub_group_avc_ref_payload_t
+-intel_sub_group_avc_fme_initialize(ushort2 src_coord,
+-                                   ulong motion_vectors,
+-                                   uchar major_shapes,
+-                                   uchar minor_shapes,
+-                                   uchar directions,
+-                                   uchar pixel_resolution,
+-                                   uchar sad_adjustment ){
+-  intel_sub_group_avc_ref_payload_t pl;
+-  pl.srcCoord = src_coord;
+-  pl.mv = motion_vectors;
+-  pl.major_shape = major_shapes;
+-  pl.minor_shapes = minor_shapes;
+-  pl.directions = directions;
+-  pl.pixel_mode = pixel_resolution;
+-  pl.sad_adjustment = sad_adjustment;
+-#if REF_ENABLE_COST_PENALTY
+-  pl.cc0 = 0;
+-  pl.cc1 = 0;
+-  pl.cc2 = 0;
+-  pl.cc3 = 0;
+-  pl.packed_cost_table = (uint2)(0, 0);
+-  pl.cost_precision = 2;
+-  pl.packed_shape_cost = 0;
+-#endif
+-  return pl;
+-}
+-
+-intel_sub_group_avc_ref_result_t
+-intel_sub_group_avc_ref_evaluate_with_single_reference(read_only image2d_t src_image,
+-                                                      read_only image2d_t ref_image,
+-                                                      sampler_t vme_media_sampler,
+-                                                      intel_sub_group_avc_ref_payload_t payload){
+-  uint src_grf0_dw7;
+-  uint src_grf0_dw6;
+-  uint src_grf0_dw5;
+-  uint src_grf0_dw4;
+-  uint src_grf0_dw3;
+-  uint src_grf0_dw2;
+-  uint src_grf0_dw1;
+-  uint src_grf0_dw0;
+-  uint src_grf1_dw7;
+-  uint src_grf1_dw6;
+-  uint src_grf1_dw5;
+-  uint src_grf1_dw4;
+-  uint src_grf1_dw3;
+-  uint src_grf1_dw2;
+-  uint src_grf1_dw1;
+-  uint src_grf1_dw0;
+-  uint src_grf2_dw7;
+-  uint src_grf2_dw6;
+-  uint src_grf2_dw5;
+-  uint src_grf2_dw4;
+-  uint src_grf2_dw3;
+-  uint src_grf2_dw2;
+-  uint src_grf2_dw1;
+-  uint src_grf2_dw0;
+-  uint src_grf3_dw7;
+-  uint src_grf3_dw6;
+-  uint src_grf3_dw5;
+-  uint src_grf3_dw4;
+-  uint src_grf3_dw3;
+-  uint src_grf3_dw2;
+-  uint src_grf3_dw1;
+-  uint src_grf3_dw0;
+-  uint src_grf4_dw7;
+-  uint src_grf4_dw6;
+-  uint src_grf4_dw5;
+-  uint src_grf4_dw4;
+-  uint src_grf4_dw3;
+-  uint src_grf4_dw2;
+-  uint src_grf4_dw1;
+-  uint src_grf4_dw0;
+-  uint src_grf5_dw7;
+-  uint src_grf5_dw6;
+-  uint src_grf5_dw5;
+-  uint src_grf5_dw4;
+-  uint src_grf5_dw3;
+-  uint src_grf5_dw2;
+-  uint src_grf5_dw1;
+-  uint src_grf5_dw0;
+-  uint src_grf6_dw7;
+-  uint src_grf6_dw6;
+-  uint src_grf6_dw5;
+-  uint src_grf6_dw4;
+-  uint src_grf6_dw3;
+-  uint src_grf6_dw2;
+-  uint src_grf6_dw1;
+-  uint src_grf6_dw0;
+-  uint src_grf7_dw7;
+-  uint src_grf7_dw6;
+-  uint src_grf7_dw5;
+-  uint src_grf7_dw4;
+-  uint src_grf7_dw3;
+-  uint src_grf7_dw2;
+-  uint src_grf7_dw1;
+-  uint src_grf7_dw0;
+-
+-
+-  //src_grf0_dw7 = Debug;
+-  src_grf0_dw7 = 0;
+-  //src_grf0_dw6 = Debug;
+-  src_grf0_dw6 = 0;
+-  //src_grf0_dw5 = (Ref_Height << 24) | (Ref_Width << 16) | (Ignored << 8) | (Dispatch_Id);
+-  src_grf0_dw5 = 0;
+-  //src_grf0_dw4 = Ignored;
+-  src_grf0_dw4 = 0;
+-  //src_grf0_dw3 = (Reserved << 31)                | (Sub_Mb_Part_Mask << 24)       | (Intra_SAD << 22)
+-  src_grf0_dw3 =   (0 << 31)                       | (0 << 24)                      | (0 << 22)
+-                 //| (Inter_SAD << 20)             | (BB_Skip_Enabled << 19)        | (Reserverd << 18)
+-                   | (payload.sad_adjustment << 20)| (0 << 19)                      | (0 << 18)
+-                 //| (Dis_Aligned_Src_Fetch << 17) | (Dis_Aligned_Ref_Fetch << 16)  | (Dis_Field_Cache_Alloc << 15)
+-                   | (0 << 17)                     | (0 << 16)                      | (0 << 15)
+-                 //| (Skip_Type << 14)             | (Sub_Pel_Mode << 12)           | (Dual_Search_Path_Opt << 11)
+-                   | (0 << 14)                     | (payload.pixel_mode << 12)     | (0 << 11)
+-                 //| (Search_Ctrl << 8)            | (Ref_Access << 7)              | (SrcAccess << 6)
+-                   | (0 << 8)                      | (0 << 7)                       | (0 << 6)
+-                 //| (Mb_Type_Remap << 4)          | (Reserved_Workaround << 3)     | (Reserved_Workaround << 2)
+-                   | (0 << 4)                      | (0 << 3)                       | (0 << 2)
+-                 //| (Src_Size);
+-                   | (0);
+-  //src_grf0_dw2 = (SrcY << 16) | (SrcX);
+-  src_grf0_dw2 = (payload.srcCoord.y << 16)  | (payload.srcCoord.x);
+-  //src_grf0_dw1 = (Ref1Y << 16)  | (Ref1X);
+-  src_grf0_dw1 = 0;
+-  //src_grf0_dw0 = (Ref0Y << 16)  | (Ref0X);
+-  src_grf0_dw0 = 0;
+-  
+-
+-  /*src_grf1_dw7 = (Skip_Center_Mask << 24)         | (Reserved << 22)               | (Ref1_Field_Polarity << 21)
+-                 | (Ref0_Field_Polarity << 20)   | (Src_Field_Polarity << 19)     | (Bilinear_Enable << 18)
+-                 | (MV_Cost_Scale_Factor << 16)  | (Mb_Intra_Struct << 8)         | (Intra_Corner_Swap << 7)
+-                 | (Non_Skip_Mode_Added << 6)    | (Non_Skip_ZMv_Added << 5)      | (IntraPartMask);*/
+-  src_grf1_dw7 = 0;
+-  //src_grf1_dw6 = Reserved;
+-  src_grf1_dw6 = 0;
+-  /*src_grf1_dw5 = Reseverd for BDW+
+-  src_grf1_dw4 = Reseverd for BDW+*/
+-  src_grf1_dw5 = 0;
+-  src_grf1_dw4 = 0;
+-  //src_grf1_dw3 = Weighted SAD Control Sub-block 0...15
+-  src_grf1_dw3 = 0;
+-  //src_grf1_dw2 = (Start1Y << 28)                  | (Start1X << 24)                | (Start0Y << 20)
+-                 //| (Start0X << 16)               | (Max_Num_SU << 8)              | (LenSP);
+-  src_grf1_dw2 = 0;
+-  /*src_grf1_dw1 = (RepartEn << 31)                 | (FBPrunEn << 30)               | (AdaptiveValidationControl << 29)
+-                 | (Uni_Mix_Disable << 28)       | (Bi_Sub_Mb_Part_Mask << 24)    | (Reserverd << 22)
+-                 | (Bi_Weight << 16)             | (Reserved << 6)                | (MaxNumMVs);*/
+-  //src_grf1_dw1 = (0 << 24) | (2);
+-  src_grf1_dw1 = (0 << 24) | (16);
+-  /*src_grf1_dw0 = (Early_Ime_Stop << 24)           | (Early_Fme_Success << 16)      | (Skip_Success << 8)
+-                 | (T8x8_Flag_For_Inter_En << 7) | (Quit_Inter_En << 6)           | (Early_Ime_Success_En << 5)
+-                 | (Early_Success_En << 4)       | (Part_Candidate_En << 3)       | (Bi_Mix_Dis << 2)
+-                 | (Adaptive_En  << 1)           | (SkipModeEn);*/
+-  src_grf1_dw0 = 0;
+-
+-  //src_grf2_dw7 = SIC Forward Transform Coeff Threshold Matrix[3...6]
+-  src_grf2_dw7 = 0;
+-  //src_grf2_dw6 = SIC Forward Transform Coeff Threshold Matrix[0...2]
+-  src_grf2_dw6 = 0;
+-  //src_grf2_dw5 = (Reserved << 24) | (FBR_SubPredMode_Input << 16) | (FBR_SubMBShape_Input << 8) | (Reserved << 2) | (FBR_MbMode_Input);
+-  src_grf2_dw5 = (0 << 24) | (payload.directions << 16) | (payload.minor_shapes << 8) | (payload.major_shape);
+-#if REF_ENABLE_COST_PENALTY
+-  //src_grf2_dw4 = MV_4_Cost ... MV_7_Cost;
+-  src_grf2_dw4 = payload.packed_cost_table.s1;
+-  //src_grf2_dw3 = MV_0_Cost ... MV_3_Cost;
+-  src_grf2_dw3 = payload.packed_cost_table.s0;
+-  //src_grf2_dw2 = ... Mode 8 Cost;
+-  src_grf2_dw2 = (payload.packed_shape_cost >> 32) & 0x000000ff;
+-  //src_grf2_dw1 = Mode 4 Cost ... Mode 7 Cost
+-  src_grf2_dw1 = payload.packed_shape_cost;
+-  src_grf2_dw0 = 0;
+-  //src_grf3_dw7 = (BWDCostCenter3Y << 16) | (BWDCostCenter3X) ;
+-  src_grf3_dw7 = payload.cc3 >> 32;
+-  //src_grf3_dw6 = (FWDCostCenter3Y << 16) | (FWDCostCenter3X) ;
+-  src_grf3_dw6 = payload.cc3;
+-  //src_grf3_dw5 = (BWDCostCenter2Y << 16) | (BWDCostCenter2X) ;
+-  src_grf3_dw5 = payload.cc2 >> 32;
+-  //src_grf3_dw4 = (FWDCostCenter2Y << 16) | (FWDCostCenter2X) ;
+-  src_grf3_dw4 = payload.cc2;
+-  //src_grf3_dw3 = (BWDCostCenter1Y << 16) | (BWDCostCenter1X) ;
+-  src_grf3_dw3 = payload.cc1 >> 32;
+-  //src_grf3_dw2 = (FWDCostCenter1Y << 16) | (FWDCostCenter1X) ;
+-  src_grf3_dw2 = payload.cc1;
+-  //src_grf3_dw1 = (BWDCostCenter0Y << 16) | (BWDCostCenter0X) ;
+-  src_grf3_dw1 = payload.cc0 >> 32;
+-  //src_grf3_dw0 = (FWDCostCenter0Y << 16) | (FWDCostCenter0X) ;
+-  src_grf3_dw0 = payload.cc0;
+-#else
+-  src_grf2_dw4 = 0;
+-  src_grf2_dw3 = 0;
+-  src_grf2_dw2 = 0;
+-  src_grf2_dw1 = 0;
+-  src_grf2_dw0 = 0;
+-  src_grf3_dw7 = 0;
+-  src_grf3_dw6 = 0;
+-  src_grf3_dw5 = 0;
+-  src_grf3_dw4 = 0;
+-  src_grf3_dw3 = 0;
+-  src_grf3_dw2 = 0;
+-  src_grf3_dw1 = 0;
+-  src_grf3_dw0 = 0;
+-#endif
+-
+-  //grf4...grf7 =   Ref0/1 Sub-block XY 0...15
+-  int2 bi_mv_temp = as_int2( payload.mv );
+-  int2 bi_mv = intel_sub_group_shuffle(bi_mv_temp, 3);
+-  src_grf4_dw7 = bi_mv.s1;
+-  src_grf4_dw6 = bi_mv.s0;
+-  bi_mv = intel_sub_group_shuffle(bi_mv_temp, 2);
+-  src_grf4_dw5 = bi_mv.s1;
+-  src_grf4_dw4 = bi_mv.s0;
+-  bi_mv = intel_sub_group_shuffle(bi_mv_temp, 1);
+-  src_grf4_dw3 = bi_mv.s1;
+-  src_grf4_dw2 = bi_mv.s0;
+-  bi_mv = intel_sub_group_shuffle(bi_mv_temp, 0);
+-  src_grf4_dw1 = bi_mv.s1;
+-  src_grf4_dw0 = bi_mv.s0;
+-
+-  bi_mv = intel_sub_group_shuffle(bi_mv_temp, 7);
+-  src_grf5_dw7 = bi_mv.s1;
+-  src_grf5_dw6 = bi_mv.s0;
+-  bi_mv = intel_sub_group_shuffle(bi_mv_temp, 6);
+-  src_grf5_dw5 = bi_mv.s1;
+-  src_grf5_dw4 = bi_mv.s0;
+-  bi_mv = intel_sub_group_shuffle(bi_mv_temp, 5);
+-  src_grf5_dw3 = bi_mv.s1;
+-  src_grf5_dw2 = bi_mv.s0;
+-  bi_mv = intel_sub_group_shuffle(bi_mv_temp, 4);
+-  src_grf5_dw1 = bi_mv.s1;
+-  src_grf5_dw0 = bi_mv.s0;
+-
+-  bi_mv = intel_sub_group_shuffle(bi_mv_temp, 11);
+-  src_grf6_dw7 = bi_mv.s1;
+-  src_grf6_dw6 = bi_mv.s0;
+-  bi_mv = intel_sub_group_shuffle(bi_mv_temp, 10);
+-  src_grf6_dw5 = bi_mv.s1;
+-  src_grf6_dw4 = bi_mv.s0;
+-  bi_mv = intel_sub_group_shuffle(bi_mv_temp, 9);
+-  src_grf6_dw3 = bi_mv.s1;
+-  src_grf6_dw2 = bi_mv.s0;
+-  bi_mv = intel_sub_group_shuffle(bi_mv_temp, 8);
+-  src_grf6_dw1 = bi_mv.s1;
+-  src_grf6_dw0 = bi_mv.s0;
+-
+-  bi_mv = intel_sub_group_shuffle(bi_mv_temp, 15);
+-  src_grf7_dw7 = bi_mv.s1;
+-  src_grf7_dw6 = bi_mv.s0;
+-  bi_mv = intel_sub_group_shuffle(bi_mv_temp, 14);
+-  src_grf7_dw5 = bi_mv.s1;
+-  src_grf7_dw4 = bi_mv.s0;
+-  bi_mv = intel_sub_group_shuffle(bi_mv_temp, 13);
+-  src_grf7_dw3 = bi_mv.s1;
+-  src_grf7_dw2 = bi_mv.s0;
+-  bi_mv = intel_sub_group_shuffle(bi_mv_temp, 12);
+-  src_grf7_dw1 = bi_mv.s1;
+-  src_grf7_dw0 = bi_mv.s0;
+-
+-  intel_sub_group_avc_ref_result_t ref_result;
+-  ref_result = __gen_ocl_ime(src_image, ref_image,
+-                src_grf0_dw7, src_grf0_dw6, src_grf0_dw5, src_grf0_dw4,
+-                src_grf0_dw3, src_grf0_dw2, src_grf0_dw1, src_grf0_dw0,
+-                src_grf1_dw7, src_grf1_dw6, src_grf1_dw5, src_grf1_dw4,
+-                src_grf1_dw3, src_grf1_dw2, src_grf1_dw1, src_grf1_dw0,
+-                src_grf2_dw7, src_grf2_dw6, src_grf2_dw5, src_grf2_dw4,
+-                src_grf2_dw3, src_grf2_dw2, src_grf2_dw1, src_grf2_dw0,
+-                src_grf3_dw7, src_grf3_dw6, src_grf3_dw5, src_grf3_dw4,
+-                src_grf3_dw3, src_grf3_dw2, src_grf3_dw1, src_grf3_dw0,
+-                src_grf4_dw7, src_grf4_dw6, src_grf4_dw5, src_grf4_dw4,
+-                src_grf4_dw3, src_grf4_dw2, src_grf4_dw1, src_grf4_dw0,
+-                src_grf5_dw7, src_grf5_dw6, src_grf5_dw5, src_grf5_dw4,
+-                src_grf5_dw3, src_grf5_dw2, src_grf5_dw1, src_grf5_dw0,
+-                src_grf6_dw7, src_grf6_dw6, src_grf6_dw5, src_grf6_dw4,
+-                src_grf6_dw3, src_grf6_dw2, src_grf6_dw1, src_grf6_dw0,
+-                src_grf7_dw7, src_grf7_dw6, src_grf7_dw5, src_grf7_dw4,
+-                src_grf7_dw3, src_grf7_dw2, src_grf7_dw1, src_grf7_dw0,
+-                //msg_type
+-                3);
+-
+-  return ref_result;
+-}
+-
+-ulong intel_sub_group_avc_ref_get_motion_vectors(intel_sub_group_avc_ref_result_t result){
+-  uint lid_x = get_sub_group_local_id();
+-  uint fwd_mv, bwd_mv;
+-  if(lid_x < 4){
+-    fwd_mv = intel_sub_group_shuffle(result.s0, 8 + lid_x*2);
+-    bwd_mv = intel_sub_group_shuffle(result.s0, 9 + lid_x*2);
+-  }
+-  else if(lid_x >= 4 && lid_x <= 12){
+-    fwd_mv = intel_sub_group_shuffle(result.s1, 0 + (lid_x-4)*2);
+-    bwd_mv = intel_sub_group_shuffle(result.s1, 1 + (lid_x-4)*2);
+-  }
+-  else if(lid_x < 16){
+-    fwd_mv = intel_sub_group_shuffle(result.s2, 0 + (lid_x-12)*2);
+-    bwd_mv = intel_sub_group_shuffle(result.s2, 1 + (lid_x-12)*2);
+-  }
+-  
+-  ulong res = (bwd_mv << 32) | (fwd_mv & 0x00000000ffffffff);
+-  return res;
+-}
+-
+-ushort intel_sub_group_avc_ref_get_inter_distortions(intel_sub_group_avc_ref_result_t result){
+-  uint lid_x = get_sub_group_local_id();
+-  uint write_back_dw = intel_sub_group_shuffle(result.s2, 8 + lid_x/2);
+-  int start_bit = lid_x%2 * 16;
+-  ushort distortion = (write_back_dw >> start_bit);
+-  return distortion;
+-}
+-
+-uint2 intel_sub_group_avc_mce_get_default_medium_penalty_cost_table(void){
+-  #define COST_PENALTY(idx, base, shift)  \
+-            uchar cost_penalty_##idx = (shift << 4) | (base);
+-
+-  COST_PENALTY(0, 1, 0)
+-  COST_PENALTY(1, 1, 0)
+-  COST_PENALTY(2, 1, 0)
+-  COST_PENALTY(3, 1, 0)
+-  COST_PENALTY(4, 1, 0)
+-  COST_PENALTY(5, 1, 0)
+-  COST_PENALTY(6, 1, 0)
+-  COST_PENALTY(7, 1, 0)
+-  uint2 cost_table;
+-  cost_table.s0 = cost_penalty_0 | (cost_penalty_1 << 8) | ( cost_penalty_2 << 16) | (cost_penalty_3 << 24);
+-  cost_table.s1 = cost_penalty_4 | (cost_penalty_5 << 8) | ( cost_penalty_6 << 16) | (cost_penalty_7 << 24);
+-  return cost_table;
+-}
+-
+-intel_sub_group_avc_ime_payload_t
+-intel_sub_group_avc_ime_set_motion_vector_cost_function(ulong packed_cost_center_delta,
+-                                                        uint2 packed_cost_table,
+-                                                        uchar cost_precision,
+-                                                        intel_sub_group_avc_ime_payload_t payload){
+-  intel_sub_group_avc_ime_payload_t pl = payload;
+-  pl.packed_cost_table = packed_cost_table;
+-  pl.cost_precision = cost_precision;
+-  
+-  uint lid_x = get_sub_group_local_id();
+-  if(lid_x == 0)
+-    pl.cc0 = packed_cost_center_delta;
+-  else if(lid_x == 1)
+-    pl.cc1 = packed_cost_center_delta;
+-  else if(lid_x == 2)
+-    pl.cc2 = packed_cost_center_delta;
+-  else if(lid_x == 3)
+-    pl.cc3 = packed_cost_center_delta;
+-  else{
+-  }
+-  return pl;
+-}
+-
+-#if REF_ENABLE_COST_PENALTY
+-intel_sub_group_avc_ref_payload_t
+-intel_sub_group_avc_ref_set_motion_vector_cost_function(ulong packed_cost_center_delta,
+-                                                        uint2 packed_cost_table,
+-                                                        uchar cost_precision,
+-                                                        intel_sub_group_avc_ref_payload_t payload){
+-  intel_sub_group_avc_ref_payload_t pl = payload;
+-  pl.packed_cost_table = packed_cost_table;
+-  pl.cost_precision = cost_precision;
+-  
+-  uint lid_x = get_sub_group_local_id();
+-  if(lid_x == 0)
+-    pl.cc0 = packed_cost_center_delta;
+-  else if(lid_x == 1)
+-    pl.cc1 = packed_cost_center_delta;
+-  else if(lid_x == 2)
+-    pl.cc2 = packed_cost_center_delta;
+-  else if(lid_x == 3)
+-    pl.cc3 = packed_cost_center_delta;
+-  else{
+-  }
+-  return pl;
+-}
+-
+-#endif
+-
+-intel_sub_group_avc_ime_payload_t
+-intel_sub_group_avc_ime_set_inter_shape_penalty(ulong packed_shape_cost,
+-                                                intel_sub_group_avc_ime_payload_t payload){
+-  intel_sub_group_avc_ime_payload_t pl = payload;
+-  pl.packed_shape_cost = packed_shape_cost;  
+-  return pl;
+-}
+-
+-intel_sub_group_avc_sic_result_t
+-intel_sub_group_avc_sic_evaluate_ipe(read_only image2d_t src_image,
+-                                     sampler_t vme_media_sampler,
+-                                     intel_sub_group_avc_sic_payload_t payload){
+-  uint src_grf0_dw7;
+-  uint src_grf0_dw6;
+-  uint src_grf0_dw5;
+-  uint src_grf0_dw4;
+-  uint src_grf0_dw3;
+-  uint src_grf0_dw2;
+-  uint src_grf0_dw1;
+-  uint src_grf0_dw0;
+-  uint src_grf1_dw7;
+-  uint src_grf1_dw6;
+-  uint src_grf1_dw5;
+-  uint src_grf1_dw4;
+-  uint src_grf1_dw3;
+-  uint src_grf1_dw2;
+-  uint src_grf1_dw1;
+-  uint src_grf1_dw0;
+-  uint src_grf2_dw7;
+-  uint src_grf2_dw6;
+-  uint src_grf2_dw5;
+-  uint src_grf2_dw4;
+-  uint src_grf2_dw3;
+-  uint src_grf2_dw2;
+-  uint src_grf2_dw1;
+-  uint src_grf2_dw0;
+-  uint src_grf3_dw7;
+-  uint src_grf3_dw6;
+-  uint src_grf3_dw5;
+-  uint src_grf3_dw4;
+-  uint src_grf3_dw3;
+-  uint src_grf3_dw2;
+-  uint src_grf3_dw1;
+-  uint src_grf3_dw0;
+-  uint src_grf4_dw7;
+-  uint src_grf4_dw6;
+-  uint src_grf4_dw5;
+-  uint src_grf4_dw4;
+-  uint src_grf4_dw3;
+-  uint src_grf4_dw2;
+-  uint src_grf4_dw1;
+-  uint src_grf4_dw0;
+-  uint src_grf5_dw7;
+-  uint src_grf5_dw6;
+-  uint src_grf5_dw5;
+-  uint src_grf5_dw4;
+-  uint src_grf5_dw3;
+-  uint src_grf5_dw2;
+-  uint src_grf5_dw1;
+-  uint src_grf5_dw0;
+-  uint src_grf6_dw7;
+-  uint src_grf6_dw6;
+-  uint src_grf6_dw5;
+-  uint src_grf6_dw4;
+-  uint src_grf6_dw3;
+-  uint src_grf6_dw2;
+-  uint src_grf6_dw1;
+-  uint src_grf6_dw0;
+-  uint src_grf7_dw7;
+-  uint src_grf7_dw6;
+-  uint src_grf7_dw5;
+-  uint src_grf7_dw4;
+-  uint src_grf7_dw3;
+-  uint src_grf7_dw2;
+-  uint src_grf7_dw1;
+-  uint src_grf7_dw0;
+-
+-
+-  //src_grf0_dw7 = Debug;
+-  src_grf0_dw7 = 0;
+-  //src_grf0_dw6 = Debug;
+-  src_grf0_dw6 = 0;
+-  //src_grf0_dw5 = (Ref_Height << 24) | (Ref_Width << 16) | (Ignored << 8) | (Dispatch_Id);
+-  src_grf0_dw5 = 0;
+-  //src_grf0_dw4 = Ignored;
+-  src_grf0_dw4 = 0;
+-  //src_grf0_dw3 = (Reserved << 31)                | (Sub_Mb_Part_Mask << 24)       | (Intra_SAD << 22)
+-  src_grf0_dw3 =   (0 << 31)                       | (0 << 24)                      | (payload.intra_sad_adjustment << 22)
+-                 //| (Inter_SAD << 20)             | (BB_Skip_Enabled << 19)        | (Reserverd << 18)
+-                   | (0 << 20)                     | (0 << 19)                      | (0 << 18)
+-                 //| (Dis_Aligned_Src_Fetch << 17) | (Dis_Aligned_Ref_Fetch << 16)  | (Dis_Field_Cache_Alloc << 15)
+-                   | (0 << 17)                     | (0 << 16)                      | (0 << 15)
+-                 //| (Skip_Type << 14)             | (Sub_Pel_Mode << 12)           | (Dual_Search_Path_Opt << 11)
+-                   | (0 << 14)                     | (0 << 12)                      | (0 << 11)
+-                 //| (Search_Ctrl << 8)            | (Ref_Access << 7)              | (SrcAccess << 6)
+-                   | (0 << 8)                      | (0 << 7)                       | (0 << 6)
+-                 //| (Mb_Type_Remap << 4)          | (Reserved_Workaround << 3)     | (Reserved_Workaround << 2)
+-                   | (0 << 4)                      | (0 << 3)                       | (0 << 2)
+-                 //| (Src_Size);
+-                   | (0);
+-  //src_grf0_dw2 = (SrcY << 16) | (SrcX);
+-  src_grf0_dw2 = (payload.srcCoord.y<<16)  | (payload.srcCoord.x);
+-  //src_grf0_dw1 = (Ref1Y << 16)  | (Ref1X);
+-  src_grf0_dw1 = 0;
+-  //src_grf0_dw0 = (Ref0Y << 16)  | (Ref0X);
+-  src_grf0_dw0 = 0;
+-
+-  //src_grf1_dw7 = (Skip_Center_Mask << 24)         | (Reserved << 22)               | (Ref1_Field_Polarity << 21)
+-  src_grf1_dw7 = (0 << 24)                          | (0 << 22)                      | (0 << 21)
+-                 //| (Ref0_Field_Polarity << 20)   | (Src_Field_Polarity << 19)     | (Bilinear_Enable << 18)
+-                 | (0 << 20)                       | (0 << 19)                      | (0 << 18)
+-                 //| (MV_Cost_Scale_Factor << 16)  | (Mb_Intra_Struct << 8)         | (Intra_Corner_Swap << 7)
+-                 | (0 << 16)                       | (payload.intra_neighbour_availabilty << 8)   | (0 << 7)
+-                 //| (Non_Skip_Mode_Added << 6)    | (Non_Skip_ZMv_Added << 5)      | (IntraPartMask);
+-                 | (0 << 6)                        | (0 << 5)                       | (payload.luma_intra_partition_mask);
+-  //src_grf1_dw6 = Reserved;
+-  src_grf1_dw6 = 0;
+-  /*src_grf1_dw5 = Reseverd for BDW+
+-  src_grf1_dw4 = Reseverd for BDW+*/
+-  src_grf1_dw5 = 0;
+-  src_grf1_dw4 = 0;
+-  //src_grf1_dw3 = Weighted SAD Control Sub-block 0...15
+-  src_grf1_dw3 = 0;
+-  //src_grf1_dw2 = (Start1Y << 28)                  | (Start1X << 24)                | (Start0Y << 20)
+-                 //| (Start0X << 16)               | (Max_Num_SU << 8)              | (LenSP);
+-  src_grf1_dw2 = 0;
+-  
+-  /*src_grf1_dw1 = (RepartEn << 31)                 | (FBPrunEn << 30)               | (AdaptiveValidationControl << 29)
+-                 | (Uni_Mix_Disable << 28)       | (Bi_Sub_Mb_Part_Mask << 24)    | (Reserverd << 22)
+-                 | (Bi_Weight << 16)             | (Reserved << 6)                | (MaxNumMVs);*/
+-  src_grf1_dw1 = 0;
+-  /*src_grf1_dw0 = (Early_Ime_Stop << 24)           | (Early_Fme_Success << 16)      | (Skip_Success << 8)
+-                 | (T8x8_Flag_For_Inter_En << 7) | (Quit_Inter_En << 6)           | (Early_Ime_Success_En << 5)
+-                 | (Early_Success_En << 4)       | (Part_Candidate_En << 3)       | (Bi_Mix_Dis << 2)
+-                 | (Adaptive_En  << 1)           | (SkipModeEn);*/
+-  src_grf1_dw0 = 0;
+-
+-  //cost related
+-  src_grf2_dw7 = 0;
+-  src_grf2_dw6 = 0;
+-  src_grf2_dw5 = 0;
+-  src_grf2_dw4 = 0;
+-  src_grf2_dw3 = 0;
+-  src_grf2_dw2 = 0;
+-  src_grf2_dw1 = 0;
+-  //src_grf2_dw0 = (MODE_INTRA_4x4 << 24) | (MODE_INTRA_8x8 << 16) | (MODE_INTRA_16x16 << 8) | (MODE_INTRA_NONPRED);
+-  src_grf2_dw0 = payload.intra_shape_cost;
+-  src_grf3_dw7 = 0;
+-  src_grf3_dw6 = 0;
+-  src_grf3_dw5 = 0;
+-  src_grf3_dw4 = 0;
+-  src_grf3_dw3 = 0;
+-  src_grf3_dw2 = 0;
+-  src_grf3_dw1 = 0;
+-  src_grf3_dw0 = 0;
+-
+-  //Ref* SkipCenter* Delta XY
+-  /*src_grf4_dw7 = Ref1_SkipCenter_3_Delta_XY;
+-  src_grf4_dw6 = Ref0_SkipCenter_3_Delta_XY;
+-  src_grf4_dw5 = Ref1_SkipCenter_2_Delta_XY;
+-  src_grf4_dw4 = Ref0_SkipCenter_3_Delta_XY;
+-  src_grf4_dw3 = Ref1_SkipCenter_1_Delta_XY;
+-  src_grf4_dw2 = Ref0_SkipCenter_1_Delta_XY;
+-  src_grf4_dw1 = Ref1_SkipCenter_0_Delta_XY;
+-  src_grf4_dw0 = (Ref0_Skip_Center_0_Delta_Y << 16)  | (Ref0_Skip_Center_0_Delta_X);*/
+-  src_grf4_dw7 = 0;
+-  src_grf4_dw6 = 0;
+-  src_grf4_dw5 = 0;
+-  src_grf4_dw4 = 0;
+-  src_grf4_dw3 = 0;
+-  src_grf4_dw2 = 0;
+-  src_grf4_dw1 = 0;
+-  src_grf4_dw0 = 0;
+-
+-  //src_grf5_dw7 = Neighbor pixel Luma value [23, -1] to [20, -1];
+-  src_grf5_dw7 = payload.ur_20_23;
+-  //src_grf5_dw6 = Neighbor pixel Luma value [19, -1] to [16, -1];
+-  src_grf5_dw6 = payload.ur_16_19;
+-  //src_grf5_dw5 = Neighbor pixel Luma value [15, -1] to [12, -1];
+-  src_grf5_dw5 = payload.u_12_15;
+-  //src_grf5_dw4 = Neighbor pixel Luma value [11, -1] to [8, -1];
+-  src_grf5_dw4 = payload.u_8_11;
+-  //src_grf5_dw3 = Neighbor pixel Luma value [7, -1] to [4, -1];
+-  src_grf5_dw3 = payload.u_4_7;
+-  //src_grf5_dw2 = (Neighbor pixel Luma value [3, -1] << 24)    | (Neighbor pixel Luma value [2, -1] << 16)
+-                 //| (Neighbor pixel Luma value [1, -1] << 8)  | (Neighbor pixel Luma value [0, -1]);
+-  src_grf5_dw2 = payload.u_0_3;
+-  uchar mode_mask_16_16 = 0xf;
+-  ushort mode_mask_8_8 = 0x01ff, mode_mask_4_4 = 0x01ff;
+-  if(payload.luma_intra_partition_mask == CLK_AVC_ME_INTRA_LUMA_PARTITION_MASK_ALL_INTEL){
+-    mode_mask_16_16 = 0;
+-    mode_mask_8_8 = 0;
+-    mode_mask_4_4 = 0;
+-  }
+-  else if(payload.luma_intra_partition_mask == CLK_AVC_ME_INTRA_LUMA_PARTITION_MASK_16x16_INTEL){
+-    mode_mask_16_16 = 0;
+-  }
+-  else if(payload.luma_intra_partition_mask == CLK_AVC_ME_INTRA_LUMA_PARTITION_MASK_8x8_INTEL){
+-    mode_mask_8_8 = 0;
+-  }
+-  else if(payload.luma_intra_partition_mask == CLK_AVC_ME_INTRA_LUMA_PARTITION_MASK_4x4_INTEL){
+-    mode_mask_4_4 = 0;
+-  }
+-  //src_grf5_dw1 = (Corner_Neighbor_pixel_0 << 24)  | (Reserved << 10) | (IntraComputeType << 8)
+-                 //| (IntraChromaModeMask << 4) | (Intra16x16ModeMask);
+-  src_grf5_dw1 = (payload.upper_left_corner_luma_pixel << 24)  | (0 << 10) | (1 << 8) | (0xf << 4) | (mode_mask_16_16);
+-  //src_grf5_dw0 = (Reserved<<25)  | (Intra_8x8_Mode_Mask << 16)  | (Reserved<<9)  | (Intra_4x4_Mode_Mask);
+-  src_grf5_dw0 = (0<<25)  | (mode_mask_8_8 << 16)  | (0<<9)  | (mode_mask_4_4);
+-  //src_grf6_dw7 = (Reserved << 24) | (Penalty_4x4_non_DC << 16) | (Penalty_8x8_non_DC << 8) | (Penalty_16x16_non_DC);
+-  src_grf6_dw7 = 0;
+-  //src_grf6_dw6 = Reserved;
+-  src_grf6_dw6 = 0;
+-  //src_grf6_dw5 = (Reserved << 16) | (Neighbor pixel Chroma value CbCr pair [-1, -1]);
+-  src_grf6_dw5 = 0;
+-  //src_grf6_dw4 = (Intra_MxM_Pred_Mode_B15 << 28)    | (Intra_MxM_Pred_Mode_B14 << 24)  | (Intra_MxM_Pred_Mode_B11 << 20)
+-                 //| (Intra_MxM_Pred_Mode_B10 << 16) | (Intra_MxM_Pred_Mode_A15 << 12)  | (Intra_MxM_Pred_Mode_A13 << 8)
+-                 //| (Intra_MxM_Pred_Mode_A7 << 4)   | (Intra_MxM_Pred_Mode_A5);
+-  //XXX: Which value should be set to?
+-  src_grf6_dw4 = (2 << 28)    | (2 << 24)  | (2 << 20)
+-                 | (2 << 16) | (2 << 12)  | (2 << 8)
+-                 | (2 << 4)   | (2);
+-  //src_grf6_dw3 = (Corner_Neighbor_pixel_1 << 24)  | (Neighbor pixel Luma value [-1, 14] to [-1, 12]);
+-  src_grf6_dw3 = payload.l_12_15;
+-  //src_grf6_dw2 = Neighbor pixel Luma value [-1, 11] to [-1, 8];
+-  src_grf6_dw2 = payload.l_8_11;
+-  //src_grf6_dw1 = Neighbor pixel Luma value [-1, 7] to [-1, 4];
+-  src_grf6_dw1 = payload.l_4_7;
+-  //src_grf6_dw0 = (Neighbor pixel Luma value [-1, 3] << 24)    | (Neighbor pixel Luma value [-1, 2] << 16)
+-                 //| (Neighbor pixel Luma value [-1, 1] << 8)  | (Neighbor pixel Luma value [-1, 0]);
+-  src_grf6_dw0 = payload.l_0_3;
+-
+-
+-  //chroma related
+-  src_grf7_dw7 = 0;
+-  src_grf7_dw6 = 0;
+-  src_grf7_dw5 = 0;
+-  src_grf7_dw4 = 0;
+-  src_grf7_dw3 = 0;
+-  src_grf7_dw2 = 0;
+-  src_grf7_dw1 = 0;
+-  src_grf7_dw0 = 0;
+-
+-
+-  intel_sub_group_avc_sic_result_t ime_result;
+-  ime_result = __gen_ocl_ime(src_image, src_image,
+-                src_grf0_dw7, src_grf0_dw6, src_grf0_dw5, src_grf0_dw4,
+-                src_grf0_dw3, src_grf0_dw2, src_grf0_dw1, src_grf0_dw0,
+-                src_grf1_dw7, src_grf1_dw6, src_grf1_dw5, src_grf1_dw4,
+-                src_grf1_dw3, src_grf1_dw2, src_grf1_dw1, src_grf1_dw0,
+-                src_grf2_dw7, src_grf2_dw6, src_grf2_dw5, src_grf2_dw4,
+-                src_grf2_dw3, src_grf2_dw2, src_grf2_dw1, src_grf2_dw0,
+-                src_grf3_dw7, src_grf3_dw6, src_grf3_dw5, src_grf3_dw4,
+-                src_grf3_dw3, src_grf3_dw2, src_grf3_dw1, src_grf3_dw0,
+-                src_grf4_dw7, src_grf4_dw6, src_grf4_dw5, src_grf4_dw4,
+-                src_grf4_dw3, src_grf4_dw2, src_grf4_dw1, src_grf4_dw0,
+-                src_grf5_dw7, src_grf5_dw6, src_grf5_dw5, src_grf5_dw4,
+-                src_grf5_dw3, src_grf5_dw2, src_grf5_dw1, src_grf5_dw0,
+-                src_grf6_dw7, src_grf6_dw6, src_grf6_dw5, src_grf6_dw4,
+-                src_grf6_dw3, src_grf6_dw2, src_grf6_dw1, src_grf6_dw0,
+-                src_grf7_dw7, src_grf7_dw6, src_grf7_dw5, src_grf7_dw4,
+-                src_grf7_dw3, src_grf7_dw2, src_grf7_dw1, src_grf7_dw0,
+-                //msg_type
+-                1);
+-
+-  return ime_result;
+-}
+-
+-intel_sub_group_avc_sic_payload_t
+-intel_sub_group_avc_sic_initialize(ushort2 src_coord ){
+-  intel_sub_group_avc_sic_payload_t pl;
+-  pl.srcCoord = src_coord;
+-  pl.intra_shape_cost = 0;
+-  return pl;
+-}
+-
+-intel_sub_group_avc_sic_payload_t
+-intel_sub_group_avc_sic_configure_ipe(uchar luma_intra_partition_mask,
+-                                      uchar intra_neighbour_availabilty,
+-                                      uchar left_edge_luma_pixels,
+-                                      uchar upper_left_corner_luma_pixel,
+-                                      uchar upper_edge_luma_pixels,
+-                                      uchar upper_right_edge_luma_pixels,
+-                                      uchar intra_sad_adjustment,
+-                                      intel_sub_group_avc_sic_payload_t payload ){
+-  intel_sub_group_avc_sic_payload_t pl = payload;
+-  pl.luma_intra_partition_mask = luma_intra_partition_mask;
+-  pl.intra_neighbour_availabilty = intra_neighbour_availabilty;
+-  uchar pixel[16];
+-  for(uint i = 0; i < 16; i++)
+-    pixel[i] = intel_sub_group_shuffle(left_edge_luma_pixels, i);
+-
+-  pl.l_0_3 = (pixel[3] << 24) | (pixel[2] << 16) | (pixel[1] << 8) | (pixel[0]);
+-  pl.l_4_7 = (pixel[7] << 24) | (pixel[6] << 16) | (pixel[5] << 8) | (pixel[4]);
+-  pl.l_8_11 = (pixel[11] << 24) | (pixel[10] << 16) | (pixel[9] << 8) | (pixel[8]);
+-  pl.l_12_15 = (pixel[15] << 24) | (pixel[14] << 16) | (pixel[13] << 8) | (pixel[12]);
+-
+-  for(uint i = 0; i < 16; i++)
+-    pixel[i] = intel_sub_group_shuffle(upper_edge_luma_pixels, i);
+-  pl.u_0_3 = (pixel[3] << 24) | (pixel[2] << 16) | (pixel[1] << 8) | (pixel[0]);
+-  pl.u_4_7 = (pixel[7] << 24) | (pixel[6] << 16) | (pixel[5] << 8) | (pixel[4]);
+-  pl.u_8_11 = (pixel[11] << 24) | (pixel[10] << 16) | (pixel[9] << 8) | (pixel[8]);
+-  pl.u_12_15 = (pixel[15] << 24) | (pixel[14] << 16) | (pixel[13] << 8) | (pixel[12]);
+-
+-  for(uint i = 0; i < 8; i++)
+-    pixel[i] = intel_sub_group_shuffle(upper_right_edge_luma_pixels, i);
+-  pl.ur_16_19 = (pixel[3] << 24) | (pixel[2] << 16) | (pixel[1] << 8) | (pixel[0]);
+-  pl.ur_20_23 = (pixel[7] << 24) | (pixel[6] << 16) | (pixel[5] << 8) | (pixel[4]);
+-
+-  pl.upper_left_corner_luma_pixel = upper_left_corner_luma_pixel;
+-  pl.intra_sad_adjustment = intra_sad_adjustment;
+-  return pl;
+-}
+-
+-intel_sub_group_avc_sic_payload_t
+-intel_sub_group_avc_sic_set_intra_luma_shape_penalty(uint packed_shape_cost,
+-                                                     intel_sub_group_avc_sic_payload_t payload ){
+-  intel_sub_group_avc_sic_payload_t pl = payload;
+-  pl.intra_shape_cost = packed_shape_cost;
+-  return pl;
+-}
+-
+-intel_sub_group_avc_sic_result_t
+-intel_sub_group_avc_sic_evaluate_with_single_reference(read_only image2d_t src_image,
+-                                                      read_only image2d_t ref_image,
+-                                                      sampler_t vme_media_sampler,
+-                                                      intel_sub_group_avc_sic_payload_t payload){
+-  uint src_grf0_dw7;
+-  uint src_grf0_dw6;
+-  uint src_grf0_dw5;
+-  uint src_grf0_dw4;
+-  uint src_grf0_dw3;
+-  uint src_grf0_dw2;
+-  uint src_grf0_dw1;
+-  uint src_grf0_dw0;
+-  uint src_grf1_dw7;
+-  uint src_grf1_dw6;
+-  uint src_grf1_dw5;
+-  uint src_grf1_dw4;
+-  uint src_grf1_dw3;
+-  uint src_grf1_dw2;
+-  uint src_grf1_dw1;
+-  uint src_grf1_dw0;
+-  uint src_grf2_dw7;
+-  uint src_grf2_dw6;
+-  uint src_grf2_dw5;
+-  uint src_grf2_dw4;
+-  uint src_grf2_dw3;
+-  uint src_grf2_dw2;
+-  uint src_grf2_dw1;
+-  uint src_grf2_dw0;
+-  uint src_grf3_dw7;
+-  uint src_grf3_dw6;
+-  uint src_grf3_dw5;
+-  uint src_grf3_dw4;
+-  uint src_grf3_dw3;
+-  uint src_grf3_dw2;
+-  uint src_grf3_dw1;
+-  uint src_grf3_dw0;
+-  uint src_grf4_dw7;
+-  uint src_grf4_dw6;
+-  uint src_grf4_dw5;
+-  uint src_grf4_dw4;
+-  uint src_grf4_dw3;
+-  uint src_grf4_dw2;
+-  uint src_grf4_dw1;
+-  uint src_grf4_dw0;
+-  uint src_grf5_dw7;
+-  uint src_grf5_dw6;
+-  uint src_grf5_dw5;
+-  uint src_grf5_dw4;
+-  uint src_grf5_dw3;
+-  uint src_grf5_dw2;
+-  uint src_grf5_dw1;
+-  uint src_grf5_dw0;
+-  uint src_grf6_dw7;
+-  uint src_grf6_dw6;
+-  uint src_grf6_dw5;
+-  uint src_grf6_dw4;
+-  uint src_grf6_dw3;
+-  uint src_grf6_dw2;
+-  uint src_grf6_dw1;
+-  uint src_grf6_dw0;
+-  uint src_grf7_dw7;
+-  uint src_grf7_dw6;
+-  uint src_grf7_dw5;
+-  uint src_grf7_dw4;
+-  uint src_grf7_dw3;
+-  uint src_grf7_dw2;
+-  uint src_grf7_dw1;
+-  uint src_grf7_dw0;
+-
+-
+-  //src_grf0_dw7 = Debug;
+-  src_grf0_dw7 = 0;
+-  //src_grf0_dw6 = Debug;
+-  src_grf0_dw6 = 0;
+-  //src_grf0_dw5 = (Ref_Height << 24) | (Ref_Width << 16) | (Ignored << 8) | (Dispatch_Id);
+-  src_grf0_dw5 = 0;
+-  //src_grf0_dw4 = Ignored;
+-  src_grf0_dw4 = 0;
+-  //src_grf0_dw3 = (Reserved << 31)                | (Sub_Mb_Part_Mask << 24)       | (Intra_SAD << 22)
+-  src_grf0_dw3 =   (0 << 31)                       | (0 << 24)                      | (payload.intra_sad_adjustment << 22)
+-                 //| (Inter_SAD << 20)             | (BB_Skip_Enabled << 19)        | (Reserverd << 18)
+-                   | (payload.skip_sad_adjustment << 20)  | (0 << 19)                      | (0 << 18)
+-                 //| (Dis_Aligned_Src_Fetch << 17) | (Dis_Aligned_Ref_Fetch << 16)  | (Dis_Field_Cache_Alloc << 15)
+-                   | (0 << 17)                     | (0 << 16)                      | (0 << 15)
+-                 //| (Skip_Type << 14)             | (Sub_Pel_Mode << 12)           | (Dual_Search_Path_Opt << 11)
+-                   | (0 << 14)                     | (0 << 12)                      | (0 << 11)
+-                 //| (Search_Ctrl << 8)            | (Ref_Access << 7)              | (SrcAccess << 6)
+-                   | (0 << 8)                      | (0 << 7)                       | (0 << 6)
+-                 //| (Mb_Type_Remap << 4)          | (Reserved_Workaround << 3)     | (Reserved_Workaround << 2)
+-                   | (0 << 4)                      | (0 << 3)                       | (0 << 2)
+-                 //| (Src_Size);
+-                   | (0);
+-  src_grf0_dw3 |= payload.skip_block_partition_type;
+-  //Block-Based Skip Enabled
+-  if(payload.skip_block_partition_type == CLK_AVC_ME_SKIP_BLOCK_PARTITION_8x8_INTEL)
+-    src_grf0_dw3 |= (1 << 19);
+-  //src_grf0_dw2 = (SrcY << 16) | (SrcX);
+-  src_grf0_dw2 = (payload.srcCoord.y << 16)  | (payload.srcCoord.x);
+-  //src_grf0_dw1 = (Ref1Y << 16)  | (Ref1X);
+-  src_grf0_dw1 = 0;
+-  //src_grf0_dw0 = (Ref0Y << 16)  | (Ref0X);
+-  src_grf0_dw0 = 0;
+-
+-  //src_grf1_dw7 = (Skip_Center_Mask << 24)         | (Reserved << 22)               | (Ref1_Field_Polarity << 21)
+-  src_grf1_dw7 = (0 << 24)                          | (0 << 22)                      | (0 << 21)
+-                 //| (Ref0_Field_Polarity << 20)   | (Src_Field_Polarity << 19)     | (Bilinear_Enable << 18)
+-                 | (0 << 20)                       | (0 << 19)                      | (0 << 18)
+-                 //| (MV_Cost_Scale_Factor << 16)  | (Mb_Intra_Struct << 8)         | (Intra_Corner_Swap << 7)
+-                 | (0 << 16)                       | (payload.intra_neighbour_availabilty << 8)   | (0 << 7)
+-                 //| (Non_Skip_Mode_Added << 6)    | (Non_Skip_ZMv_Added << 5)      | (IntraPartMask);
+-                 | (0 << 6)                        | (0 << 5)                       | (payload.luma_intra_partition_mask);
+-  src_grf1_dw7 |= payload.skip_motion_vector_mask;
+-  //src_grf1_dw6 = Reserved;
+-  src_grf1_dw6 = 0;
+-  /*src_grf1_dw5 = (Cost_Center1Y << 16)  | (Cost_Center1X);
+-  src_grf1_dw4 = (Cost_Center0Y << 16)  | (Cost_Center0X);
+-  src_grf1_dw3 = (Ime_Too_Good << 24 )  | (Ime_Too_Bad << 16)  | (Part_Tolerance_Thrhd << 8) | (FBPrunThrhd);*/
+-  src_grf1_dw5 = 0;
+-  src_grf1_dw4 = 0;
+-  src_grf1_dw3 = 0;
+-  //src_grf1_dw2 = (Start1Y << 28)                  | (Start1X << 24)                | (Start0Y << 20)
+-                 //| (Start0X << 16)               | (Max_Num_SU << 8)              | (LenSP);
+-  src_grf1_dw2 = 0;
+-  /*src_grf1_dw1 = (RepartEn << 31)                 | (FBPrunEn << 30)               | (AdaptiveValidationControl << 29)
+-                 | (Uni_Mix_Disable << 28)       | (Bi_Sub_Mb_Part_Mask << 24)    | (Reserverd << 22)
+-                 | (Bi_Weight << 16)             | (Reserved << 6)                | (MaxNumMVs);*/
+-  src_grf1_dw1 = (0 << 24) | (payload.bidirectional_weight << 16) | (16);
+-  /*src_grf1_dw0 = (Early_Ime_Stop << 24)           | (Early_Fme_Success << 16)      | (Skip_Success << 8)
+-                 | (T8x8_Flag_For_Inter_En << 7) | (Quit_Inter_En << 6)           | (Early_Ime_Success_En << 5)
+-                 | (Early_Success_En << 4)       | (Part_Candidate_En << 3)       | (Bi_Mix_Dis << 2)
+-                 | (Adaptive_En  << 1)           | (SkipModeEn);*/
+-  src_grf1_dw0 = 1;
+-
+-  //src_grf2_dw7 = SIC Forward Transform Coeff Threshold Matrix[3...6]
+-  src_grf2_dw7 = 0;
+-  //src_grf2_dw6 = SIC Forward Transform Coeff Threshold Matrix[0...2]
+-  src_grf2_dw6 = 0;
+-  //src_grf2_dw5 = (Reserved << 24) | (FBR_SubPredMode_Input << 16) | (FBR_SubMBShape_Input << 8) | (Reserved << 2) | (FBR_MbMode_Input);
+-  src_grf2_dw5 = 0;
+-  //XXX: TO DO: setting mv cost related bit filed
+-  //src_grf2_dw4 = MV_4_Cost ... MV_7_Cost;
+-  src_grf2_dw4 = 0;
+-  //src_grf2_dw3 = MV_0_Cost ... MV_3_Cost;
+-  src_grf2_dw3 = 0;
+-  //src_grf2_dw2 = (Chroma_Intra_Mode_Cost << 24) | (RefID_Cost << 16) | (Mode_9_Cost << 8) | (Mode_8_Cost);
+-  src_grf2_dw2 = 0;
+-  //src_grf2_dw1 = Mode 4 Cost ... Mode 7 Cost
+-  src_grf2_dw1 = 0;
+-  //src_grf2_dw0 = (MODE_INTRA_4x4 << 24) | (MODE_INTRA_8x8 << 16) | (MODE_INTRA_16x16 << 8) | (MODE_INTRA_NONPRED);
+-  src_grf2_dw0 = payload.intra_shape_cost;
+-  /*
+-  //src_grf3_dw7 = (BWDCostCenter3Y << 16) | (BWDCostCenter3X) ;
+-  src_grf3_dw7 = payload.cc3 >> 32;
+-  //src_grf3_dw6 = (FWDCostCenter3Y << 16) | (FWDCostCenter3X) ;
+-  src_grf3_dw6 = payload.cc3;
+-  //src_grf3_dw5 = (BWDCostCenter2Y << 16) | (BWDCostCenter2X) ;
+-  src_grf3_dw5 = payload.cc2 >> 32;
+-  //src_grf3_dw4 = (FWDCostCenter2Y << 16) | (FWDCostCenter2X) ;
+-  src_grf3_dw4 = payload.cc2;
+-  //src_grf3_dw3 = (BWDCostCenter1Y << 16) | (BWDCostCenter1X) ;
+-  src_grf3_dw3 = payload.cc1 >> 32;
+-  //src_grf3_dw2 = (FWDCostCenter1Y << 16) | (FWDCostCenter1X) ;
+-  src_grf3_dw2 = payload.cc1;
+-  //src_grf3_dw1 = (BWDCostCenter0Y << 16) | (BWDCostCenter0X) ;
+-  src_grf3_dw1 = payload.cc0 >> 32;
+-  //src_grf3_dw0 = (FWDCostCenter0Y << 16) | (FWDCostCenter0X) ;
+-  src_grf3_dw0 = payload.cc0;*/
+-  src_grf3_dw7 = 0;
+-  src_grf3_dw6 = 0;
+-  src_grf3_dw5 = 0;
+-  src_grf3_dw4 = 0;
+-  src_grf3_dw3 = 0;
+-  src_grf3_dw2 = 0;
+-  src_grf3_dw1 = 0;
+-  src_grf3_dw0 = 0;
+-
+-  //Ref1/Ref0 SkipCenter 3...0 Delta XY
+-  int2 bi_mv_temp = as_int2( payload.mv );
+-  int2 bi_mv = intel_sub_group_shuffle(bi_mv_temp, 3);
+-  src_grf4_dw7 = bi_mv.s1;
+-  src_grf4_dw6 = bi_mv.s0;
+-  bi_mv = intel_sub_group_shuffle(bi_mv_temp, 2);
+-  src_grf4_dw5 = bi_mv.s1;
+-  src_grf4_dw4 = bi_mv.s0;
+-  bi_mv = intel_sub_group_shuffle(bi_mv_temp, 1);
+-  src_grf4_dw3 = bi_mv.s1;
+-  src_grf4_dw2 = bi_mv.s0;
+-  bi_mv = intel_sub_group_shuffle(bi_mv_temp, 0);
+-  src_grf4_dw1 = bi_mv.s1;
+-  src_grf4_dw0 = bi_mv.s0;
+- 
+-  //src_grf5_dw7 = Neighbor pixel Luma value [23, -1] to [20, -1];
+-  src_grf5_dw7 = payload.ur_20_23;
+-  //src_grf5_dw6 = Neighbor pixel Luma value [19, -1] to [16, -1];
+-  src_grf5_dw6 = payload.ur_16_19;
+-  //src_grf5_dw5 = Neighbor pixel Luma value [15, -1] to [12, -1];
+-  src_grf5_dw5 = payload.u_12_15;
+-  //src_grf5_dw4 = Neighbor pixel Luma value [11, -1] to [8, -1];
+-  src_grf5_dw4 = payload.u_8_11;
+-  //src_grf5_dw3 = Neighbor pixel Luma value [7, -1] to [4, -1];
+-  src_grf5_dw3 = payload.u_4_7;
+-  //src_grf5_dw2 = (Neighbor pixel Luma value [3, -1] << 24)    | (Neighbor pixel Luma value [2, -1] << 16)
+-                 //| (Neighbor pixel Luma value [1, -1] << 8)  | (Neighbor pixel Luma value [0, -1]);
+-  src_grf5_dw2 = payload.u_0_3;
+-  uchar mode_mask_16_16 = 0xf;
+-  ushort mode_mask_8_8 = 0x01ff, mode_mask_4_4 = 0x01ff;
+-  if(payload.luma_intra_partition_mask == CLK_AVC_ME_INTRA_LUMA_PARTITION_MASK_ALL_INTEL){
+-    mode_mask_16_16 = 0;
+-    mode_mask_8_8 = 0;
+-    mode_mask_4_4 = 0;
+-  }
+-  else if(payload.luma_intra_partition_mask == CLK_AVC_ME_INTRA_LUMA_PARTITION_MASK_16x16_INTEL){
+-    mode_mask_16_16 = 0;
+-  }
+-  else if(payload.luma_intra_partition_mask == CLK_AVC_ME_INTRA_LUMA_PARTITION_MASK_8x8_INTEL){
+-    mode_mask_8_8 = 0;
+-  }
+-  else if(payload.luma_intra_partition_mask == CLK_AVC_ME_INTRA_LUMA_PARTITION_MASK_4x4_INTEL){
+-    mode_mask_4_4 = 0;
+-  }
+-  //src_grf5_dw1 = (Corner_Neighbor_pixel_0 << 24)  | (Reserved << 10) | (IntraComputeType << 8)
+-                 //| (IntraChromaModeMask << 4) | (Intra16x16ModeMask);
+-  src_grf5_dw1 = (payload.upper_left_corner_luma_pixel << 24)  | (0 << 10) | (1 << 8) | (0xf << 4) | (mode_mask_16_16);
+-  //src_grf5_dw1 = (payload.upper_left_corner_luma_pixel << 24)  | (0 << 10) | (1 << 8) | (0xf << 4) | (0xb);
+-  //src_grf5_dw0 = (Reserved<<25)  | (Intra_8x8_Mode_Mask << 16)  | (Reserved<<9)  | (Intra_4x4_Mode_Mask);
+-  src_grf5_dw0 = (0<<25)  | (mode_mask_8_8 << 16)  | (0<<9)  | (mode_mask_4_4);
+-  //src_grf6_dw7 = (Reserved << 24) | (Penalty_4x4_non_DC << 16) | (Penalty_8x8_non_DC << 8) | (Penalty_16x16_non_DC);
+-  src_grf6_dw7 = 0;
+-  //src_grf6_dw6 = Reserved;
+-  src_grf6_dw6 = 0;
+-  //src_grf6_dw5 = (Reserved << 16) | (Neighbor pixel Chroma value CbCr pair [-1, -1]);
+-  src_grf6_dw5 = 0;
+-  //src_grf6_dw4 = (Intra_MxM_Pred_Mode_B15 << 28)    | (Intra_MxM_Pred_Mode_B14 << 24)  | (Intra_MxM_Pred_Mode_B11 << 20)
+-                 //| (Intra_MxM_Pred_Mode_B10 << 16) | (Intra_MxM_Pred_Mode_A15 << 12)  | (Intra_MxM_Pred_Mode_A13 << 8)
+-                 //| (Intra_MxM_Pred_Mode_A7 << 4)   | (Intra_MxM_Pred_Mode_A5);
+-  //XXX: Which value should be set to?
+-  src_grf6_dw4 = (2 << 28)    | (2 << 24)  | (2 << 20)
+-                 | (2 << 16) | (2 << 12)  | (2 << 8)
+-                 | (2 << 4)   | (2);
+-  //src_grf6_dw3 = (Corner_Neighbor_pixel_1 << 24)  | (Neighbor pixel Luma value [-1, 14] to [-1, 12]);
+-  src_grf6_dw3 = payload.l_12_15;
+-  //src_grf6_dw2 = Neighbor pixel Luma value [-1, 11] to [-1, 8];
+-  src_grf6_dw2 = payload.l_8_11;
+-  //src_grf6_dw1 = Neighbor pixel Luma value [-1, 7] to [-1, 4];
+-  src_grf6_dw1 = payload.l_4_7;
+-  //src_grf6_dw0 = (Neighbor pixel Luma value [-1, 3] << 24)    | (Neighbor pixel Luma value [-1, 2] << 16)
+-                 //| (Neighbor pixel Luma value [-1, 1] << 8)  | (Neighbor pixel Luma value [-1, 0]);
+-  src_grf6_dw0 = payload.l_0_3;
+-
+-
+-  //chroma related
+-  src_grf7_dw7 = 0;
+-  src_grf7_dw6 = 0;
+-  src_grf7_dw5 = 0;
+-  src_grf7_dw4 = 0;
+-  src_grf7_dw3 = 0;
+-  src_grf7_dw2 = 0;
+-  src_grf7_dw1 = 0;
+-  src_grf7_dw0 = 0;
+-
+-
+-  intel_sub_group_avc_ref_result_t sic_result;
+-  sic_result = __gen_ocl_ime(src_image, ref_image,
+-                src_grf0_dw7, src_grf0_dw6, src_grf0_dw5, src_grf0_dw4,
+-                src_grf0_dw3, src_grf0_dw2, src_grf0_dw1, src_grf0_dw0,
+-                src_grf1_dw7, src_grf1_dw6, src_grf1_dw5, src_grf1_dw4,
+-                src_grf1_dw3, src_grf1_dw2, src_grf1_dw1, src_grf1_dw0,
+-                src_grf2_dw7, src_grf2_dw6, src_grf2_dw5, src_grf2_dw4,
+-                src_grf2_dw3, src_grf2_dw2, src_grf2_dw1, src_grf2_dw0,
+-                src_grf3_dw7, src_grf3_dw6, src_grf3_dw5, src_grf3_dw4,
+-                src_grf3_dw3, src_grf3_dw2, src_grf3_dw1, src_grf3_dw0,
+-                src_grf4_dw7, src_grf4_dw6, src_grf4_dw5, src_grf4_dw4,
+-                src_grf4_dw3, src_grf4_dw2, src_grf4_dw1, src_grf4_dw0,
+-                src_grf5_dw7, src_grf5_dw6, src_grf5_dw5, src_grf5_dw4,
+-                src_grf5_dw3, src_grf5_dw2, src_grf5_dw1, src_grf5_dw0,
+-                src_grf6_dw7, src_grf6_dw6, src_grf6_dw5, src_grf6_dw4,
+-                src_grf6_dw3, src_grf6_dw2, src_grf6_dw1, src_grf6_dw0,
+-                src_grf7_dw7, src_grf7_dw6, src_grf7_dw5, src_grf7_dw4,
+-                src_grf7_dw3, src_grf7_dw2, src_grf7_dw1, src_grf7_dw0,
+-                //msg_type
+-                1);
+-
+-  return sic_result;
+-}
+-
+-intel_sub_group_avc_sic_payload_t
+-intel_sub_group_avc_sic_configure_skc(uint skip_block_partition_type,
+-                                      uint skip_motion_vector_mask,
+-                                      ulong motion_vectors,
+-                                      char bidirectional_weight,
+-                                      uchar skip_sad_adjustment,
+-                                      intel_sub_group_avc_sic_payload_t payload){
+-  intel_sub_group_avc_sic_payload_t pl = payload;
+-  pl.skip_block_partition_type = skip_block_partition_type;
+-  pl.skip_motion_vector_mask = skip_motion_vector_mask;
+-  pl.bidirectional_weight = bidirectional_weight;
+-  pl.skip_sad_adjustment = skip_sad_adjustment;
+-  pl.mv = motion_vectors;
+-  return pl;
+-}
+-
+-ushort
+-intel_sub_group_avc_sic_get_inter_distortions(intel_sub_group_avc_sic_result_t result){
+-  uint lid_x = get_sub_group_local_id();
+-  uint write_back_dw = intel_sub_group_shuffle(result.s2, 8 + lid_x/2);
+-  int start_bit = lid_x%2 * 16;
+-  ushort distortion = (write_back_dw >> start_bit);
+-  return distortion;
+-}
+-
+-uchar
+-intel_sub_group_avc_sic_get_ipe_luma_shape(intel_sub_group_avc_sic_result_t result){
+-  uint write_back_dw00 = intel_sub_group_shuffle(result.s0, 0);
+-  uchar luma_shape = write_back_dw00 & 0x03;
+-  return luma_shape;
+-}
+-
+-ushort
+-intel_sub_group_avc_sic_get_best_ipe_luma_distortion(intel_sub_group_avc_sic_result_t result){
+-  uint write_back_dw03 = intel_sub_group_shuffle(result.s0, 3);
+-  ushort luma_distortion = write_back_dw03;
+-  return luma_distortion;
+-}
+-
+-ulong intel_sub_group_avc_sic_get_packed_ipe_luma_modes(intel_sub_group_avc_sic_result_t result){
+-  uint write_back_dw00 = intel_sub_group_shuffle(result.s0, 0);
+-  uchar luma_shape = write_back_dw00 & 0x03;
+-  ulong luma_modes = 0;
+-  uint write_back_dw04 = intel_sub_group_shuffle(result.s0, 4);
+-  uint write_back_dw05 = intel_sub_group_shuffle(result.s0, 5);
+-  if(luma_shape == CLK_AVC_ME_INTRA_16x16_INTEL)
+-    luma_modes |= (write_back_dw04 & 0x03);
+-  else if(luma_shape == CLK_AVC_ME_INTRA_8x8_INTEL){
+-    ulong modes_temp = write_back_dw04;
+-    luma_modes = (modes_temp & 0x0f) | ((modes_temp & 0x00f0) << 12) | ((modes_temp & 0x0f00) << 24) | ((modes_temp & 0x0000f000) << 36);
+-  }
+-  else if(luma_shape == CLK_AVC_ME_INTRA_4x4_INTEL){
+-    ulong modes_temp = write_back_dw05;
+-    luma_modes = (modes_temp << 32) | (write_back_dw04 & 0x00000000ffffffff);
+-  }
+-  return luma_modes;
+-}
+-
+ bool __gen_ocl_in_local(size_t p) {
+   bool cond1 = p > 0;
+   bool cond2 = p < 64*1024;
+diff --git a/backend/src/llvm/llvm_gen_backend.cpp b/backend/src/llvm/llvm_gen_backend.cpp
+index c552c914..81dc0f26 100644
+--- a/backend/src/llvm/llvm_gen_backend.cpp
++++ b/backend/src/llvm/llvm_gen_backend.cpp
+@@ -4050,7 +4050,6 @@ namespace gbe
+       case GEN_OCL_SIMD_ID:
+       case GEN_OCL_SIMD_SHUFFLE:
+       case GEN_OCL_VME:
+-      case GEN_OCL_IME:
+       case GEN_OCL_WORK_GROUP_ALL:
+       case GEN_OCL_WORK_GROUP_ANY:
+       case GEN_OCL_WORK_GROUP_BROADCAST:
+@@ -4971,41 +4970,6 @@ namespace gbe
+                     lut_sub_x.getIntegerValue());
+             break;
+           }
+-          case GEN_OCL_IME:
+-          {
+-
+-            const uint8_t imageID = getImageID(I);
+-
+-            AI++;
+-            AI++;
+-
+-            Constant *msg_type_cpv = dyn_cast<Constant>(*(AI + 64));
+-            assert(msg_type_cpv);
+-            const ir::Immediate &msg_type_x = processConstantImm(msg_type_cpv);
+-            int msg_type = msg_type_x.getIntegerValue();
+-            // msy_type (00: IDM [BDW+], 01: SIC, 10: IME, 11: FBR)
+-            GBE_ASSERT(msg_type == 1 || msg_type == 2 || msg_type == 3);
+-            uint32_t src_length = ((msg_type == 1 || msg_type == 3) ? 64 : 48);
+-
+-            vector<ir::Register> dstTupleData, srcTupleData;
+-            for (uint32_t i = 0; i < src_length; i++, AI++){
+-              srcTupleData.push_back(this->getRegister(*AI));
+-            }
+-
+-            const ir::Tuple srcTuple = ctx.arrayTuple(&srcTupleData[0], src_length);
+-
+-            uint32_t dst_length;
+-            dst_length = 7;
+-            for (uint32_t elemID = 0; elemID < dst_length; ++elemID) {
+-              const ir::Register reg = this->getRegister(&I, elemID);
+-              dstTupleData.push_back(reg);
+-            }
+-            const ir::Tuple dstTuple = ctx.arrayTuple(&dstTupleData[0], dst_length);
+-
+-            ctx.IME(imageID, dstTuple, srcTuple, dst_length, src_length,
+-                    msg_type);
+-            break;
+-          }
+           case GEN_OCL_IN_PRIVATE:
+           {
+             const ir::Register dst = this->getRegister(&I);
+diff --git a/backend/src/llvm/llvm_gen_ocl_function.hxx b/backend/src/llvm/llvm_gen_ocl_function.hxx
+index a9873ca4..d3802d20 100644
+--- a/backend/src/llvm/llvm_gen_ocl_function.hxx
++++ b/backend/src/llvm/llvm_gen_ocl_function.hxx
+@@ -179,7 +179,6 @@ DECL_LLVM_GEN_FUNCTION(REGION, __gen_ocl_region)
+ DECL_LLVM_GEN_FUNCTION(IN_PRIVATE, __gen_ocl_in_private)
+ 
+ DECL_LLVM_GEN_FUNCTION(VME, __gen_ocl_vme)
+-DECL_LLVM_GEN_FUNCTION(IME, __gen_ocl_ime)
+ 
+ // printf function
+ DECL_LLVM_GEN_FUNCTION(PRINTF, __gen_ocl_printf_stub)
+diff --git a/backend/src/llvm/llvm_scalarize.cpp b/backend/src/llvm/llvm_scalarize.cpp
+index 2d8d7bae..be3d5499 100644
+--- a/backend/src/llvm/llvm_scalarize.cpp
++++ b/backend/src/llvm/llvm_scalarize.cpp
+@@ -717,7 +717,6 @@ namespace gbe {
+             break;
+           }
+           case GEN_OCL_VME:
+-          case GEN_OCL_IME:
+           case GEN_OCL_SUB_GROUP_BLOCK_READ_UI_MEM2:
+           case GEN_OCL_SUB_GROUP_BLOCK_READ_UI_MEM4:
+           case GEN_OCL_SUB_GROUP_BLOCK_READ_UI_MEM8:
+diff --git a/src/cl_command_queue.c b/src/cl_command_queue.c
+index 93902c86..55b1a230 100644
+--- a/src/cl_command_queue.c
++++ b/src/cl_command_queue.c
+@@ -154,14 +154,6 @@ cl_command_queue_bind_image(cl_command_queue queue, cl_kernel k, cl_gpgpu gpgpu,
+                           image->intel_fmt, image->image_type, image->bpp,
+                           image->w, image->h, image->depth,
+                           image->row_pitch, image->slice_pitch, (cl_gpgpu_tiling)image->tiling);
+-    //We always setup media surface state, so this surface can be used for vme
+-    else if ((image->fmt.image_channel_order == CL_R) && (image->fmt.image_channel_data_type == CL_UNORM_INT8) &&
+-             cl_gpgpu_bind_image_for_vme)
+-      cl_gpgpu_bind_image_for_vme(gpgpu, k->images[i].idx + BTI_WORKAROUND_IMAGE_OFFSET, image->base.bo,
+-                          image->offset + k->args[id].mem->offset,
+-                          image->intel_fmt, image->image_type, image->bpp,
+-                          image->w, image->h, image->depth,
+-                          image->row_pitch, image->slice_pitch, (cl_gpgpu_tiling)image->tiling);
+   }
+   return CL_SUCCESS;
+ }
+diff --git a/src/cl_device_id.c b/src/cl_device_id.c
+index c20f9eda..c10d3462 100644
+--- a/src/cl_device_id.c
++++ b/src/cl_device_id.c
+@@ -606,7 +606,6 @@ skl_gt1_break:
+       cl_intel_platform_enable_extension(ret, cl_khr_fp64_ext_id);
+ #endif
+       cl_intel_platform_enable_extension(ret, cl_khr_fp16_ext_id);
+-      cl_intel_platform_enable_extension(ret, cl_intel_device_side_avc_motion_estimation_ext_id);
+       break;
+ 
+     case PCI_CHIP_SKYLAKE_ULT_GT2:
+@@ -632,7 +631,6 @@ skl_gt2_break:
+       cl_intel_platform_enable_extension(ret, cl_khr_fp64_ext_id);
+ #endif
+       cl_intel_platform_enable_extension(ret, cl_khr_fp16_ext_id);
+-      cl_intel_platform_enable_extension(ret, cl_intel_device_side_avc_motion_estimation_ext_id);
+       break;
+ 
+     case PCI_CHIP_SKYLAKE_ULT_GT3:
+@@ -656,7 +654,6 @@ skl_gt3_break:
+       cl_intel_platform_enable_extension(ret, cl_khr_fp64_ext_id);
+ #endif
+       cl_intel_platform_enable_extension(ret, cl_khr_fp16_ext_id);
+-      cl_intel_platform_enable_extension(ret, cl_intel_device_side_avc_motion_estimation_ext_id);
+       break;
+ 
+     case PCI_CHIP_SKYLAKE_DT_GT4:
+@@ -676,7 +673,6 @@ skl_gt4_break:
+       cl_intel_platform_enable_extension(ret, cl_khr_fp64_ext_id);
+ #endif
+       cl_intel_platform_enable_extension(ret, cl_khr_fp16_ext_id);
+-      cl_intel_platform_enable_extension(ret, cl_intel_device_side_avc_motion_estimation_ext_id);
+       break;
+ 
+     case PCI_CHIP_BROXTON_0:
+diff --git a/src/cl_extensions.c b/src/cl_extensions.c
+index 4987bee2..56099ad0 100644
+--- a/src/cl_extensions.c
++++ b/src/cl_extensions.c
+@@ -70,7 +70,7 @@ check_intel_extension(cl_extensions_t *extensions)
+   int id;
+   for(id = INTEL_EXT_START_ID; id <= INTEL_EXT_END_ID; id++)
+   {
+-    if(id != EXT_ID(intel_motion_estimation) && id != EXT_ID(intel_device_side_avc_motion_estimation))
++    if(id != EXT_ID(intel_motion_estimation))
+       extensions->extensions[id].base.ext_enabled = 1;
+     if(id == EXT_ID(intel_required_subgroup_size))
+ #if LLVM_VERSION_MAJOR * 10 + LLVM_VERSION_MINOR > 40
+diff --git a/src/cl_extensions.h b/src/cl_extensions.h
+index b32b2362..bb61c0bc 100644
+--- a/src/cl_extensions.h
++++ b/src/cl_extensions.h
+@@ -32,8 +32,7 @@
+   DECL_EXT(intel_subgroups_short) \
+   DECL_EXT(intel_required_subgroup_size) \
+   DECL_EXT(intel_media_block_io) \
+-  DECL_EXT(intel_planar_yuv) \
+-  DECL_EXT(intel_device_side_avc_motion_estimation)
++  DECL_EXT(intel_planar_yuv)
+ 
+ #define DECL_GL_EXTENSIONS \
+   DECL_EXT(khr_gl_sharing)\
+@@ -68,7 +67,7 @@ cl_khr_extension_id_max
+ #define OPT1_EXT_START_ID EXT_ID(khr_int64_base_atomics)
+ #define OPT1_EXT_END_ID EXT_ID(khr_icd)
+ #define INTEL_EXT_START_ID EXT_ID(intel_accelerator)
+-#define INTEL_EXT_END_ID EXT_ID(intel_device_side_avc_motion_estimation)
++#define INTEL_EXT_END_ID EXT_ID(intel_planar_yuv)
+ #define GL_EXT_START_ID EXT_ID(khr_gl_sharing)
+ #define GL_EXT_END_ID EXT_ID(khr_gl_msaa_sharing)
+ 
+diff --git a/src/intel/intel_gpgpu.c b/src/intel/intel_gpgpu.c
+index b0d6bd94..2b778e5a 100644
+--- a/src/intel/intel_gpgpu.c
++++ b/src/intel/intel_gpgpu.c
+@@ -1337,75 +1337,6 @@ intel_gpgpu_bind_image_for_vme_gen7(intel_gpgpu_t *gpgpu,
+   assert(index < GEN_MAX_SURFACES);
+ }
+ 
+-static void
+-intel_gpgpu_bind_image_for_vme_gen9(intel_gpgpu_t *gpgpu,
+-                                    uint32_t index,
+-                                    dri_bo* obj_bo,
+-                                    uint32_t obj_bo_offset,
+-                                    uint32_t format,
+-                                    cl_mem_object_type type,
+-                                    uint32_t bpp,
+-                                    int32_t w,
+-                                    int32_t h,
+-                                    int32_t depth,
+-                                    int32_t pitch,
+-                                    int32_t slice_pitch,
+-                                    int32_t tiling)
+-{
+-  surface_heap_t *heap = gpgpu->aux_buf.bo->virtual + gpgpu->aux_offset.surface_heap_offset;
+-  gen9_media_surface_state_t *ss = (gen9_media_surface_state_t *) &heap->surface[index * sizeof(gen8_surface_state_t)];
+-
+-  memset(ss, 0, sizeof(gen8_surface_state_t));
+-  ss->ss0.rotation = 0; //++
+-  ss->ss1.uv_offset_v_direction = 0;
+-  ss->ss1.pic_struct = 0;
+-  ss->ss1.width = w - 1;
+-  ss->ss1.height = h - 1;
+-  if (tiling == GPGPU_NO_TILE) {
+-    ss->ss2.tile_mode = 0;
+-  }
+-  else if (tiling == GPGPU_TILE_X){
+-    ss->ss2.tile_mode = 2;
+-  }
+-  else if (tiling == GPGPU_TILE_Y){
+-    ss->ss2.tile_mode = 3;
+-  }
+-  ss->ss2.half_pitch_for_chroma = 0;
+-  ss->ss2.surface_pitch = pitch - 1;
+-  ss->ss2.address_control = 1; //++ CLAMP: 0; MIRROR:1;
+-  ss->ss2.mem_compress_enable = 0; //++
+-  ss->ss2.mem_compress_mode = 0; //++
+-  ss->ss2.uv_offset_v_direction_msb = 0; //++
+-  ss->ss2.uv_offset_u_direction = 0; //++
+-  ss->ss2.interleave_chroma = 0;
+-  ss->ss2.surface_format = 12; //Y8_UNORM
+-  //ss->ss2.surface_format = 4; //PLANAR_420_8
+-  ss->ss3.y_offset_for_u = 0;
+-  ss->ss3.x_offset_for_u = 0;
+-  ss->ss4.y_offset_for_v = 0;
+-  ss->ss4.x_offset_for_v = 0;
+-  ss->ss5.surface_object_control_state = cl_gpgpu_get_cache_ctrl();
+-  ss->ss5.tiled_res_mode = 0;  //++ TRMODE_NONE: 0; TRMODE_TILEYF: 1; TRMODE_TILEYS:2
+-  ss->ss5.vert_line_stride_offset = 0; //++
+-  ss->ss5.vert_line_stride = 0;  //++
+-  ss->ss6.base_addr = (obj_bo->offset64 + obj_bo_offset) & 0xffffffff;  //
+-  ss->ss7.base_addr_high = ((obj_bo->offset64 + obj_bo_offset) >> 32) & 0xffffffff; //
+-
+-
+-  heap->binding_table[index] = offsetof(surface_heap_t, surface) +
+-                               index * surface_state_sz;
+-  dri_bo_emit_reloc(gpgpu->aux_buf.bo,
+-                    I915_GEM_DOMAIN_RENDER,
+-                    I915_GEM_DOMAIN_RENDER,
+-                    obj_bo_offset,
+-                    gpgpu->aux_offset.surface_heap_offset +
+-                    heap->binding_table[index] +
+-                    offsetof(gen9_media_surface_state_t, ss6),
+-                    obj_bo);
+-
+-  assert(index < GEN_MAX_SURFACES);
+-}
+-
+ 
+ static void
+ intel_gpgpu_bind_image_gen75(intel_gpgpu_t *gpgpu,
+@@ -2631,7 +2562,6 @@ intel_set_gpgpu_callbacks(int device_id)
+   }
+   if (IS_GEN9(device_id)) {
+     cl_gpgpu_bind_image = (cl_gpgpu_bind_image_cb *) intel_gpgpu_bind_image_gen9;
+-    cl_gpgpu_bind_image_for_vme = (cl_gpgpu_bind_image_cb *) intel_gpgpu_bind_image_for_vme_gen9;
+     intel_gpgpu_set_L3 = intel_gpgpu_set_L3_gen8;
+     cl_gpgpu_get_cache_ctrl = (cl_gpgpu_get_cache_ctrl_cb *)intel_gpgpu_get_cache_ctrl_gen9;
+     intel_gpgpu_get_scratch_index = intel_gpgpu_get_scratch_index_gen8;
+diff --git a/src/intel/intel_structs.h b/src/intel/intel_structs.h
+index 282929d7..b38cc423 100644
+--- a/src/intel/intel_structs.h
++++ b/src/intel/intel_structs.h
+@@ -425,69 +425,6 @@ typedef struct gen7_media_surface_state
+   } ss7;
+ } gen7_media_surface_state_t;
+ 
+-typedef struct gen9_media_surface_state
+-{
+-  struct {
+-    uint32_t pad3:12;
+-    uint32_t pad2:4;
+-    uint32_t pad1:11; //ExistsIf [Surface Format] is not one of Planar Formats
+-    uint32_t rotation:2;
+-  } ss0;
+-
+-  struct {
+-    uint32_t uv_offset_v_direction:2;
+-    uint32_t pic_struct:2;
+-    uint32_t width:14;
+-    uint32_t height:14;
+-  } ss1;
+-
+-  struct {
+-    uint32_t tile_mode:2;
+-    uint32_t half_pitch_for_chroma:1;
+-    uint32_t surface_pitch:18;
+-    uint32_t address_control:1;
+-    uint32_t mem_compress_enable:1;
+-    uint32_t mem_compress_mode:1;
+-    uint32_t uv_offset_v_direction_msb:1;
+-    uint32_t uv_offset_u_direction:1;
+-    uint32_t interleave_chroma:1;
+-    uint32_t surface_format:5;
+-  } ss2;
+-
+-  struct {
+-    uint32_t y_offset_for_u:14;
+-    uint32_t pad1:2;
+-    uint32_t x_offset_for_u:14;
+-    uint32_t pad0:2;
+-  } ss3;
+-
+-  struct {
+-    uint32_t y_offset_for_v:15;
+-    uint32_t pad1:1;
+-    uint32_t x_offset_for_v:14;
+-    uint32_t pad0:2;
+-  } ss4;
+-
+-  struct {
+-    uint32_t surface_object_control_state:7;
+-    uint32_t pad2:11;
+-    uint32_t tiled_res_mode:2;
+-    uint32_t pad1:4;
+-    uint32_t pad0:6;
+-    uint32_t vert_line_stride_offset:1;
+-    uint32_t vert_line_stride:1;
+-  } ss5;
+-
+-  struct {
+-    uint32_t base_addr;
+-  } ss6;
+-
+-  struct {
+-    uint32_t base_addr_high:16;
+-    uint32_t pad0:16;
+-  } ss7;
+-} gen9_media_surface_state_t;
+-
+ typedef union gen_surface_state
+ {
+   gen7_surface_state_t gen7_surface_state;
+diff --git a/utests/utest_helper.cpp b/utests/utest_helper.cpp
+index 52d17146..2e826bc6 100644
+--- a/utests/utest_helper.cpp
++++ b/utests/utest_helper.cpp
+@@ -895,24 +895,6 @@ int cl_check_motion_estimation(void)
+   return 1;
+ }
+ 
+-int cl_check_device_side_avc_motion_estimation(void)
+-{
+-  std::string extStr;
+-  size_t param_value_size;
+-  OCL_CALL(clGetDeviceInfo, device, CL_DEVICE_EXTENSIONS, 0, 0, &param_value_size);
+-  std::vector<char> param_value(param_value_size);
+-  OCL_CALL(clGetDeviceInfo, device, CL_DEVICE_EXTENSIONS, param_value_size,
+-           param_value.empty() ? NULL : &param_value.front(), &param_value_size);
+-  if (!param_value.empty())
+-    extStr = std::string(&param_value.front(), param_value_size-1);
+-
+-  if (std::strstr(extStr.c_str(), "cl_intel_device_side_avc_motion_estimation") == NULL) {
+-    printf("No cl_intel_device_side_avc_motion_estimation, Skip!");
+-    return 0;
+-  }
+-  return 1;
+-}
+-
+ int cl_check_subgroups(void)
+ {
+   std::string extStr;
+diff --git a/utests/utest_helper.hpp b/utests/utest_helper.hpp
+index fe6d1bbb..c3040087 100644
+--- a/utests/utest_helper.hpp
++++ b/utests/utest_helper.hpp
+@@ -315,9 +315,6 @@ extern clGetKernelSubGroupInfoKHR_cb* utestclGetKernelSubGroupInfoKHR;
+ /* Check if cl_intel_motion_estimation enabled. */
+ extern int cl_check_motion_estimation(void);
+ 
+-/* Check if cl_intel_device_side_avc_motion_estimation enabled. */
+-extern int cl_check_device_side_avc_motion_estimation(void);
+-
+ /* Check is cl version 2.0 or Beignet extension. */
+ extern int cl_check_ocl20(bool or_beignet = true);
+ 
+-- 
+2.25.1
+

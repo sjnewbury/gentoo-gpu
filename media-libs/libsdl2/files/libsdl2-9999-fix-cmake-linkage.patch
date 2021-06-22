@@ -1,0 +1,22 @@
+--- ./cmake/sdlchecks.cmake~	2020-09-30 10:00:09.000000000 +0100
++++ ./cmake/sdlchecks.cmake	2020-09-30 11:55:49.430112283 +0100
+@@ -443,12 +443,13 @@
+         else()
+           set(HAVE_X11_SHARED TRUE)
+         endif()
+-        if(HAVE_X11_SHARED)
+-          set(SDL_VIDEO_DRIVER_X11_DYNAMIC "\"${X11_LIB_SONAME}\"")
+-          set(SDL_VIDEO_DRIVER_X11_DYNAMIC_XEXT "\"${XEXT_LIB_SONAME}\"")
+-        else()
+-          list(APPEND EXTRA_LIBS ${X11_LIB} ${XEXT_LIB})
+-        endif()
++      endif()
++
++      if(HAVE_X11_SHARED)
++        set(SDL_VIDEO_DRIVER_X11_DYNAMIC "\"${X11_LIB_SONAME}\"")
++        set(SDL_VIDEO_DRIVER_X11_DYNAMIC_XEXT "\"${XEXT_LIB_SONAME}\"")
++      else()
++        list(APPEND EXTRA_LIBS ${X11_LIB} ${XEXT_LIB})
+       endif()
+ 
+       set(CMAKE_REQUIRED_LIBRARIES ${X11_LIB} ${X11_LIB})

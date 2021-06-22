@@ -1,5 +1,5 @@
---- include/OMX_Types.h.orig 2011-01-12 08:53:26.000000000 +0100
-+++ include/OMX_Types.h 2013-02-25 09:53:55.000000000 +0100
+--- ./include/OMX_Types.h.orig 2011-01-12 08:53:26.000000000 +0100
++++ ./include/OMX_Types.h 2013-02-25 09:53:55.000000000 +0100
 @@ -314,6 +314,18 @@
   *  platform & operating specific object used to reference the window */
  typedef void* OMX_NATIVE_WINDOWTYPE;

@@ -1,0 +1,17 @@
+Description: Disable expected-under-Wayland warning
+
+Author: Rebecca N. Palmer <rebecca_palmer@zoho.com>
+Bug-Debian: https://bugs.debian.org/882486
+Forwarded: https://lists.freedesktop.org/archives/beignet/2018-January/009182.html
+
+--- beignet-1.3.2.orig/src/intel/intel_driver.c
++++ beignet-1.3.2/src/intel/intel_driver.c
+@@ -235,8 +235,6 @@ if(intel->x11_display) {
+     intel_driver_init_shared(intel, intel->dri_ctx);
+     Xfree(driver_name);
+   }
+-  else
+-    fprintf(stderr, "X server found. dri2 connection failed! \n");
+ }
+ #endif
+ 

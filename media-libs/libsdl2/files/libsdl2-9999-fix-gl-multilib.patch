@@ -1,0 +1,18 @@
+--- ./include/SDL_opengl_glext.h.orig	2019-07-03 07:07:17.250530532 +0100
++++ ./include/SDL_opengl_glext.h	2019-07-03 07:12:46.462288369 +0100
+@@ -469,8 +469,13 @@
+ typedef long GLsizeiptr;
+ typedef long GLintptr;
+ #else
+-typedef ptrdiff_t GLsizeiptr;
+-typedef ptrdiff_t GLintptr;
++#if __LP64__
++typedef ptrdiff_t GLsizeiptr;
++typedef ptrdiff_t GLintptr;
++#else
++typedef signed long GLsizeiptr;
++typedef signed long GLintptr;
++#endif
+ #endif
+ #define GL_BUFFER_SIZE                    0x8764
+ #define GL_BUFFER_USAGE                   0x8765

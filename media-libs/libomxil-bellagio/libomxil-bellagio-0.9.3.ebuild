@@ -1,11 +1,9 @@
 # Copyright 1999-2016 Gentoo Foundation
 # Distributed under the terms of the GNU General Public License v2
 
-EAPI=5
-XORG_MULTILIB=yes
-XORG_EAUTORECONF=yes
+EAPI=7
 
-inherit xorg-2
+inherit autotools multilib-minimal
 
 DESCRIPTION="Open Source implementation of the OpenMAX Integration Layer"
 HOMEPAGE="http://omxil.sourceforge.net/"
@@ -21,25 +19,29 @@ DEPEND="${RDEPEND}
 	doc? ( app-doc/doxygen )
 "
 
+PATCHES=(
+	"${FILESDIR}"/${P}-dynamicloader-linking.patch
+	"${FILESDIR}"/${P}-parallel-build.patch
+	"${FILESDIR}"/${P}-version.patch
+	"${FILESDIR}"/${P}-gcc5.patch
+)
+
+ECONF_SOURCE="${S}"
+
 src_prepare() {
-	PATCHES=(
-		"${WORKDIR}"/debian/patches/*.patch
-		"${FILESDIR}"/${P}-dynamicloader-linking.patch
-		"${FILESDIR}"/${P}-parallel-build.patch
-		"${FILESDIR}"/${P}-version.patch
-		"${FILESDIR}"/${P}-gcc5.patch
-	)
-	xorg-2_src_prepare
+	default
+	eapply "${WORKDIR}"/debian/patches/*.patch
+	eautoreconf
 }
 
-src_configure() {
-	XORG_CONFIGURE_OPTIONS="
-		--docdir="${EPREFIX}"/usr/share/doc/${PF} \
-		$(use_enable audioeffects) \
-		$(use_enable clocksrc) \
-		$(use_enable debug) \
-		$(use_enable doc) \
+multilib_src_configure() {
+	econfargs=(
+		--docdir="${EPREFIX}"/usr/share/doc/${PF}
+		$(use_enable audioeffects)
+		$(use_enable clocksrc)
+		$(use_enable debug)
+		$(use_enable doc)
 		$(use_enable videoscheduler)
-	"
-	xorg-2_src_configure
+	)
+	econf "${econf_args[@]}"
 }

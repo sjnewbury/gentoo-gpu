@@ -1,0 +1,10 @@
+--- ./Source/WebCore/CMakeLists.txt~	2019-04-15 14:13:55.000000000 +0100
++++ ./Source/WebCore/CMakeLists.txt	2019-04-15 17:36:48.361092959 +0100
+@@ -50,6 +50,7 @@
+     "${WEBCORE_DIR}/Modules/streams"
+     "${WEBCORE_DIR}/Modules/webaudio"
+     "${WEBCORE_DIR}/Modules/webauthn"
++    "${WEBCORE_DIR}/Modules/webauthn/apdu"
+     "${WEBCORE_DIR}/Modules/webauthn/cbor"
+     "${WEBCORE_DIR}/Modules/webauthn/fido"
+     "${WEBCORE_DIR}/Modules/webdatabase"

@@ -1,0 +1,60 @@
+Description: Don't try to use sysinfo or CLOCK_MONOTONIC_RAW on non-Linux
+
+Fixes two FTBFS on kfreebsd due to use of Linux-specific features:
+https://buildd.debian.org/status/fetch.php?pkg=beignet&arch=kfreebsd-amd64&ver=1.0.1-3&stamp=1425101150
+https://buildd.debian.org/status/fetch.php?pkg=beignet&arch=kfreebsd-amd64&ver=1.1.1-1&stamp=1445338350
+
+Origin: https://github.com/freebsd/freebsd-ports-graphics/blob/opencl/lang/beignet/files/patch-src_cl__device__id.c https://github.com/freebsd/freebsd-ports-graphics/blob/master/lang/beignet/files/patch-src_cl__event.c
+Author: Koop Mast, Rebecca Palmer
+
+--- a/src/cl_device_id.c
++++ b/src/cl_device_id.c
+@@ -34,7 +34,12 @@
+ #include <stdio.h>
+ #include <string.h>
+ #include <stdlib.h>
++#if defined(linux) || defined(__linux__) || defined(__LINUX__)
+ #include <sys/sysinfo.h>
++#else
++#include <sys/types.h>
++#include <sys/sysctl.h>
++#endif
+ 
+ #ifndef CL_VERSION_1_2
+ #define CL_DEVICE_BUILT_IN_KERNELS 0x103F
+@@ -815,11 +820,24 @@ glk12eu_break:
+   #define toMB(size) (size)&(UINT64_MAX<<20)
+   /* Get the global_mem_size and max_mem_alloc size from
+    * driver, system ram and hardware*/
++#if defined(linux) || defined(__linux__) || defined(__LINUX__)
+   struct sysinfo info;
+   if (sysinfo(&info) == 0) {
++    uint64_t totalram = info.totalram * info.mem_unit;
++#else
++  {
++  int mib[2];
++
++  mib[0] = CTL_HW;
++  mib[1] = HW_USERMEM;
++
++  uint64_t totalram;
++  size_t len;
++  len = sizeof(totalram);
++  sysctl(mib, 2, &totalram, &len, NULL, 0);
++#endif
+     uint64_t totalgpumem = ret->global_mem_size;
+ 	uint64_t maxallocmem = ret->max_mem_alloc_size;
+-    uint64_t totalram = info.totalram * info.mem_unit;
+ 	/* In case to keep system stable we just use half
+ 	 * of the raw as global mem */
+     ret->global_mem_size = toMB((totalram / 2 > totalgpumem) ?
+--- a/src/cl_event.c
++++ b/src/cl_event.c
+@@ -22,6 +22,7 @@
+ #include "cl_alloc.h"
+ #include <string.h>
+ #include <stdio.h>
++#include <time.h>
+ 
+ // TODO: Need to move it to some device related file later.
+ static void

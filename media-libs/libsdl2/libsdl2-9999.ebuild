@@ -4,16 +4,19 @@
 
 # TODO: convert FusionSound #484250
 
-EAPI=6
-inherit autotools flag-o-matic toolchain-funcs eutils multilib-minimal
+EAPI=7
+
+CMAKE_ECLASS=cmake
+
+inherit flag-o-matic toolchain-funcs eutils cmake-multilib
 
 MY_P=SDL2-${PV}
 DESCRIPTION="Simple Direct Media Layer"
 HOMEPAGE="http://www.libsdl.org"
 
 if [[ ${PV} == 9999* ]]; then
-	inherit mercurial
-	EHG_REPO_URI=http://hg.libsdl.org/SDL
+	inherit git-r3
+	EGIT_REPO_URI=https://github.com/libsdl-org/SDL.git
 else
 	SRC_URI="http://www.libsdl.org/release/${MY_P}.tar.gz"
 	KEYWORDS="~alpha ~amd64 ~arm ~hppa ~ppc ~ppc64 ~x86"
@@ -22,23 +25,23 @@ fi
 LICENSE="ZLIB"
 SLOT="0"
 
-IUSE="cpu_flags_x86_3dnow alsa altivec custom-cflags dbus fusionsound gles haptic +joystick cpu_flags_x86_mmx nas opengl oss pulseaudio +sound cpu_flags_x86_sse cpu_flags_x86_sse2 static-libs +threads tslib udev +video wayland X xinerama xscreensaver libsamplerate vulkan"
+IUSE="cpu_flags_x86_3dnow alsa altivec custom-cflags fusionsound gles2 haptic +joystick cpu_flags_x86_mmx nas opengl oss pulseaudio +sound cpu_flags_x86_sse cpu_flags_x86_sse2 cpu_flags_x86_sse3 static-libs +threads tslib +video wayland X xinerama xscreensaver libsamplerate vulkan xrandr"
 REQUIRED_USE="
 	alsa? ( sound )
 	fusionsound? ( sound )
-	gles? ( video )
+	gles2? ( video )
 	nas? ( sound )
 	opengl? ( video )
 	pulseaudio? ( sound )
-	wayland? ( gles )
+	wayland? ( gles2 )
 	xinerama? ( X )
 	xscreensaver? ( X )"
 
 RDEPEND="
 	alsa? ( >=media-libs/alsa-lib-1.0.27.2[${MULTILIB_USEDEP}] )
-	dbus? ( >=sys-apps/dbus-1.6.18-r1[${MULTILIB_USEDEP}] )
+	>=sys-apps/dbus-1.6.18-r1[${MULTILIB_USEDEP}]
 	fusionsound? ( || ( >=media-libs/FusionSound-1.1.1 >=dev-libs/DirectFB-1.7.1[fusionsound] ) )
-	gles? ( >=media-libs/mesa-9.1.6[${MULTILIB_USEDEP},gles2] )
+	gles2? ( >=media-libs/mesa-9.1.6[${MULTILIB_USEDEP},gles2] )
 	nas? ( >=media-libs/nas-1.9.4[${MULTILIB_USEDEP}] )
 	opengl? (
 		>=virtual/opengl-7.0-r1[${MULTILIB_USEDEP}]
@@ -46,7 +49,7 @@ RDEPEND="
 	)
 	pulseaudio? ( >=media-sound/pulseaudio-2.1-r1[${MULTILIB_USEDEP}] )
 	tslib? ( >=x11-libs/tslib-1.0-r3[${MULTILIB_USEDEP}] )
-	udev? ( >=virtual/libudev-208:=[${MULTILIB_USEDEP}] )
+	>=virtual/libudev-208:=[${MULTILIB_USEDEP}]
 	wayland? (
 		>=dev-libs/wayland-1.0.6[${MULTILIB_USEDEP}]
 		>=media-libs/mesa-9.1.6[${MULTILIB_USEDEP},egl,gles2,wayland]
@@ -57,7 +60,7 @@ RDEPEND="
 		>=x11-libs/libXcursor-1.1.14[${MULTILIB_USEDEP}]
 		>=x11-libs/libXext-1.3.2[${MULTILIB_USEDEP}]
 		>=x11-libs/libXi-1.7.2[${MULTILIB_USEDEP}]
-		>=x11-libs/libXrandr-1.4.2[${MULTILIB_USEDEP}]
+		xrandr? ( >=x11-libs/libXrandr-1.4.2[${MULTILIB_USEDEP}] )
 		>=x11-libs/libXt-1.1.4[${MULTILIB_USEDEP}]
 		>=x11-libs/libXxf86vm-1.1.3[${MULTILIB_USEDEP}]
 		xinerama? ( >=x11-libs/libXinerama-1.1.3[${MULTILIB_USEDEP}] )
@@ -77,97 +80,103 @@ MULTILIB_WRAPPED_HEADERS=(
 
 PATCHES=(
 	# https://bugzilla.libsdl.org/show_bug.cgi?id=1431
-	"${FILESDIR}"/${P}-static-libs.patch
+	#"${FILESDIR}"/${P}-static-libs.patch
 	"${FILESDIR}"/${P}-wayland-before-x11.patch
+	"${FILESDIR}"/${P}-fix-gl-multilib.patch
+	#"${FILESDIR}"/${PN}-2.0.12-vulkan-headers.patch
+	"${FILESDIR}"/${P}-fix-cmake-linkage.patch
 )
 
-S=${WORKDIR}/${MY_P}
+[[ ${PV} == 9999* ]] || S=${WORKDIR}/${MY_P}
 
 src_prepare() {
-	default
 	sed -i -e 's/\"\.\/khronos\/\(.*\)\"/<\1>/' src/video/SDL_vulkan_internal.h || die
-	AT_M4DIR="/usr/share/aclocal acinclude" eautoreconf
+	cmake_src_prepare
 }
 
 multilib_src_configure() {
+	local mycmakeargs=()
 	use custom-cflags || strip-flags
 	append-cppflags -DHAVE_VULKAN_H
 
-	# sorted by `./configure --help`
-	ECONF_SOURCE="${S}" econf \
-		$(use_enable static-libs static) \
-		--enable-atomic \
-		$(use_enable sound audio) \
-		$(use_enable video) \
-		--enable-render \
-		--enable-events \
-		$(use_enable joystick) \
-		$(use_enable haptic) \
-		--enable-power \
-		--enable-filesystem \
-		$(use_enable threads) \
-		--enable-timers \
-		--enable-file \
-		--enable-loadso \
-		--enable-cpuinfo \
-		--enable-assembly \
-		$(use_enable cpu_flags_x86_sse ssemath) \
-		$(use_enable cpu_flags_x86_mmx mmx) \
-		$(use_enable cpu_flags_x86_3dnow 3dnow) \
-		$(use_enable cpu_flags_x86_sse sse) \
-		$(use_enable cpu_flags_x86_sse2 sse2) \
-		$(use_enable altivec) \
-		$(use_enable oss) \
-		$(use_enable alsa) \
-		--disable-alsa-shared \
-		--disable-esd \
-		$(use_enable pulseaudio) \
-		--disable-pulseaudio-shared \
-		$(use_enable libsamplerate) \
-		--disable-libsamplerate-shared \
-		--disable-arts \
-		$(use_enable nas) \
-		--disable-nas-shared \
-		--disable-sndio \
-		--disable-sndio-shared \
-		$(use_enable sound diskaudio) \
-		$(use_enable sound dummyaudio) \
-		$(use_enable wayland video-wayland) \
-		--disable-wayland-shared \
-		--disable-video-mir \
-		$(use_enable X video-x11) \
-		--disable-x11-shared \
-		$(use_enable X video-x11-xcursor) \
-		$(use_enable X video-x11-xdbe) \
-		$(use_enable xinerama video-x11-xinerama) \
-		$(use_enable X video-x11-xinput) \
-		$(use_enable X video-x11-xrandr) \
-		$(use_enable xscreensaver video-x11-scrnsaver) \
-		$(use_enable X video-x11-xshape) \
-		$(use_enable X video-x11-vm) \
-		--disable-video-cocoa \
-		--disable-video-directfb \
-		$(use_enable vulkan video-vulkan) \
-		$(multilib_native_use_enable fusionsound) \
-		--disable-fusionsound-shared \
-		$(use_enable video video-dummy) \
-		$(use_enable opengl video-opengl) \
-		$(use_enable gles video-opengles) \
-		$(use_enable udev libudev) \
-		$(use_enable dbus) \
-		--disable-ibus \
-		$(use_enable tslib input-tslib) \
-		--disable-directx \
-		--disable-rpath \
-		--disable-render-d3d \
-		$(use_with X x)
+	# We always build shared libs, but static libs are only built when
+	# no preference is made or shared libs are disabled
+	if ! use static-libs; then
+		mycmakeargs+=(
+			-DBUILD_SHARED_LIBS=YES
+		)
+	fi
+
+	mycmakeargs+=(
+		-DGCC_ATOMICS=YES
+		-DSDL_AUDIO=$(usex sound)
+		-DSDL_VIDEO=$(usex video)
+		-DSDL_RENDER=YES
+		-DSDL_EVENTS=YES
+		-DSDL_JOYSTICK=$(usex joystick)
+		-DSDL_HAPTIC=$(usex haptic)
+		-DSDL_POWER=YES
+		-DSDL_FILESYSTEM=YES
+		-DSDL_THREADS=$(usex threads)
+		-DSDL_TIMERS=YES
+		-DSDL_FILE=YES
+		-DSDL_LOADSO=YES
+		-DSDL_CPUINFO=YES
+		-DASSEMBLY=YES
+		-DSSEMATH=$(usex cpu_flags_x86_sse)
+		-DMMX=$(usex cpu_flags_x86_mmx)
+		-D3DNOW=$(usex cpu_flags_x86_3dnow)
+		-DSSE=$(usex cpu_flags_x86_sse)
+		-DSSE2=$(usex cpu_flags_x86_sse2)
+		-DSSE3=$(usex cpu_flags_x86_sse3)
+		-DALTIVEC=$(usex altivec)
+		-DOSS=$(usex oss)
+		-DALSA=$(usex alsa)
+		-DALSA_SHARED=NO
+		-DESD=NO
+		-DPULSEAUDIO=$(usex pulseaudio)
+		-DPULSEAUDIO_SHARED=NO
+		-DLIBSAMPLERATE=$(usex libsamplerate)
+		-DLIBSAMPLERATE_SHARED=NO
+		-DARTS=NO
+		-DNAS=$(usex nas)
+		-DNAS_SHARED=NO
+		-DSNDIO=NO
+		-DSNDIO_SHARED=NO
+		-DDISKAUDIO=$(usex sound)
+		-DDUMMYAUDIO=$(usex sound)
+		-DVIDEO_WAYLAND=$(usex wayland)
+		-DWAYLAND_SHARED=NO
+		-DVIDEO_X11=$(usex X)
+		-DX11_SHARED=NO
+		-DVIDEO_X11_XCURSOR=$(usex X)
+		-DVIDEO_X11_XINERAMA=$(usex xinerama)
+		-DVIDEO_X11_XINPUT=$(usex X)
+		-DVIDEO_X11_XRANDR=$(usex xrandr)
+		-DVIDEO_X11_XSCRNSAVER=$(usex xscreensaver)
+		-DVIDEO_X11_XSHAPE=$(usex X)
+		-DVIDEO_X11_XVM=$(usex X)
+		-DVIDEO_COCOA=NO
+		-DVIDEO_DIRECTFB=NO
+		-DVIDEO_VULKAN=$(usex vulkan)
+		-DFUSIONSOUND=$(multilib_native_usex fusionsound)
+		-DFUSIONSOUND_SHARED=NO
+		-DVIDEO_DUMMY=$(usex video)
+		-DVIDEO_OPENGL=$(usex opengl)
+		-DVIDEO_OPENGLES=$(usex gles2)
+		-DVIDEO_RPI=NO
+		-DSDL_USE_IME=NO
+		-DINPUT_TSLIB=$(usex tslib)
+		-DDIRECTX=NO
+		-DRPATH=NO
+		-DRENDER_D3D=NO
+	)
+	cmake_src_configure
 }
 
 multilib_src_install() {
-	emake DESTDIR="${D}" install
-}
+	cmake_src_install
 
-multilib_src_install_all() {
-	prune_libtool_files
-	dodoc {BUGS,CREDITS,README,README-SDL,TODO,WhatsNew}.txt docs/README*.md
+	multilib_is_native_abi && \
+		dodoc "${S}"/{BUGS,CREDITS,README-SDL,TODO,WhatsNew}.txt "${S}"/docs/README*.md
 }

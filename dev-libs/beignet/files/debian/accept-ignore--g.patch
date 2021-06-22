@@ -1,0 +1,21 @@
+Description: Don't error out when -g is passed
+
+Author: Rebecca N. Palmer <rebecca_palmer@zoho.com>
+Bug-Debian: https://bugs.debian.org/881054
+Forwarded: https://lists.freedesktop.org/archives/beignet/2019-February/009228.html
+
+--- a/backend/src/backend/program.cpp
++++ b/backend/src/backend/program.cpp
+@@ -985,6 +985,12 @@ EXTEND_QUOTE:
+           continue; // Don't push this str back; ignore it.
+         }
+ 
++        if(str == "-g") {
++            // The OpenCL 2.0 standard requires accepting -g,
++            // but does not require that it actually does anything
++            continue;
++        }
++
+         clOpt.push_back(str);
+       }
+       free(c_str);

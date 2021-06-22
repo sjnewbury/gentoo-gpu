@@ -1,0 +1,160 @@
+Description: Update documentation
+
+Reflect #767148 fix, high precision now being default, and releases.
+Clarify what hardware is supported.
+Add Debian specific information; recommend the Debian BTS rather than
+mostly-inactive upstream contact points.
+
+Author: Rebecca N. Palmer <rebecca_palmer@zoho.com>
+Forwarded: partially, most recently https://lists.freedesktop.org/archives/beignet/2019-January/009225.html
+
+--- a/src/cl_device_id.c
++++ b/src/cl_device_id.c
+@@ -907,7 +907,7 @@ cl_self_test(cl_device_id device, cl_sel
+                     } else {
+                       ret = SELF_TEST_SLM_FAIL;
+                       printf("Beignet: self-test failed: (3, 7, 5) + (5, 7, 3) returned (%i, %i, %i)\n"
+-                             "See README.md or http://www.freedesktop.org/wiki/Software/Beignet/\n",
++                             "This can usually be fixed by upgrading Linux to >= 4.2,\nsee /usr/share/doc/beignet-dev/Beignet.html or https://www.freedesktop.org/wiki/Software/Beignet/\n",
+                              test_data[0], test_data[1], test_data[2]);
+ 
+                     }
+--- a/docs/Beignet/Backend.mdwn
++++ b/docs/Beignet/Backend.mdwn
+@@ -37,9 +37,7 @@ Environment variables are used all over
+   precision math instructions compliant with OpenCL Spec. So we provide a
+   software version to meet the high precision requirement. Obviously the
+   software version's performance is not as good as native version supported by
+-  GEN hardware. What's more, most graphics application don't need this high
+-  precision, so we choose 0 as the default value. So OpenCL apps do not suffer
+-  the performance penalty for using high precision math functions.
++  GEN hardware.
+ 
+ - `OCL_SIMD_WIDTH` `(8 or 16)`. Select the number of lanes per hardware thread,
+   Normally, you don't need to set it, we will select suitable simd width for
+--- /dev/null
++++ b/docs/index.mdwn
+@@ -0,0 +1 @@
++[[!map pages="* and !ikiwiki/*" show=title]]
+--- a/docs/Beignet.mdwn
++++ b/docs/Beignet.mdwn
+@@ -16,6 +16,8 @@ News
+ Prerequisite
+ ------------
+ 
++(for building the upstream source; Debian packages handle this automatically)
++
+ The project depends on the following external libraries:
+ 
+ - libdrm libraries (libdrm and libdrm\_intel)
+@@ -84,7 +86,7 @@ you need to configure it as below:
+ 
+ CMake will check the dependencies and will complain if it does not find them.
+ 
+-`> make`
++`> make utest`
+ 
+ The cmake will build the backend firstly. Please refer to:
+ [[OpenCL Gen Backend|Beignet/Backend]] to get more dependencies.
+@@ -123,25 +125,17 @@ platform. Beignet also produces various
+ consistency. This small test framework uses a simple c++ registration system to
+ register all the unit tests.
+ 
+-You need to call setenv.sh in the utests/ directory to set some environment variables
+-firstly as below:
+-
+-`> . setenv.sh`
++In Debian beignet, the testing tool is in the _beignet-dev_ package, and is run with:
+ 
+-Then in `utests/`:
++`> /usr/lib/\`dpkg-architecture -qDEB_HOST_MULTIARCH\`/beignet/utest_run`
+ 
+-`> ./utest_run`
++(this name and path may change in future releases - please do not rely on it).  It will test the first OpenCL GPU device it finds (which does _not_ have to be a Beignet device).  If you want to test a different device, uninstall all other ICDs.  To see more options, pass `-h`.
+ 
+-will run all the unit tests one after the others
++If you compiled Beignet yourself, you will find this tool in `utests`, and will need to set some environment variables to use it (see `setenv.sh`).
+ 
+-`> ./utest_run some_unit_test`
+-
+-will only run `some_unit_test` test.
+ 
+ On all supported target platform, the pass rate should be 100%. If it is not, you may
+-need to refer the "Known Issues" section. Please be noted, the `. setenv.sh` is only
+-required to run unit test cases. For all other OpenCL applications, don't execute that
+-command.
++need to refer the "Known Issues" section.
+ 
+ Normally, beignet needs to run under X server environment as normal user. If there isn't X server,
+ beignet provides two alternative to run:
+@@ -151,14 +145,22 @@ beignet provides two alternative to run:
+ Supported Targets
+ -----------------
+ 
++Beignet aims to support Gen7 to Gen9 Intel HD (not PowerVR) integrated GPUs, i.e:
++
+  * 3rd Generation Intel Core Processors "Ivybridge".
+  * 3rd Generation Intel Atom Processors "BayTrail".
+  * 4th Generation Intel Core Processors "Haswell", need kernel patch if your linux kernel older than 4.2, see the "Known Issues" section.
+  * 5th Generation Intel Core Processors "Broadwell".
+  * 5th Generation Intel Atom Processors "Braswell".
+- * 6th Generation Intel Core Processors "Skylake" and "Kabylake".
++ * 6th Generation Intel Core Processors "Skylake", "Kabylake" and "Coffeelake".
+  * 5th Generation Intel Atom Processors "Broxten" or "Apollolake".
+ 
++As Beignet is being replaced by [Intel Compute Runtime (Neo)](https://01.org/compute-runtime) (likely to use the Debian package name intel-opencl-icd), future GPU models will probably _not_ be supported in Beignet.
++
++Not all processor models have an integrated GPU (Beignet does _not_ support running OpenCL on the CPU itself - see [pocl-opencl-icd](https://packages.debian.org/search?keywords=pocl-opencl-icd&searchon=names&exact=1&suite=all&section=all) for that).  Systems that also have a discrete GPU may disable the integrated GPU: check _xrandr --listproviders_ or see [here](https://nouveau.freedesktop.org/wiki/Optimus/).
++
++Attempting to run Beignet on unsupported hardware should return CL_DEVICE_NOT_FOUND; if it does anything else (especially crashing) please [report a bug](#howtocontribute).
++
+ OpenCL 2.0
+ ----------
+ From release v1.3.0, beignet supports OpenCL 2.0 on Skylake and later hardware.
+@@ -188,7 +190,7 @@ Known Issues
+   forever until a reboot.
+ 
+ * "Beignet: self-test failed" and almost all unit tests fail.
+-  Linux 3.15 and 3.16 (commits [f0a346b](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=f0a346bdafaf6fc4a51df9ddf1548fd888f860d8)
++  Linux 3.15 and upstream 3.16 (_not_ Debian jessie 3.16; commits [f0a346b](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=f0a346bdafaf6fc4a51df9ddf1548fd888f860d8)
+   to [c9224fa](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=c9224faa59c3071ecfa2d4b24592f4eb61e57069))
+   enable the register whitelist by default but miss some registers needed
+   for Beignet.
+@@ -224,10 +226,15 @@ Known Issues
+   This extension is partially implemented(the most commonly used part), and we will implement
+   other parts based on requirement.
+ 
++* Programs using Intel-specific extensions fail to compile.
++  
++  Debian opencl-c-headers is the standard (Khronos) headers, which splits some of these into separate files
++  (e.g. cl\_ext\_intel.h): search /usr/include/CL.  cl\_intel.h is in the beignet-dev package.
++
+ Project repository
+ ------------------
+ Right now, we host our project on fdo at:
+-[http://cgit.freedesktop.org/beignet/](http://cgit.freedesktop.org/beignet/).  
++[https://gitlab.freedesktop.org/beignet/beignet](https://gitlab.freedesktop.org/beignet/beignet).
+ And the Intel 01.org:
+ [https://01.org/beignet](https://01.org/beignet)
+ 
+@@ -263,15 +265,11 @@
+ 
+ How to contribute
+ -----------------
+-You are always welcome to contribute to this project, just need to subscribe
+-to the beignet mail list and send patches to it for review.
+-The official mail list is as below:
+-[http://lists.freedesktop.org/mailman/listinfo/beignet](http://lists.freedesktop.org/mailman/listinfo/beignet)  
+-The official bugzilla is at:
+-[https://bugs.freedesktop.org/enter_bug.cgi?product=Beignet](https://bugs.freedesktop.org/enter_bug.cgi?product=Beignet)  
+-You are welcome to submit beignet bug. Please be noted, please specify the exact platform
+-information, such as BYT/IVB/HSW/BDW, and GT1/GT2/GT3. You can easily get this information
+-by running the beignet's unit test.
++Please [report bugs to Debian](https://www.debian.org/Bugs/Reporting) package beignet-opencl-icd.
++
++Please specify your hardware when reporting a bug: _reportbug beignet-opencl-icd_ will automatically include this information.
++
++The upstream [email list](http://lists.freedesktop.org/mailman/listinfo/beignet) and [bug tracker](https://gitlab.freedesktop.org/beignet/beignet/issues) are still available, but as upstream is mostly inactive, it may be some time before they respond.
+ 
+ Documents for OpenCL application developers
+ -------------------------------------------

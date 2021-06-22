@@ -1,0 +1,383 @@
+# Copyright 1999-2020 Gentoo Authors
+# Distributed under the terms of the GNU General Public License v2
+
+EAPI=6
+CMAKE_MAKEFILE_GENERATOR="ninja"
+CMAKE_BUILD_TYPE="Release"
+PYTHON_COMPAT=( python3_{6,7,8} )
+USE_RUBY="ruby24 ruby25 ruby26 ruby27"
+CMAKE_MIN_VERSION=3.10
+
+inherit check-reqs cmake-utils flag-o-matic gnome2 pax-utils python-any-r1 ruby-single toolchain-funcs virtualx
+
+MY_P="webkitgtk-${PV}"
+DESCRIPTION="Open source web browser engine"
+HOMEPAGE="https://www.webkitgtk.org"
+if [[ $PV == 9999* ]]; then
+	SLOT="4/9999" # live version	
+	SRC_URI=
+	EGIT_REPO_URI=https://github.com/WebKit/webkit.git
+	inherit git-r3
+else
+	SRC_URI="https://www.webkitgtk.org/releases/${MY_P}.tar.xz"
+	SLOT="4/37" # soname version of libwebkit2gtk-4.0
+	KEYWORDS="~alpha ~amd64 ~arm ~arm64 ~ia64 ~ppc ~ppc64 ~sparc ~x86 ~amd64-fbsd ~amd64-linux ~x86-linux ~x86-macos"
+fi
+
+LICENSE="LGPL-2+ BSD"
+
+IUSE="aqua +bmalloc coverage doc +egl examples +geolocation gles2-only gnome-keyring +gstreamer +introspection jit jpeg2k +jumbo-build libnotify media-source +opengl seccomp spell wayland webrtc +wpe +X"
+
+# gstreamer with opengl/gles2-only needs egl
+REQUIRED_USE="
+	geolocation? ( introspection )
+	gles2-only? ( egl !opengl )
+	gstreamer? ( opengl? ( egl ) )
+	wayland? ( egl )
+	wpe? ( opengl wayland )
+	media-source? ( gstreamer )
+	webrtc? ( media-source )
+	|| ( aqua wayland X )
+"
+
+# Aqua support in gtk3 is untested
+# Dependencies found at Source/cmake/OptionsGTK.cmake
+# Various compile-time optionals for gtk+-3.22.0 - ensure it
+# >=gst-plugins-opus-1.14.4-r1 for opusparse (required by MSE)
+RDEPEND="
+	>=x11-libs/cairo-1.16.0:=[X?]
+	>=media-libs/fontconfig-2.13.0:1.0
+	>=media-libs/freetype-2.9.0:2
+	>=dev-libs/libgcrypt-1.7.0:0=
+	>=x11-libs/gtk+-3.22.0:3[aqua?,introspection?,wayland?,X?]
+	>=media-libs/harfbuzz-1.4.2:=[icu(+)]
+	>=dev-libs/icu-3.8.1-r1:=
+	virtual/jpeg:0=
+	>=net-libs/libsoup-2.54:2.4[introspection?]
+	>=dev-libs/libxml2-2.8.0:2
+	>=media-libs/libpng-1.4:0=
+	dev-db/sqlite:3=
+	sys-libs/zlib:0
+	>=dev-libs/atk-2.16.0
+	media-libs/libwebp:=
+
+	>=dev-libs/glib-2.44.0:2
+	>=dev-libs/libxslt-1.1.7
+	>=media-libs/woff2-1.0.2
+	gnome-keyring? ( app-crypt/libsecret )
+	geolocation? ( >=app-misc/geoclue-2.1.5:2.0 )
+	introspection? ( >=dev-libs/gobject-introspection-1.32.0:= )
+	dev-libs/libtasn1:=
+	spell? ( >=app-text/enchant-0.22:= )
+	gstreamer? (
+		>=media-libs/gstreamer-1.14:1.0
+		>=media-libs/gst-plugins-base-1.14:1.0[egl?,opengl?]
+		gles2-only? ( media-libs/gst-plugins-base:1.0[gles2] )
+		>=media-plugins/gst-plugins-opus-1.14.4-r1:1.0
+		>=media-libs/gst-plugins-bad-1.14:1.0 )
+
+	media-source? (
+			>=media-libs/gstreamer-1.16:1.0
+			webrtc? ( >=media-plugins/gst-plugins-webrtc-1.16:1.0 )
+	)
+
+	X? (
+		x11-libs/libX11
+		x11-libs/libXcomposite
+		x11-libs/libXdamage
+		x11-libs/libXrender
+		x11-libs/libXt )
+
+	libnotify? ( x11-libs/libnotify )
+	dev-libs/hyphen
+	jpeg2k? ( >=media-libs/openjpeg-2.2.0:2= )
+
+	egl? ( media-libs/mesa[egl] )
+	gles2-only? ( media-libs/mesa[gles2] )
+	opengl? ( virtual/opengl )
+	wpe? (
+		>=gui-libs/libwpe-1.3.0:=
+		>=gui-libs/wpebackend-fdo-1.3.1:=
+	)
+	seccomp? (
+		>=sys-apps/bubblewrap-0.3.1
+		sys-libs/libseccomp
+		sys-apps/xdg-dbus-proxy
+	)
+"
+
+# paxctl needed for bug #407085
+# Need real bison, not yacc
+DEPEND="${RDEPEND}
+	${PYTHON_DEPS}
+	${RUBY_DEPS}
+	dev-util/glib-utils
+	>=dev-util/gtk-doc-am-1.10
+	>=dev-util/gperf-3.0.1
+	>=sys-devel/bison-2.4.3
+	|| ( >=sys-devel/gcc-7.3 >=sys-devel/clang-5 )
+	sys-devel/gettext
+	virtual/pkgconfig
+
+	>=dev-lang/perl-5.10
+	virtual/perl-Data-Dumper
+	virtual/perl-Carp
+	virtual/perl-JSON-PP
+
+	doc? ( >=dev-util/gtk-doc-1.10 )
+	geolocation? ( dev-util/gdbus-codegen )
+	sys-apps/paxctl
+
+	test? (
+		dev-python/pygobject:3[python_targets_python2_7]
+		x11-themes/hicolor-icon-theme )
+"
+
+[[ ${PV} == 9999* ]] || S="${WORKDIR}/${MY_P}"
+
+CHECKREQS_DISK_BUILD="18G" # and even this might not be enough, bug #417307
+
+pkg_pretend() {
+	if [[ ${MERGE_TYPE} != "binary" ]] ; then
+		if is-flagq "-g*" && ! is-flagq "-g*0" ; then
+			einfo "Checking for sufficient disk space to build ${PN} with debugging CFLAGS"
+			check-reqs_pkg_pretend
+		fi
+
+		if ! test-flag-CXX -std=c++17 ; then
+			die "You need at least GCC 7.3.x or Clang >= 5 for C++17-specific compiler flags"
+		fi
+	fi
+
+	if ! use opengl && ! use gles2-only; then
+		ewarn
+		ewarn "You are disabling OpenGL usage (USE=opengl or USE=gles2-only) completely."
+		ewarn "This is an unsupported configuration meant for very specific embedded"
+		ewarn "use cases, where there truly is no GL possible (and even that use case"
+		ewarn "is very unlikely to come by). If you have GL (even software-only), you"
+		ewarn "really really should be enabling OpenGL!"
+		ewarn
+	fi
+}
+
+pkg_setup() {
+	if [[ ${MERGE_TYPE} != "binary" ]] && is-flagq "-g*" && ! is-flagq "-g*0" ; then
+		check-reqs_pkg_setup
+	fi
+
+	python-any-r1_pkg_setup
+}
+
+src_prepare() {
+	eapply "${FILESDIR}/${PN}-2.24.4-eglmesaext-include.patch" # bug 699054 # https://bugs.webkit.org/show_bug.cgi?id=204108
+	cmake-utils_src_prepare
+	gnome2_src_prepare
+}
+
+src_configure() {
+	# Respect CC, otherwise fails on prefix #395875
+	tc-export CC
+
+	# It does not compile on alpha without this in LDFLAGS
+	# https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=648761
+	use alpha && append-ldflags "-Wl,--no-relax"
+
+	# ld segfaults on ia64 with LDFLAGS --as-needed, bug #555504
+	use ia64 && append-ldflags "-Wl,--no-as-needed"
+
+	# Sigbuses on SPARC with mcpu and co., bug #???
+	use sparc && filter-flags "-mvis"
+
+	# https://bugs.webkit.org/show_bug.cgi?id=42070 , #301634
+	use ppc64 && append-flags "-mminimal-toc"
+
+	# Try to use less memory, bug #469942 (see Fedora .spec for reference)
+	# --no-keep-memory doesn't work on ia64, bug #502492
+	if ! use ia64; then
+		append-ldflags "-Wl,--no-keep-memory"
+	fi
+
+	# We try to use gold when possible for this package
+	#if ! tc-ld-is-gold ; then
+	#	append-ldflags "-Wl,--reduce-memory-overheads"
+	#fi
+
+	append-cxxflags -fpermissive
+
+	# Ruby situation is a bit complicated. See bug 513888
+	local rubyimpl
+	local ruby_interpreter=""
+	for rubyimpl in ${USE_RUBY}; do
+		if has_version --host-root "virtual/rubygems[ruby_targets_${rubyimpl}]"; then
+			ruby_interpreter="-DRUBY_EXECUTABLE=$(type -P ${rubyimpl})"
+		fi
+	done
+	# This will rarely occur. Only a couple of corner cases could lead us to
+	# that failure. See bug 513888
+	[[ -z $ruby_interpreter ]] && die "No suitable ruby interpreter found"
+
+	# TODO: Check Web Audio support
+	# should somehow let user select between them?
+	#
+	# opengl needs to be explicetly handled, bug #576634
+
+	local opengl_enabled
+	if use opengl || use gles2-only; then
+		opengl_enabled=ON
+	else
+		opengl_enabled=OFF
+	fi
+
+	local mycmakeargs=(
+		# begin PRIVATE options
+		-DSHOULD_INSTALL_JS_SHELL=$(usex examples)
+		-DENABLE_GEOLOCATION=$(usex geolocation)
+		-DENABLE_UNIFIED_BUILDS=$(usex jumbo-build)
+		-DENABLE_API_TESTS=$(usex test)
+		# end
+		-DENABLE_MINIBROWSER=$(usex examples)
+		-DENABLE_QUARTZ_TARGET=$(usex aqua)
+		-DENABLE_GTKDOC=$(usex doc)
+		$(cmake-utils_use_find_package gles2-only OpenGLES2)
+		-DENABLE_GLES2=$(usex gles2-only)
+		-DENABLE_VIDEO=$(usex gstreamer)
+		-DENABLE_WEB_AUDIO=$(usex gstreamer)
+		-DENABLE_INTROSPECTION=$(usex introspection)
+		-DUSE_LIBNOTIFY=$(usex libnotify)
+		-DUSE_LIBSECRET=$(usex gnome-keyring)
+		-DUSE_OPENJPEG=$(usex jpeg2k)
+		-DUSE_WOFF2=ON
+		-DENABLE_SPELLCHECK=$(usex spell)
+		-DENABLE_WAYLAND_TARGET=$(usex wayland)
+		$(cmake-utils_use_find_package egl EGL)
+		$(cmake-utils_use_find_package opengl OpenGL)
+		-DENABLE_X11_TARGET=$(usex X)
+		-DENABLE_OPENGL=${opengl_enabled}
+		-DENABLE_WEBGL=${opengl_enabled}
+		-DUSE_WPE_RENDERER=$(usex wpe)
+		-DENABLE_BUBBLEWRAP_SANDBOX=$(usex seccomp)
+		-DENABLE_MEDIA_SOURCE=$(usex media-source)
+		-DBWRAP_EXECUTABLE="${EPREFIX}"/usr/bin/bwrap # If bubblewrap[suid] then portage makes it go-r and cmake find_program fails with that
+		-DPORT=GTK
+
+		#experimental
+		-DUSE_SYSTEM_MALLOC=$(usex !bmalloc)
+		#-DENABLE_MEDIA_STREAM=$(usex webrtc)
+		#-DENABLE_WEB_RTC=$(usex webrtc)
+		-DENABLE_MEDIA_STREAM=OFF
+		-USE_LIBWEBRTC=NO
+		#-DENABLE_MEDIA_CAPTURE=$(usex media-source)
+ 		-DENABLE_INDEXED_DATABASE=ON
+		-DENABLE_INDEXED_DATABASE_IN_WORKERS=ON
+		-DENABLE_SERVICE_WORKER=ON
+		-DENABLE_GAMEPAD=ON
+		-DENABLE_FTPDIR=ON
+		-DENABLE_DATACUE_VALUE=ON
+		-DENABLE_DEVICE_ORIENTATION=ON
+		-DENABLE_POINTER_LOCK=ON
+		-DENABLE_APPLICATION_MANIFEST=ON
+		-DENABLE_CONTENT_EXTENSIONS=ON
+		-DENABLE_CSS_TYPED_OM=ON
+		-DENABLE_CSS_PAINTING_API=ON
+
+		# JavaScript
+		-DENABLE_EXPERIMENTAL_FEATURES=ON
+		-DENABLE_CSS_CONIC_GRADIENTS=ON
+		-DENABLE_DARK_MODE_CSS=ON
+		-DENABLE_FULLSCREEN_API=ON
+		-DENABLE_PDFKIT_PLUGIN=NO
+		-DENABLE_NOTIFICATIONS=ON
+		-DENABLE_ENCRYPTED_MEDIA=ON
+		-DENABLE_LEGACY_ENCRYPTED_MEDIA=ON
+		-DENABLE_INPUT_TYPE_DATE=ON
+		-DENABLE_INPUT_TYPE_DATETIMELOCAL=ON
+		#-DENABLE_INPUT_TYPE_DATETIME_INCOMPLETE=OFF
+		-DENABLE_INPUT_TYPE_MONTH=ON
+		-DENABLE_INPUT_TYPE_TIME=ON
+
+		# Breaks build
+		-DENABLE_INPUT_TYPE_WEEK=OFF
+
+		# Not optional for webkitgtk
+		#-DENABLE_INPUT_TYPE_COLOR=ON
+
+		-DENABLE_DEVICE_ORIENTATION=ON
+		#-DENABLE_DATA_INTERACTION=ON
+		#-DENABLE_DATALIST_ELEMENT=ON
+
+		${ruby_interpreter}
+	)
+        if [[ ${opengl_enabled} == ON ]]; then
+                mycmakeargs+=( -DENABLE_3D_TRANSFORMS=ON )
+                if ! use egl && use X; then
+                        mycmakeargs+=( -DUSE_GLX=YES -DUSE_EGL=NO )
+                else
+                        mycmakeargs+=( -DUSE_EGL=YES -DUSE_GLX=NO )
+                        if use X; then
+                                append-cppflags -DMESA_EGL_NO_X11_HEADERS=1
+                        else
+                                if use wayland; then
+                                        append-cppflags -DWL_EGL_PLATFORM=1
+                                fi
+                        fi
+                fi
+                # Not currently supported with GLES2 renderer
+                if ! use gles2-only; then
+                        mycmakeargs+=(
+                                -DENABLE_ACCELERATED_2D_CANVAS=ON
+                                -DENABLE_CSS_COMPOSITING=ON
+                                -DUSE_COORDINATED_GRAPHICS=YES
+                                -DENABLE_GRAPHICS_CONTEXT_GL=ON
+                                -DUSE_TEXTURE_MAPPER=YES
+                                # OpenVR needs to be packaged
+                                #-DUSE_OPENVR=ON
+                                -DENABLE_WEBGL2=ON
+                        )
+                         append-cppflags -DUSE_OPENGL=1 -DHAVE_OPENGL_4=1 -DUSE_OPENGL_ES=0 -DDHAVE_OPENGL_ES_3=0
+                else
+                         append-cppflags -DUSE_OPENGL=0 -DHAVE_OPENGL_4=0 -DUSE_OPENGL_ES=1 -DHAVE_OPENGL_ES_3=1
+                fi
+        fi
+
+	if use jit; then
+		mycmakeargs+=(
+			-DENABLE_JIT=ON
+			-DENABLE_FTL_JIT=ON
+			-DENABLE_FTL_DEFAULT=ON
+			-DENABLE_WEBASSEMBLY=ON
+			-DENABLE_WEBASSEMBLY_STREAMING_API=ON
+		)
+	else
+		append-cppflags -DENABLE_JIT=0 -DENABLE_YARR_JIT=0 -DENABLE_ASSEMBLER=0
+	fi
+
+	# Allow it to use GOLD when possible as it has all the magic to
+	# detect when to use it and using gold for this concrete package has
+	# multiple advantages and is also the upstream default, bug #585788
+	if tc-ld-is-gold ; then
+		mycmakeargs+=( -DUSE_LD_GOLD=ON )
+	else
+		mycmakeargs+=( -DUSE_LD_GOLD=OFF )
+	fi
+
+	cmake-utils_src_configure
+}
+
+src_compile() {
+	cmake-utils_src_compile
+}
+
+src_test() {
+	# Prevents test failures on PaX systems
+	pax-mark m $(list-paxables Programs/*[Tt]ests/*) # Programs/unittests/.libs/test*
+
+	cmake-utils_src_test
+}
+
+src_install() {
+	cmake-utils_src_install
+
+	# Prevents crashes on PaX systems, bug #522808
+	pax-mark m "${ED}usr/libexec/webkit2gtk-4.0/jsc" "${ED}usr/libexec/webkit2gtk-4.0/WebKitWebProcess"
+	pax-mark m "${ED}usr/libexec/webkit2gtk-4.0/WebKitPluginProcess"
+}
