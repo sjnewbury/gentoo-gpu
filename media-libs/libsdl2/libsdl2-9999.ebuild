@@ -25,7 +25,7 @@ fi
 LICENSE="ZLIB"
 SLOT="0"
 
-IUSE="cpu_flags_x86_3dnow alsa altivec custom-cflags fusionsound gles2 haptic +joystick cpu_flags_x86_mmx nas opengl oss pulseaudio +sound cpu_flags_x86_sse cpu_flags_x86_sse2 cpu_flags_x86_sse3 static-libs +threads tslib +video wayland X xinerama xscreensaver libsamplerate vulkan xrandr"
+IUSE="cpu_flags_x86_3dnow alsa altivec custom-cflags fusionsound gles2 haptic +joystick cpu_flags_x86_mmx nas opengl oss pulseaudio pipewire +sound cpu_flags_x86_sse cpu_flags_x86_sse2 cpu_flags_x86_sse3 sndio static-libs +threads tslib +video wayland X xinerama xscreensaver libsamplerate vulkan xrandr"
 REQUIRED_USE="
 	alsa? ( sound )
 	fusionsound? ( sound )
@@ -33,6 +33,8 @@ REQUIRED_USE="
 	nas? ( sound )
 	opengl? ( video )
 	pulseaudio? ( sound )
+	pipewire? ( sound )
+	sndio? ( sound )
 	wayland? ( gles2 )
 	xinerama? ( X )
 	xscreensaver? ( X )"
@@ -48,12 +50,15 @@ RDEPEND="
 		>=virtual/glu-9.0-r1[${MULTILIB_USEDEP}]
 	)
 	pulseaudio? ( >=media-sound/pulseaudio-2.1-r1[${MULTILIB_USEDEP}] )
+	pipewire? ( media-video/pipewire[${MULTILIB_USEDEP}] )
+	sndio? ( media-sound/sndio[${MULTILIB_USEDEP}] )
 	tslib? ( >=x11-libs/tslib-1.0-r3[${MULTILIB_USEDEP}] )
 	>=virtual/libudev-208:=[${MULTILIB_USEDEP}]
 	wayland? (
 		>=dev-libs/wayland-1.0.6[${MULTILIB_USEDEP}]
 		>=media-libs/mesa-9.1.6[${MULTILIB_USEDEP},egl,gles2,wayland]
 		>=x11-libs/libxkbcommon-0.2.0[${MULTILIB_USEDEP}]
+		>=gui-libs/libdecor-0.1.0[${MULTILIB_USEDEP}]
 	)
 	X? (
 		>=x11-libs/libX11-1.6.2[${MULTILIB_USEDEP}]
@@ -132,23 +137,27 @@ multilib_src_configure() {
 		-DALTIVEC=$(usex altivec)
 		-DOSS=$(usex oss)
 		-DALSA=$(usex alsa)
-		-DALSA_SHARED=NO
+		-DALSA_SHARED=$(usex alsa)
 		-DESD=NO
 		-DPULSEAUDIO=$(usex pulseaudio)
-		-DPULSEAUDIO_SHARED=NO
+		-DPULSEAUDIO_SHARED=$(usex pulseaudio)
+		-DPIPEWIRE=$(usex pipewire)
+		-DPIPEWIRE_SHARED=$(usex pipewire)
 		-DLIBSAMPLERATE=$(usex libsamplerate)
-		-DLIBSAMPLERATE_SHARED=NO
+		-DLIBSAMPLERATE_SHARED=$(usex libsamplerate)
 		-DARTS=NO
 		-DNAS=$(usex nas)
-		-DNAS_SHARED=NO
-		-DSNDIO=NO
-		-DSNDIO_SHARED=NO
+		-DNAS_SHARED=$(usex nas)
+		-DSNDIO=$(usex sndio)
+		-DSNDIO_SHARED=$(usex sndio)
 		-DDISKAUDIO=$(usex sound)
 		-DDUMMYAUDIO=$(usex sound)
 		-DVIDEO_WAYLAND=$(usex wayland)
-		-DWAYLAND_SHARED=NO
+		-DWAYLAND_LIBDECOR=$(usex wayland)
+		-DLIBDECOR_SHARED=$(usex wayland)
+		-DWAYLAND_SHARED=$(usex wayland)
 		-DVIDEO_X11=$(usex X)
-		-DX11_SHARED=NO
+		-DX11_SHARED=$(usex X)
 		-DVIDEO_X11_XCURSOR=$(usex X)
 		-DVIDEO_X11_XINERAMA=$(usex xinerama)
 		-DVIDEO_X11_XINPUT=$(usex X)
@@ -160,7 +169,7 @@ multilib_src_configure() {
 		-DVIDEO_DIRECTFB=NO
 		-DVIDEO_VULKAN=$(usex vulkan)
 		-DFUSIONSOUND=$(multilib_native_usex fusionsound)
-		-DFUSIONSOUND_SHARED=NO
+		-DFUSIONSOUND_SHARED=$(multilib_native_usex fusionsound)
 		-DVIDEO_DUMMY=$(usex video)
 		-DVIDEO_OPENGL=$(usex opengl)
 		-DVIDEO_OPENGLES=$(usex gles2)
