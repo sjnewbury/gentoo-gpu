@@ -6,7 +6,7 @@ EAPI=7
 
 PYTHON_COMPAT=( python3_{6,7,8} )
 CMAKE_BUILD_TYPE="Release"
-LLVM_VER=9
+LLVM_VER=10
 
 inherit python-any-r1 cmake-multilib flag-o-matic toolchain-funcs
 
@@ -81,6 +81,7 @@ PATCHES=(
 	"${FILESDIR}"/${PN}-9999-no-self-test.patch
 	"${FILESDIR}"/GBE-let-GenRegister-reg-never-return-uninitialized-m.patch
 	"${FILESDIR}"/${P}-c++14.patch
+	"${FILESDIR}"/${P}-llvm10-r1.patch
 )
 
 DOCS=(
