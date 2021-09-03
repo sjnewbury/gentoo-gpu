@@ -26,7 +26,7 @@ IUSE=""
 
 RDEPEND="
 	x11-misc/bumblebee
-	x11-drivers/nvidia-drivers[compat]
+	x11-drivers/nvidia-drivers
 "
 DEPEND="virtual/opengl"
 

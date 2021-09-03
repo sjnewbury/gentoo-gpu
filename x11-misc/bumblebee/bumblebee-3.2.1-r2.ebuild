@@ -3,7 +3,7 @@
 # $Header: /var/cvsroot/gentoo-x86/x11-misc/bumblebee/bumblebee-3.2.1.ebuild,v 1.1 2013/05/26 18:55:23 pacho Exp $
 
 EAPI=5
-inherit eutils multilib readme.gentoo systemd user
+inherit eutils multilib systemd user
 
 DESCRIPTION="Service providing elegant and stable means of managing Optimus graphics chipsets"
 HOMEPAGE="http://bumblebee-project.org https://github.com/Bumblebee-Project/Bumblebee"
@@ -70,7 +70,7 @@ src_install() {
 	sed -i "s:TurnCardOffAtExit=.*:TurnCardOffAtExit=true:g" \
 		"${S}/conf/bumblebee.conf" || die
 
-	readme.gentoo_create_doc
+	#readme.gentoo_create_doc
 
 	default
 
