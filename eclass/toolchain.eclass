@@ -1,8 +1,11 @@
 # Copyright 1999-2021 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
-# Maintainer: Toolchain Ninjas <toolchain@gentoo.org>
+# @ECLASS: toolchain.eclass
+# @MAINTAINER:
+# Toolchain Ninjas <toolchain@gentoo.org>
 # @SUPPORTED_EAPIS: 5 6 7 8
+# @BLURB: Common code for sys-devel/gcc ebuilds
 
 DESCRIPTION="The GNU Compiler Collection"
 HOMEPAGE="https://gcc.gnu.org/"
@@ -87,11 +90,11 @@ GCC_CONFIG_VER=${GCC_RELEASE_VER}
 
 # Pre-release support. Versioning schema:
 # 1.0.0_pre9999: live ebuild
-# 1.2.3_alphaYYYYMMDD: weekly snapshots
+# 1.2.3_pYYYYMMDD: weekly snapshots
 # 1.2.3_rcYYYYMMDD: release candidates
-if [[ ${GCC_PV} == *_alpha* ]] ; then
+if [[ ${GCC_PV} == *_p* ]] ; then
 	# weekly snapshots
-	SNAPSHOT=${GCCMAJOR}-${GCC_PV##*_alpha}
+	SNAPSHOT=${GCCMAJOR}-${GCC_PV##*_p}
 elif [[ ${GCC_PV} == *_rc* ]] ; then
 	# release candidates
 	SNAPSHOT=${GCC_PV%_rc*}-RC-${GCC_PV##*_rc}
@@ -185,6 +188,7 @@ if [[ ${PN} != "kgcc64" && ${PN} != gcc-* && ${PN} != offload-* ]] ; then
 		IUSE+=" systemtap" TC_FEATURES+=(systemtap)
 	tc_version_is_at_least 9.0 && IUSE+=" d"
 	tc_version_is_at_least 9.1 && IUSE+=" lto"
+	tc_version_is_at_least 10 && IUSE+=" cet"
 	tc_version_is_at_least 10 && IUSE+=" zstd" TC_FEATURES+=(zstd)
 	tc_version_is_at_least 11 && IUSE+=" valgrind" TC_FEATURES+=(valgrind)
 	tc_version_is_at_least 11 && IUSE+=" custom-cflags"
@@ -309,11 +313,16 @@ S=$(
 )
 
 gentoo_urls() {
-	local devspace="HTTP~vapier/dist/URI HTTP~rhill/dist/URI
-	HTTP~zorry/patches/gcc/URI HTTP~blueness/dist/URI
-	HTTP~tamiko/distfiles/URI HTTP~slyfox/distfiles/URI"
+	local devspace="
+		HTTP~soap/distfiles/URI
+		HTTP~sam/distfiles/URI
+		HTTP~sam/distfiles/sys-devel/gcc/URI
+		HTTP~tamiko/distfiles/URI
+		HTTP~zorry/patches/gcc/URI
+		HTTP~vapier/dist/URI
+		HTTP~blueness/dist/URI"
 	devspace=${devspace//HTTP/https:\/\/dev.gentoo.org\/}
-	echo mirror://gentoo/$1 ${devspace//URI/$1}
+	echo ${devspace//URI/$1} mirror://gentoo/$1
 }
 
 # This function handles the basics of setting the SRC_URI for a gcc ebuild.
@@ -374,6 +383,7 @@ gentoo_urls() {
 get_gcc_src_uri() {
 	export PATCH_GCC_VER=${PATCH_GCC_VER:-${GCC_RELEASE_VER}}
 	export UCLIBC_GCC_VER=${UCLIBC_GCC_VER:-${PATCH_GCC_VER}}
+	export MUSL_GCC_VER=${MUSL_GCC_VER:-${PATCH_GCC_VER}}
 	export PIE_GCC_VER=${PIE_GCC_VER:-${GCC_RELEASE_VER}}
 	export HTB_GCC_VER=${HTB_GCC_VER:-${GCC_RELEASE_VER}}
 	export SPECS_GCC_VER=${SPECS_GCC_VER:-${GCC_RELEASE_VER}}
@@ -399,6 +409,8 @@ get_gcc_src_uri() {
 		GCC_SRC_URI+=" $(gentoo_urls gcc-${UCLIBC_GCC_VER}-uclibc-patches-${UCLIBC_VER}.tar.bz2)"
 	[[ -n ${PATCH_VER} ]] && \
 		GCC_SRC_URI+=" $(gentoo_urls gcc-${PATCH_GCC_VER}-patches-${PATCH_VER}.tar.bz2)"
+	[[ -n ${MUSL_VER} ]] && \
+		GCC_SRC_URI+=" $(gentoo_urls gcc-${MUSL_GCC_VER}-musl-patches-${MUSL_VER}.tar.bz2)"
 
 	[[ -n ${PIE_VER} ]] && \
 		PIE_CORE=${PIE_CORE:-gcc-${PIE_GCC_VER}-piepatches-v${PIE_VER}.tar.bz2} && \
@@ -579,8 +591,26 @@ do_gcc_gentoo_patches() {
 			tc_apply_patches "Applying Gentoo patches ..." "${WORKDIR}"/patch/*.patch
 			BRANDING_GCC_PKGVERSION="${BRANDING_GCC_PKGVERSION} p${PATCH_VER}"
 		fi
+
 		if [[ -n ${UCLIBC_VER} ]] ; then
 			tc_apply_patches "Applying uClibc patches ..." "${WORKDIR}"/uclibc/*.patch
+		fi
+
+		if [[ -n ${MUSL_VER} ]] && [[ ${CTARGET} == *musl* ]] ; then
+			if [[ ${CATEGORY} == cross-* ]] ; then
+				# We don't want to apply some patches when cross-compiling.
+				if [[ -d "${WORKDIR}"/musl/nocross ]] ; then
+					rm -fv "${WORKDIR}"/musl/nocross/*.patch || die
+				else
+					# Just make an empty directory to make the glob below easier.
+					mkdir -p "${WORKDIR}"/musl/nocross || die
+				fi
+			fi
+
+			local shopt_save=$(shopt -p nullglob)
+			shopt -s nullglob
+			tc_apply_patches "Applying musl patches ..." "${WORKDIR}"/musl/{,nocross/}*.patch
+			${shopt_save}
 		fi
 	fi
 }
@@ -635,6 +665,11 @@ make_gcc_hard() {
 			# -z now
 			# see *_all_extra-options.patch gcc patches.
 			gcc_hard_flags+=" -DEXTRA_OPTIONS"
+
+			if _tc_use_if_iuse cet && [[ ${CTARGET} == *x86_64*-linux* ]] ; then
+				gcc_hard_flags+=" -DEXTRA_OPTIONS_CF"
+			fi
+
 			# rebrand to make bug reports easier
 			BRANDING_GCC_PKGVERSION=${BRANDING_GCC_PKGVERSION/Gentoo/Gentoo Hardened}
 		fi
@@ -1236,6 +1271,10 @@ toolchain_src_configure() {
 
 	if in_iuse ada ; then
 		confgcc+=( --disable-libada )
+	fi
+
+	if in_iuse cet ; then
+		confgcc+=( $(use_enable cet) )
 	fi
 
 	if in_iuse cilk ; then

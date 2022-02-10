@@ -1,0 +1,24 @@
+From: Ying-Chun Liu (PaulLiu) <paulliu@debian.org>
+Subject: fix FTBFS with GCC-11
+ We need to malloc line before using it.
+Bug-Debian: http://bugs.debian.org/984195
+Index: libomxil-bellagio-0.9.3/src/core_extensions/OMXCoreRMExt.c
+===================================================================
+--- libomxil-bellagio-0.9.3.orig/src/core_extensions/OMXCoreRMExt.c
++++ libomxil-bellagio-0.9.3/src/core_extensions/OMXCoreRMExt.c
+@@ -169,6 +169,7 @@ OMX_ERRORTYPE readRegistryFile() {
+ 	}
+ 	free(registry_filename);
+ 	libname = malloc(OMX_MAX_STRINGNAME_SIZE * 2);
++	line = malloc(MAX_LINE_LENGTH+1);
+ 	fseek(omxregistryfp, 0, 0);
+ 
+ 	  while(1) {
+@@ -193,7 +194,6 @@ OMX_ERRORTYPE readRegistryFile() {
+ 	fseek(omxregistryfp, 0, 0);
+ 	qualityList = malloc(numberOfLines * sizeof (stLoaderComponentType*));
+ 	qualityListItems = numberOfLines;
+-	line = malloc(MAX_LINE_LENGTH);
+ 	listindex = 0;
+ 
+ 	  while(1) {

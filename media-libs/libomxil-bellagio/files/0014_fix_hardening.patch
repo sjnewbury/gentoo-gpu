@@ -1,0 +1,32 @@
+Description: fix hardening errors
+ Debian now enable hardening, and found several bugs inside the code.
+ We fix all of them in this patch.
+Author: Ying-Chun Liu (PaulLiu) <paulliu@debian.org>
+Last-Update: 2020-08-09
+
+Index: libomxil-bellagio-0.9.3/src/base/omx_base_component.c
+===================================================================
+--- libomxil-bellagio-0.9.3.orig/src/base/omx_base_component.c
++++ libomxil-bellagio-0.9.3/src/base/omx_base_component.c
+@@ -827,7 +827,7 @@ OSCL_EXPORT_REF OMX_ERRORTYPE omx_base_c
+   uuid[0] = (OMX_U32)omx_component;
+   uuid[1] = getpid();
+   uuid[2] = getuid();
+-  memcpy(*pComponentUUID, uuid, 3*sizeof(uuid));
++  memcpy(*pComponentUUID, uuid, sizeof(uuid));
+ 
+   DEBUG(DEB_LEV_FUNCTION_NAME, "Out of %s for component %p\n", __func__, hComponent);
+   return OMX_ErrorNone;
+Index: libomxil-bellagio-0.9.3/src/omx_create_loaders_linux.c
+===================================================================
+--- libomxil-bellagio-0.9.3.orig/src/omx_create_loaders_linux.c
++++ libomxil-bellagio-0.9.3/src/omx_create_loaders_linux.c
+@@ -98,7 +98,7 @@ int createComponentLoaders() {
+ 		libraryFileName = malloc(MAX_LINE_LENGTH);
+ 		while(1) {
+ 			index_readline = 0;
+-			while(index_readline < MAX_LINE_LENGTH) {
++			while(index_readline + 1 < MAX_LINE_LENGTH) {
+ 				*(libraryFileName + index_readline) = fgetc(loaderFP);
+ 				if ((*(libraryFileName + index_readline) == '\n') || (*(libraryFileName + index_readline) == '\0')) {
+ 					break;

@@ -1,0 +1,31 @@
+From 492af6eba58bceaeeb408c956e16da706b40ba2d Mon Sep 17 00:00:00 2001
+From: Jayesh Kumar Tank <jayesh.kumarx.tank@intel.com>
+Date: Thu, 8 Mar 2018 12:17:53 -0800
+Subject: [PATCH 4/8] [DRI3] Mark DRI3 dependent on Present
+
+Present support is provided by xcb-present library so mark
+DRI3 support dependent on it.
+
+Signed-off-by: Jayesh Kumar Tank <jayesh.kumarx.tank@intel.com>
+---
+ configure.ac | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index 793364f..ea38ccd 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -249,8 +249,8 @@ if test "$USE_X11:$enable_dri3" = "no:yes"; then
+ fi
+ 
+ if test "$enable_dri3" != "no"; then
+-    PKG_CHECK_MODULES([DRI3], [xcb x11-xcb xcb-dri3 xcb-sync xshmfence],
+-[USE_DRI3="yes"], [:])
++    PKG_CHECK_MODULES([DRI3], [xcb x11-xcb xcb-dri3 xcb-sync  \
++       xshmfence xcb-present], [USE_DRI3="yes"], [:])
+ 
+     if test "x$USE_DRI3" = "xno" -a "x$enable_dri3" = "xyes"; then
+        AC_MSG_ERROR([VA/X11-dri3 explicitly enabled, however $DRI3_PKG_ERRORS])
+-- 
+2.18.0
+

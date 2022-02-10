@@ -7,7 +7,7 @@ inherit autotools multilib-minimal
 
 DESCRIPTION="Open Source implementation of the OpenMAX Integration Layer"
 HOMEPAGE="http://omxil.sourceforge.net/"
-SRC_URI="mirror://sourceforge/${PN:3:5}/${P}.tar.gz mirror://ubuntu/pool/universe/${PN:0:4}/${PN}/${PN}_${PV}-1ubuntu2.debian.tar.gz"
+SRC_URI="mirror://sourceforge/${PN:3:5}/${P}.tar.gz mirror://ubuntu/pool/universe/${PN:0:4}/${PN}/${PN}_${PV}-4.debian.tar.xz"
 
 LICENSE="LGPL-2.1"
 SLOT="0"
@@ -23,7 +23,10 @@ PATCHES=(
 	"${FILESDIR}"/${P}-dynamicloader-linking.patch
 	"${FILESDIR}"/${P}-parallel-build.patch
 	"${FILESDIR}"/${P}-version.patch
-	"${FILESDIR}"/${P}-gcc5.patch
+	#"${FILESDIR}"/0011_makefile_dependencies.patch
+	"${FILESDIR}"/0014_fix_hardening.patch
+	"${FILESDIR}"/0015_port_gcc_10.patch
+	"${FILESDIR}"/0016_port_gcc_11.patch
 )
 
 ECONF_SOURCE="${S}"
@@ -44,4 +47,9 @@ multilib_src_configure() {
 		$(use_enable videoscheduler)
 	)
 	econf "${econf_args[@]}"
+}
+
+src_install() {
+	default
+	rm -rf "${D}"/"${EPREFIX}"/usr/share/doc/${PN}
 }

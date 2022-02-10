@@ -1,0 +1,223 @@
+From ead2c63545c8fd63c44152527ed7cf776450454f Mon Sep 17 00:00:00 2001
+From: Jayesh Kumar Tank <jayesh.kumarx.tank@intel.com>
+Date: Thu, 8 Mar 2018 12:12:32 -0800
+Subject: [PATCH 3/4] [DRI3] Add Present Extension support
+
+DRI3 on its own does not support rendering and thus for
+enabling rendering support it needs Present extension.
+
+Present extension uses X Pixmaps to render on the screen.
+
+Signed-off-by: Jayesh Kumar Tank <jayesh.kumarx.tank@intel.com>
+---
+ va/x11/dri3_util.c    | 26 ++++++++++++++++++++++
+ va/x11/va_dri3.c      | 50 ++++++++++++++++++++++++++++++++++++++++++-
+ va/x11/va_dri3.h      | 19 +++++++++++++++-
+ va/x11/va_dricommon.h | 32 +++++++++++++++++++++++++++
+ 4 files changed, 125 insertions(+), 2 deletions(-)
+
+diff --git a/va/x11/dri3_util.c b/va/x11/dri3_util.c
+index 4dcca6c..f8236b4 100644
+--- a/va/x11/dri3_util.c
++++ b/va/x11/dri3_util.c
+@@ -45,6 +45,32 @@ va_dri3_createPixmap(VADriverContextP ctx, Drawable draw,
+                                  stride, size);
+ }
+ 
++void
++va_dri3_presentPixmap(VADriverContextP ctx,
++                      Drawable draw,
++                      Pixmap pixmap,
++                      unsigned int serial,
++                      xcb_xfixes_region_t valid,
++                      xcb_xfixes_region_t update,
++                      unsigned short int x_off,
++                      unsigned short int y_off,
++                      xcb_randr_crtc_t target_crtc,
++                      xcb_sync_fence_t wait_fence,
++                      xcb_sync_fence_t idle_fence,
++                      unsigned int options,
++                      unsigned long int target_msc,
++                      unsigned long int divisor,
++                      unsigned long int  remainder,
++                      unsigned int notifies_len,
++                      const xcb_present_notify_t *notifies)
++{
++    VA_DRI3_present_pixmap(ctx->native_dpy, draw,
++                           pixmap, serial, valid, update,
++                           x_off, y_off, target_crtc, wait_fence,
++                           idle_fence, options, target_msc, divisor,
++                           remainder, notifies_len, notifies);
++}
++
+ int
+ va_dri3_create_fence(VADriverContextP ctx, Pixmap pixmap,
+                      struct dri3_fence *fence)
+diff --git a/va/x11/va_dri3.c b/va/x11/va_dri3.c
+index e863251..4ae2439 100644
+--- a/va/x11/va_dri3.c
++++ b/va/x11/va_dri3.c
+@@ -65,6 +65,31 @@ int VA_DRI3_create_fd(Display *dpy, Pixmap pixmap, int *stride)
+     return xcb_dri3_buffer_from_pixmap_reply_fds(c, reply)[0];
+ }
+ 
++void
++VA_DRI3_present_pixmap(Display *dpy,
++                       xcb_window_t window,
++                       xcb_pixmap_t pixmap,
++                       unsigned int serial,
++                       xcb_xfixes_region_t valid,
++                       xcb_xfixes_region_t update,
++                       unsigned short int x_off,
++                       unsigned short int y_off,
++                       xcb_randr_crtc_t target_crtc,
++                       xcb_sync_fence_t wait_fence,
++                       xcb_sync_fence_t idle_fence,
++                       unsigned int options,
++                       unsigned long int target_msc,
++                       unsigned long int divisor,
++                       unsigned long int  remainder,
++                       unsigned int notifies_len,
++                       const xcb_present_notify_t *notifies)
++{
++    xcb_connection_t *c = XGetXCBConnection(dpy);
++    xcb_present_pixmap(c, window, pixmap, serial, valid, update, x_off,
++                       y_off, target_crtc, wait_fence, idle_fence, options,
++                       target_msc, divisor, remainder, notifies_len, notifies);
++}
++
+ static void VA_DRI3_query_version(xcb_connection_t *c, int *major, int *minor)
+ {
+     xcb_dri3_query_version_reply_t *reply;
+@@ -134,12 +159,32 @@ static int VA_DRI3_exists(xcb_connection_t *c)
+     major = minor = -1;
+ 
+     ext = xcb_get_extension_data(c, &xcb_dri3_id);
+-    if (ext != NULL)
++
++    if (ext != NULL && ext->present)
+         VA_DRI3_query_version(c, &major, &minor);
+ 
+     return major >= 0;
+ }
+ 
++static Bool VA_DRI3_has_present(Display *dpy)
++{
++    xcb_connection_t *c = XGetXCBConnection(dpy);
++    xcb_generic_error_t *error = NULL;
++    void *reply;
++
++    reply = xcb_present_query_version_reply(c,
++                                            xcb_present_query_version(c,
++                                                  XCB_PRESENT_MAJOR_VERSION,
++                                                  XCB_PRESENT_MINOR_VERSION),
++                                            &error);
++    if (reply == NULL)
++        return 0;
++
++    free(reply);
++    free(error);
++    return 1;
++}
++
+ int VA_DRI3_open(Display *dpy, Window root, unsigned provider)
+ {
+     xcb_connection_t *c = XGetXCBConnection(dpy);
+@@ -150,6 +195,9 @@ int VA_DRI3_open(Display *dpy, Window root, unsigned provider)
+         return -1;
+     }
+ 
++    if (!VA_DRI3_has_present(dpy))
++        return -1;
++
+     cookie = xcb_dri3_open(c, root, provider);
+     reply = xcb_dri3_open_reply(c, cookie, NULL);
+ 
+diff --git a/va/x11/va_dri3.h b/va/x11/va_dri3.h
+index 6ecc08d..4523f57 100644
+--- a/va/x11/va_dri3.h
++++ b/va/x11/va_dri3.h
+@@ -43,5 +43,22 @@ int
+ VA_DRI3_create_fence(Display *dpy, Pixmap pixmap, struct dri3_fence *fence);
+ void VA_DRI3_fence_sync(Display *dpy, struct dri3_fence *fence);
+ void VA_DRI3_fence_free(Display *dpy, struct dri3_fence *fence);
+-
++void
++VA_DRI3_present_pixmap(Display *dpy,
++                       xcb_window_t window,
++                       xcb_pixmap_t pixmap,
++                       unsigned int serial,
++                       xcb_xfixes_region_t valid,
++                       xcb_xfixes_region_t update,
++                       unsigned short int x_off,
++                       unsigned short int y_off,
++                       xcb_randr_crtc_t target_crtc,
++                       xcb_sync_fence_t wait_fence,
++                       xcb_sync_fence_t idle_fence,
++                       unsigned int options,
++                       unsigned long int target_msc,
++                       unsigned long int divisor,
++                       unsigned long int  remainder,
++                       unsigned int notifies_len,
++                       const xcb_present_notify_t *notifies);
+ #endif /* VA_DRI3_H */
+diff --git a/va/x11/va_dricommon.h b/va/x11/va_dricommon.h
+index 7267692..3e42a4a 100644
+--- a/va/x11/va_dricommon.h
++++ b/va/x11/va_dricommon.h
+@@ -33,6 +33,7 @@
+ 
+ #include <va/va_backend.h>
+ #include <va/va_drmcommon.h>
++#include <xcb/present.h>
+ 
+ #ifdef ANDROID
+ #define XID unsigned int
+@@ -93,6 +94,21 @@ struct dri_state
+     (*createPixmap)(VADriverContextP ctx, Drawable draw,
+                     int width, int height, int depth,
+                     int fd, int bpp, int stride, int size);
++    void (*presentPixmap)(VADriverContextP ctx, Drawable draw,
++                          Pixmap pixmap, unsigned int serial,
++                          xcb_xfixes_region_t valid,
++                          xcb_xfixes_region_t update,
++                          unsigned short int x_off,
++                          unsigned short int y_off,
++                          xcb_randr_crtc_t target_crtc,
++                          xcb_sync_fence_t wait_fence,
++                          xcb_sync_fence_t idle_fence,
++                          unsigned int options,
++                          unsigned long int target_msc,
++                          unsigned long int divisor,
++                          unsigned long int  remainder,
++                          unsigned int notifies_len,
++                          const xcb_present_notify_t *notifies);
+     int
+     (*create_fence)(VADriverContextP ctx, Pixmap pixmap,
+                          struct dri3_fence *fence);
+@@ -117,6 +133,22 @@ va_dri3_createPixmap(VADriverContextP ctx, Drawable draw,
+                      int width, int height, int depth,
+                      int fd, int bpp, int stride, int size);
+ int va_dri3_createfd(VADriverContextP ctx, Pixmap pixmap, int *stride);
++void
++va_dri3_presentPixmap(VADriverContextP ctx, Drawable draw,
++                      Pixmap pixmap, unsigned int serial,
++                      xcb_xfixes_region_t valid,
++                      xcb_xfixes_region_t update,
++                      unsigned short int x_off,
++                      unsigned short int y_off,
++                      xcb_randr_crtc_t target_crtc,
++                      xcb_sync_fence_t wait_fence,
++                      xcb_sync_fence_t idle_fence,
++                      unsigned int options,
++                      unsigned long int target_msc,
++                      unsigned long int divisor,
++                      unsigned long int  remainder,
++                      unsigned int notifies_len,
++                      const xcb_present_notify_t *notifies);
+ void va_dri3_close(VADriverContextP ctx);
+ int
+ va_dri3_create_fence(VADriverContextP ctx, Pixmap pixmap,
+-- 
+2.17.0
+

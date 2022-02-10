@@ -17,7 +17,7 @@ IUSE="doc static-libs"
 DEPEND="
 	>=virtual/glu-9.0-r1[${MULTILIB_USEDEP}]
 	>=virtual/opengl-7.0-r1[${MULTILIB_USEDEP}]
-	media-libs/mesa[egl,${MULTILIB_USEDEP}]
+	media-libs/mesa[${MULTILIB_USEDEP}]
 "
 RDEPEND="${DEPEND}"
 

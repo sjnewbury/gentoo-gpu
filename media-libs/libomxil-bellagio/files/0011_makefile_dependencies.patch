@@ -1,0 +1,15 @@
+Description: Fix the Makefile dependencies
+Author: Adrian Bunk <bunk@debian.org>
+Bug-Debian: https://bugs.debian.org/906604
+
+--- libomxil-bellagio-0.9.3.orig/src/Makefile.am
++++ libomxil-bellagio-0.9.3/src/Makefile.am
+@@ -7,7 +7,7 @@ bin_PROGRAMS = omxregister-bellagio
+ omxregister_bellagio_SOURCES = omxregister.c common.c common.h
+ omxregister_bellagio_CFLAGS = -DOMXILCOMPONENTSPATH=\"$(plugindir)/\" \
+ 			      -I$(top_srcdir)/include
+-omxregister_bellagio_LDFLAGS = -lomxil-bellagio -L$(builddir)
++omxregister_bellagio_LDADD = libomxil-bellagio.la
+ 
+ lib_LTLIBRARIES = libomxil-bellagio.la
+ libomxil_bellagio_la_SOURCES = component_loader.h \

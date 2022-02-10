@@ -25,7 +25,7 @@ fi
 LICENSE="ZLIB"
 SLOT="0"
 
-IUSE="cpu_flags_x86_3dnow alsa altivec custom-cflags fusionsound gles2 haptic +joystick cpu_flags_x86_mmx nas opengl oss pulseaudio pipewire +sound cpu_flags_x86_sse cpu_flags_x86_sse2 cpu_flags_x86_sse3 sndio static-libs +threads tslib +video wayland X xinerama xscreensaver libsamplerate vulkan xrandr"
+IUSE="cpu_flags_x86_3dnow alsa altivec custom-cflags fusionsound gles2 haptic +joystick cpu_flags_x86_mmx nas opengl oss pulseaudio pipewire +sound cpu_flags_x86_sse cpu_flags_x86_sse2 cpu_flags_x86_sse3 sndio static-libs +threads +video wayland X xinerama xscreensaver libsamplerate vulkan xrandr"
 REQUIRED_USE="
 	alsa? ( sound )
 	fusionsound? ( sound )
@@ -52,11 +52,10 @@ RDEPEND="
 	pulseaudio? ( >=media-sound/pulseaudio-2.1-r1[${MULTILIB_USEDEP}] )
 	pipewire? ( media-video/pipewire[${MULTILIB_USEDEP}] )
 	sndio? ( media-sound/sndio[${MULTILIB_USEDEP}] )
-	tslib? ( >=x11-libs/tslib-1.0-r3[${MULTILIB_USEDEP}] )
 	>=virtual/libudev-208:=[${MULTILIB_USEDEP}]
 	wayland? (
 		>=dev-libs/wayland-1.0.6[${MULTILIB_USEDEP}]
-		>=media-libs/mesa-9.1.6[${MULTILIB_USEDEP},egl,gles2,wayland]
+		>=media-libs/mesa-9.1.6[${MULTILIB_USEDEP},gles2,wayland]
 		>=x11-libs/libxkbcommon-0.2.0[${MULTILIB_USEDEP}]
 		>=gui-libs/libdecor-0.1.0[${MULTILIB_USEDEP}]
 	)
@@ -86,16 +85,17 @@ MULTILIB_WRAPPED_HEADERS=(
 PATCHES=(
 	# https://bugzilla.libsdl.org/show_bug.cgi?id=1431
 	#"${FILESDIR}"/${P}-static-libs.patch
-	"${FILESDIR}"/${P}-wayland-before-x11.patch
+	#"${FILESDIR}"/${P}-wayland-before-x11.patch
 	"${FILESDIR}"/${P}-fix-gl-multilib.patch
 	#"${FILESDIR}"/${PN}-2.0.12-vulkan-headers.patch
-	"${FILESDIR}"/${P}-fix-cmake-linkage.patch
+	#"${FILESDIR}"/${P}-fix-cmake-linkage.patch
 )
 
 [[ ${PV} == 9999* ]] || S=${WORKDIR}/${MY_P}
 
 src_prepare() {
 	sed -i -e 's/\"\.\/khronos\/\(.*\)\"/<\1>/' src/video/SDL_vulkan_internal.h || die
+	sed -i -e 's/ \(.*\)_RELEASE/ \1_GENTOO \1_RELEASE/g' SDL2Config.cmake || die
 	cmake_src_prepare
 }
 
@@ -113,7 +113,7 @@ multilib_src_configure() {
 	fi
 
 	mycmakeargs+=(
-		-DGCC_ATOMICS=YES
+		-DSDL_GCC_ATOMICS=YES
 		-DSDL_AUDIO=$(usex sound)
 		-DSDL_VIDEO=$(usex video)
 		-DSDL_RENDER=YES
@@ -127,58 +127,57 @@ multilib_src_configure() {
 		-DSDL_FILE=YES
 		-DSDL_LOADSO=YES
 		-DSDL_CPUINFO=YES
-		-DASSEMBLY=YES
-		-DSSEMATH=$(usex cpu_flags_x86_sse)
-		-DMMX=$(usex cpu_flags_x86_mmx)
-		-D3DNOW=$(usex cpu_flags_x86_3dnow)
-		-DSSE=$(usex cpu_flags_x86_sse)
-		-DSSE2=$(usex cpu_flags_x86_sse2)
-		-DSSE3=$(usex cpu_flags_x86_sse3)
-		-DALTIVEC=$(usex altivec)
-		-DOSS=$(usex oss)
-		-DALSA=$(usex alsa)
-		-DALSA_SHARED=$(usex alsa)
-		-DESD=NO
-		-DPULSEAUDIO=$(usex pulseaudio)
-		-DPULSEAUDIO_SHARED=$(usex pulseaudio)
-		-DPIPEWIRE=$(usex pipewire)
-		-DPIPEWIRE_SHARED=$(usex pipewire)
-		-DLIBSAMPLERATE=$(usex libsamplerate)
-		-DLIBSAMPLERATE_SHARED=$(usex libsamplerate)
-		-DARTS=NO
-		-DNAS=$(usex nas)
-		-DNAS_SHARED=$(usex nas)
-		-DSNDIO=$(usex sndio)
-		-DSNDIO_SHARED=$(usex sndio)
-		-DDISKAUDIO=$(usex sound)
-		-DDUMMYAUDIO=$(usex sound)
-		-DVIDEO_WAYLAND=$(usex wayland)
-		-DWAYLAND_LIBDECOR=$(usex wayland)
-		-DLIBDECOR_SHARED=$(usex wayland)
-		-DWAYLAND_SHARED=$(usex wayland)
-		-DVIDEO_X11=$(usex X)
-		-DX11_SHARED=$(usex X)
-		-DVIDEO_X11_XCURSOR=$(usex X)
-		-DVIDEO_X11_XINERAMA=$(usex xinerama)
-		-DVIDEO_X11_XINPUT=$(usex X)
-		-DVIDEO_X11_XRANDR=$(usex xrandr)
-		-DVIDEO_X11_XSCRNSAVER=$(usex xscreensaver)
-		-DVIDEO_X11_XSHAPE=$(usex X)
-		-DVIDEO_X11_XVM=$(usex X)
-		-DVIDEO_COCOA=NO
-		-DVIDEO_DIRECTFB=NO
-		-DVIDEO_VULKAN=$(usex vulkan)
-		-DFUSIONSOUND=$(multilib_native_usex fusionsound)
-		-DFUSIONSOUND_SHARED=$(multilib_native_usex fusionsound)
-		-DVIDEO_DUMMY=$(usex video)
-		-DVIDEO_OPENGL=$(usex opengl)
-		-DVIDEO_OPENGLES=$(usex gles2)
-		-DVIDEO_RPI=NO
+		-DSDL_ASSEMBLY=YES
+		-DSDL_SSEMATH=$(usex cpu_flags_x86_sse)
+		-DSDL_MMX=$(usex cpu_flags_x86_mmx)
+		-DSDL_3DNOW=$(usex cpu_flags_x86_3dnow)
+		-DSDL_SSE=$(usex cpu_flags_x86_sse)
+		-DSDL_SSE2=$(usex cpu_flags_x86_sse2)
+		-DSDL_SSE3=$(usex cpu_flags_x86_sse3)
+		-DSDL_ALTIVEC=$(usex altivec)
+		-DSDL_OSS=$(usex oss)
+		-DSDL_ALSA=$(usex alsa)
+		-DSDL_ALSA_SHARED=$(usex alsa)
+		-DSDL_ESD=NO
+		-DSDL_PULSEAUDIO=$(usex pulseaudio)
+		-DSDL_PULSEAUDIO_SHARED=$(usex pulseaudio)
+		-DSDL_PIPEWIRE=$(usex pipewire)
+		-DSDL_PIPEWIRE_SHARED=$(usex pipewire)
+		-DSDL_LIBSAMPLERATE=$(usex libsamplerate)
+		-DSDL_LIBSAMPLERATE_SHARED=$(usex libsamplerate)
+		-DSDL_ARTS=NO
+		-DSDL_NAS=$(usex nas)
+		-DSDL_NAS_SHARED=$(usex nas)
+		-DSDL_SNDIO=$(usex sndio)
+		-DSDL_SNDIO_SHARED=$(usex sndio)
+		-DSDL_DISKAUDIO=$(usex sound)
+		-DSDL_DUMMYAUDIO=$(usex sound)
+		-DSDL_WAYLAND=$(usex wayland)
+		-DSDL_WAYLAND_LIBDECOR=$(usex wayland)
+		-DSDL_WAYLAND_LIBDECOR_SHARED=$(usex wayland)
+		-DSDL_WAYLAND_SHARED=$(usex wayland)
+		-DSDL_X11=$(usex X)
+		-DSDL_X11_SHARED=$(usex X)
+		-DSDL_X11_XCURSOR=$(usex X)
+		-DSDL_X11_XINERAMA=$(usex xinerama)
+		-DSDL_X11_XINPUT=$(usex X)
+		-DSDL_X11_XRANDR=$(usex xrandr)
+		-DSDL_X11_XSCRNSAVER=$(usex xscreensaver)
+		-DSDL_X11_XSHAPE=$(usex X)
+		-DSDL_X11_XVM=$(usex X)
+		-DSDL_COCOA=NO
+		-DSDL_DIRECTFB=NO
+		-DSDL_VULKAN=$(usex vulkan)
+		-DSDL_FUSIONSOUND=$(multilib_native_usex fusionsound)
+		-DSDL_FUSIONSOUND_SHARED=$(multilib_native_usex fusionsound)
+		-DSDL_DUMMYVIDEO=$(usex video)
+		-DSDL_OPENGL=$(usex opengl)
+		-DSDL_OPENGLES=$(usex gles2)
+		-DSDL_RPI=NO
 		-DSDL_USE_IME=NO
-		-DINPUT_TSLIB=$(usex tslib)
-		-DDIRECTX=NO
-		-DRPATH=NO
-		-DRENDER_D3D=NO
+		-DSDL_DIRECTX=NO
+		-DSDL_RPATH=NO
+		-DSDL_RENDER_D3D=NO
 	)
 	cmake_src_configure
 }

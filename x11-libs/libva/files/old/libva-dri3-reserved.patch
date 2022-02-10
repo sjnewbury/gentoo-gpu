@@ -1,0 +1,17 @@
+--- ./va/x11/va_dricommon.h~	2018-05-06 11:45:15.000000000 +0100
++++ ./va/x11/va_dricommon.h	2018-05-06 13:23:44.296144232 +0100
+@@ -114,9 +114,13 @@
+                          struct dri3_fence *fence);
+     void (*fence_sync)(VADriverContextP ctx, struct dri3_fence *fence);
+     void (*fence_free)(VADriverContextP ctx, struct dri3_fence *fence);
+-#endif
++
++    /** \brief Reserved bytes for future use, must be zero */
++    unsigned long  va_reserved[9];
++#else
+     /** \brief Reserved bytes for future use, must be zero */
+     unsigned long  va_reserved[16];
++#endif
+ };
+ 
+ Bool va_isDRI2Connected(VADriverContextP ctx, char **driver_name);

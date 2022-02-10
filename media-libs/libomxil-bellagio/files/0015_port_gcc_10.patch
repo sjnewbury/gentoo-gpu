@@ -1,0 +1,37 @@
+Description: porting to gcc 10
+ Some multiple definitions fixed in this patch.
+Author: Ying-Chun Liu (PaulLiu) <paulliu@debian.org>
+Bug-Debian: https://bugs.debian.org/957453
+Last-Update: 2020-08-09
+
+--- libomxil-bellagio-0.9.3.orig/src/omx_reference_resource_manager.c
++++ libomxil-bellagio-0.9.3/src/omx_reference_resource_manager.c
+@@ -30,6 +30,11 @@
+ #include "base/omx_base_component.h"
+ #include "queue.h"
+ 
++int globalIndex;
++NameIndexType *listOfcomponentRegistered;
++ComponentListType **globalComponentList;
++ComponentListType **globalWaitingComponentList;
++
+ /**
+  * This is the static base pointer of the list
+  */
+--- libomxil-bellagio-0.9.3.orig/src/omx_reference_resource_manager.h
++++ libomxil-bellagio-0.9.3/src/omx_reference_resource_manager.h
+@@ -49,10 +49,10 @@ struct NameIndexType {
+ };
+ 
+ 
+-int globalIndex;
+-NameIndexType *listOfcomponentRegistered;
+-ComponentListType **globalComponentList;
+-ComponentListType **globalWaitingComponentList;
++extern int globalIndex;
++extern NameIndexType *listOfcomponentRegistered;
++extern ComponentListType **globalComponentList;
++extern ComponentListType **globalWaitingComponentList;
+ 
+ OMX_ERRORTYPE RM_RegisterComponent(char *name, int max_components);
+ OMX_ERRORTYPE addElemToList(ComponentListType **list, OMX_COMPONENTTYPE *openmaxStandComp, int index, OMX_BOOL bIsWaiting);

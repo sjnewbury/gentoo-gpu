@@ -1,0 +1,321 @@
+From 5d1a645805044cce48a92f14de742d96dbd0531e Mon Sep 17 00:00:00 2001
+From: Jayesh Kumar Tank <jayesh.kumarx.tank@intel.com>
+Date: Mon, 29 Jan 2018 17:54:40 -0800
+Subject: [PATCH 2/4] [DRI3] Plugging DRI3 support for libva
+
+Add va api mapping of core dri3 api's
+
+Use DRI3 core in libva by enabling --enable-dri3 flag in
+configure.ac
+
+Enable hooks for DRI3 in va_x11.c
+
+Signed-off-by: Jayesh Kumar Tank <jayesh.kumarx.tank@intel.com>
+---
+ configure.ac          |  28 +++++++++++
+ va/Makefile.am        |   3 ++
+ va/x11/Makefile.am    |   9 ++++
+ va/x11/dri3_util.c    | 111 ++++++++++++++++++++++++++++++++++++++++++
+ va/x11/va_dricommon.h |  30 ++++++++++++
+ va/x11/va_x11.c       |  20 +++++++-
+ 6 files changed, 200 insertions(+), 1 deletion(-)
+ create mode 100644 va/x11/dri3_util.c
+
+diff --git a/configure.ac b/configure.ac
+index 58db510..e85a5cd 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -139,6 +139,11 @@ AC_ARG_ENABLE(x11,
+                     [build with VA/X11 API support @<:@default=auto@:>@])],
+     [], [enable_x11="auto"])
+ 
++AC_ARG_ENABLE(dri3,
++    [AC_HELP_STRING([--enable-dri3],
++                    [build with VA/X11-DRI3 API support @<:@default=no@:>@])],
++    [], [enable_dri3="no"])
++
+ AC_ARG_ENABLE(glx,
+     [AC_HELP_STRING([--enable-glx],
+                     [build with VA/GLX API support @<:@default=auto@:>@])],
+@@ -236,6 +241,28 @@ if test "x$enable_x11" != "xno"; then
+ fi
+ AM_CONDITIONAL(USE_X11, test "$USE_X11" = "yes")
+ 
++# Check for DRI3
++USE_DRI3="no"
++
++if test "$USE_X11:$enable_dri3" = "no:yes"; then
++    AC_MSG_ERROR([VA/X11-DRI3 explicitly enabled, but VA/X11 isn't built])
++fi
++
++if test "$enable_dri3" != "no"; then
++    PKG_CHECK_MODULES([DRI3], [xcb x11-xcb xcb-dri3 xcb-sync xshmfence],
++[USE_DRI3="yes"], [:])
++
++    if test "x$USE_DRI3" = "xno" -a "x$enable_dri3" = "xyes"; then
++       AC_MSG_ERROR([VA/X11-dri3 explicitly enabled, however $DRI3_PKG_ERRORS])
++    fi
++
++    if test "$USE_DRI3" = "yes"; then
++       AC_DEFINE([HAVE_VA_DRI3], [1], [Defined to 1 if VA/X11-DRI3 API \
++	is built])
++    fi
++fi
++AM_CONDITIONAL(USE_DRI3, test "$USE_DRI3" = "yes")
++
+ # Check for GLX
+ USE_GLX="no"
+ 
+@@ -322,6 +349,7 @@ AC_OUTPUT([
+ BACKENDS=""
+ AS_IF([test x$USE_DRM = xyes], [BACKENDS="$BACKENDS drm"])
+ AS_IF([test x$USE_X11 = xyes], [BACKENDS="$BACKENDS x11"])
++AS_IF([test x$USE_DRI3 = xyes], [BACKENDS="$BACKENDS x11-dri3"])
+ AS_IF([test x$USE_GLX = xyes], [BACKENDS="$BACKENDS glx"])
+ AS_IF([test x$USE_WAYLAND = xyes], [BACKENDS="$BACKENDS wayland"])
+ 
+diff --git a/va/Makefile.am b/va/Makefile.am
+index 5b6d49a..aaf08a2 100644
+--- a/va/Makefile.am
++++ b/va/Makefile.am
+@@ -111,6 +111,9 @@ libva_x11_la_LDFLAGS		= $(LDADD)
+ libva_x11_la_DEPENDENCIES	= libva.la x11/libva_x11.la
+ libva_x11_la_LIBADD		= libva.la x11/libva_x11.la \
+ 	$(LIBVA_LIBS) $(X11_LIBS) $(XEXT_LIBS) $(XFIXES_LIBS) $(DRM_LIBS) -ldl
++if USE_DRI3
++libva_x11_la_LIBADD		+= $(DRI3_LIBS) -ldl
++endif
+ endif
+ 
+ if USE_GLX
+diff --git a/va/x11/Makefile.am b/va/x11/Makefile.am
+index 1a52e1c..a3639f5 100644
+--- a/va/x11/Makefile.am
++++ b/va/x11/Makefile.am
+@@ -48,6 +48,15 @@ source_h_priv = \
+ 	va_nvctrl.h		\
+ 	$(NULL)
+ 
++if USE_DRI3
++source_c += \
++	dri3_util.c		\
++	va_dri3.c		\
++	$(NULL)
++source_h += \
++	va_dri3.h
++endif
++
+ noinst_LTLIBRARIES		= libva_x11.la	
+ libva_x11includedir		= ${includedir}/va
+ libva_x11include_HEADERS	= $(source_h)
+diff --git a/va/x11/dri3_util.c b/va/x11/dri3_util.c
+new file mode 100644
+index 0000000..4dcca6c
+--- /dev/null
++++ b/va/x11/dri3_util.c
+@@ -0,0 +1,111 @@
++/*
++ * Copyright (c) 2018 Intel Corporation. All Rights Reserved.
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a
++ * copy of this software and associated documentation files (the
++ * "Software"), to deal in the Software without restriction, including
++ * without limitation the rights to use, copy, modify, merge, publish,
++ * distribute, sub license, and/or sell copies of the Software, and to
++ * permit persons to whom the Software is furnished to do so, subject to
++ * the following conditions:
++ *
++ * The above copyright notice and this permission notice (including the
++ * next paragraph) shall be included in all copies or substantial portions
++ * of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
++ * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
++ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
++ * IN NO EVENT SHALL PRECISION INSIGHT AND/OR ITS SUPPLIERS BE LIABLE FOR
++ * ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
++ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
++ * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include <fcntl.h>
++#include <X11/Xlibint.h>
++#include <unistd.h>
++
++#include "va_dri3.h"
++
++int
++va_dri3_createfd(VADriverContextP ctx, Pixmap pixmap, int *stride)
++{
++    return VA_DRI3_create_fd(ctx->native_dpy, pixmap, stride);
++}
++
++Pixmap
++va_dri3_createPixmap(VADriverContextP ctx, Drawable draw,
++                     int width, int height, int depth,
++                     int fd, int bpp, int stride, int size)
++{
++    return VA_DRI3_create_pixmap(ctx->native_dpy,
++                                 draw, width, height,
++                                 depth, fd, bpp,
++                                 stride, size);
++}
++
++int
++va_dri3_create_fence(VADriverContextP ctx, Pixmap pixmap,
++                     struct dri3_fence *fence)
++{
++    return VA_DRI3_create_fence(ctx->native_dpy, pixmap, fence);
++}
++
++void va_dri3_fence_sync(VADriverContextP ctx, struct dri3_fence *fence)
++{
++    VA_DRI3_fence_sync(ctx->native_dpy, fence);
++}
++
++void va_dri3_fence_free(VADriverContextP ctx, struct dri3_fence *fence)
++{
++    VA_DRI3_fence_free(ctx->native_dpy, fence);
++}
++
++void
++va_dri3_close(VADriverContextP ctx)
++{
++    struct dri_state *dri_state = (struct dri_state *)ctx->drm_state;
++    if(dri_state->base.fd >= 0)
++        close(dri_state->base.fd);
++}
++
++Bool
++va_isDRI3Connected(VADriverContextP ctx, char** driver_name)
++{
++    struct dri_state *dri_state = (struct dri_state *)ctx->drm_state;
++    char *device_name = NULL;
++    *driver_name = NULL;
++    dri_state->base.fd = -1;
++    dri_state->base.auth_type = VA_DRM_AUTH_CUSTOM;
++
++    if(!VA_DRI3Connect(ctx->native_dpy, driver_name, &device_name))
++            goto err_out;
++
++    dri_state->base.fd = open(device_name, O_RDWR);
++
++    if(dri_state->base.fd < 0)
++        goto err_out;
++
++    dri_state->createfd         = va_dri3_createfd;
++    dri_state->createPixmap     = va_dri3_createPixmap;
++    dri_state->close            = va_dri3_close;
++    dri_state->create_fence     = va_dri3_create_fence;
++    dri_state->fence_free       = va_dri3_fence_free;
++    dri_state->fence_sync       = va_dri3_fence_sync;
++
++    Xfree(device_name);
++
++    return True;
++
++err_out:
++    if(device_name)
++        Xfree(device_name);
++    if(*driver_name)
++        Xfree(*driver_name);
++    if(dri_state->base.fd >= 0)
++        close(dri_state->base.fd);
++    dri_state->base.fd = -1;
++
++    return False;
++}
+diff --git a/va/x11/va_dricommon.h b/va/x11/va_dricommon.h
+index ae17fac..7267692 100644
+--- a/va/x11/va_dricommon.h
++++ b/va/x11/va_dricommon.h
+@@ -71,6 +71,11 @@ struct dri_drawable
+     struct dri_drawable *next;
+ };
+ 
++struct dri3_fence {
++    XID xid;
++    void *addr;
++};
++
+ #define DRAWABLE_HASH_SZ 32
+ struct dri_state 
+ {
+@@ -83,6 +88,16 @@ struct dri_state
+     void (*swapBuffer)(VADriverContextP ctx, struct dri_drawable *dri_drawable);
+     union dri_buffer *(*getRenderingBuffer)(VADriverContextP ctx, struct dri_drawable *dri_drawable);
+     void (*close)(VADriverContextP ctx);
++    int (*createfd)(VADriverContextP ctx, Pixmap pixmap, int *stride);
++    Pixmap
++    (*createPixmap)(VADriverContextP ctx, Drawable draw,
++                    int width, int height, int depth,
++                    int fd, int bpp, int stride, int size);
++    int
++    (*create_fence)(VADriverContextP ctx, Pixmap pixmap,
++                         struct dri3_fence *fence);
++    void (*fence_sync)(VADriverContextP ctx, struct dri3_fence *fence);
++    void (*fence_free)(VADriverContextP ctx, struct dri3_fence *fence);
+ #endif
+     /** \brief Reserved bytes for future use, must be zero */
+     unsigned long  va_reserved[16];
+@@ -95,4 +110,19 @@ struct dri_drawable *va_dri_get_drawable(VADriverContextP ctx, XID drawable);
+ void va_dri_swap_buffer(VADriverContextP ctx, struct dri_drawable *dri_drawable);
+ union dri_buffer *va_dri_get_rendering_buffer(VADriverContextP ctx, struct dri_drawable *dri_drawable);
+ 
++#ifdef HAVE_VA_DRI3
++Bool va_isDRI3Connected(VADriverContextP ctx, char **driver_name);
++Pixmap
++va_dri3_createPixmap(VADriverContextP ctx, Drawable draw,
++                     int width, int height, int depth,
++                     int fd, int bpp, int stride, int size);
++int va_dri3_createfd(VADriverContextP ctx, Pixmap pixmap, int *stride);
++void va_dri3_close(VADriverContextP ctx);
++int
++va_dri3_create_fence(VADriverContextP ctx, Pixmap pixmap,
++                     struct dri3_fence *fence);
++void va_dri3_fence_sync(VADriverContextP ctx, struct dri3_fence *fence);
++void va_dri3_fence_free(VADriverContextP ctx, struct dri3_fence *fence);
++#endif
++
+ #endif /* _VA_DRICOMMON_H_ */
+diff --git a/va/x11/va_x11.c b/va/x11/va_x11.c
+index c40c8c4..f4bd6c1 100644
+--- a/va/x11/va_x11.c
++++ b/va/x11/va_x11.c
+@@ -73,6 +73,20 @@ static void va_DisplayContextDestroy (
+     free(pDisplayContext);
+ }
+ 
++#ifdef HAVE_VA_DRI3
++static VAStatus va_DRI3GetDriverName (
++    VADisplayContextP pDisplayContext,
++    char **driver_name
++)
++{
++    VADriverContextP ctx = pDisplayContext->pDriverContext;
++
++    if (!va_isDRI3Connected(ctx, driver_name))
++        return VA_STATUS_ERROR_UNKNOWN;
++
++    return VA_STATUS_SUCCESS;
++}
++#endif
+ 
+ static VAStatus va_DRI2GetDriverName (
+     VADisplayContextP pDisplayContext,
+@@ -139,7 +153,11 @@ static VAStatus va_DisplayContextGetDriverName (
+ 	*driver_name = NULL;
+     else
+         return VA_STATUS_ERROR_UNKNOWN;
+-    
++
++#ifdef HAVE_VA_DRI3
++    vaStatus = va_DRI3GetDriverName(pDisplayContext, driver_name);
++    if (vaStatus != VA_STATUS_SUCCESS)
++#endif
+     vaStatus = va_DRI2GetDriverName(pDisplayContext, driver_name);
+     if (vaStatus != VA_STATUS_SUCCESS)
+         vaStatus = va_NVCTRL_GetDriverName(pDisplayContext, driver_name);
+-- 
+2.17.0
+
