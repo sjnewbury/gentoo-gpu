@@ -10,14 +10,13 @@ CMAKE_ECLASS=cmake
 
 inherit flag-o-matic toolchain-funcs eutils cmake-multilib
 
-MY_P=SDL2-${PV}
+MY_P=SDL3-${PV}
 DESCRIPTION="Simple Direct Media Layer"
 HOMEPAGE="http://www.libsdl.org"
 
 if [[ ${PV} == 9999* ]]; then
 	inherit git-r3
 	EGIT_REPO_URI=https://github.com/libsdl-org/SDL.git
-	EGIT_BRANCH=SDL2
 else
 	SRC_URI="http://www.libsdl.org/release/${MY_P}.tar.gz"
 	KEYWORDS="~alpha ~amd64 ~arm ~hppa ~ppc ~ppc64 ~x86"
@@ -80,23 +79,13 @@ DEPEND="${RDEPEND}
 	virtual/pkgconfig"
 
 MULTILIB_WRAPPED_HEADERS=(
-	/usr/include/SDL2/SDL_config.h
-)
-
-PATCHES=(
-	# https://bugzilla.libsdl.org/show_bug.cgi?id=1431
-	#"${FILESDIR}"/${P}-static-libs.patch
-	#"${FILESDIR}"/${P}-wayland-before-x11.patch
-	"${FILESDIR}"/${P}-fix-gl-multilib.patch
-	#"${FILESDIR}"/${PN}-2.0.12-vulkan-headers.patch
-	#"${FILESDIR}"/${P}-fix-cmake-linkage.patch
+	/usr/include/SDL3/SDL_config.h
 )
 
 [[ ${PV} == 9999* ]] || S=${WORKDIR}/${MY_P}
 
 src_prepare() {
 	sed -i -e 's/\"\.\/khronos\/\(.*\)\"/<\1>/' src/video/SDL_vulkan_internal.h || die
-#	sed -i -e 's/ \(.*\)_RELEASE/ \1_GENTOO \1_RELEASE/g' SDL2Config.cmake.in || die
 	cmake_src_prepare
 }
 
