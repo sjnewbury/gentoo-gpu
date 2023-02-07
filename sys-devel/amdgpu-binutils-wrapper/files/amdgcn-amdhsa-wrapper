@@ -1,0 +1,15 @@
+#!/bin/sh
+
+gcc_prog=$(basename ${0})
+gcc_prog=${gcc_prog/amdgcn-amdhsa-}
+
+case ${gcc_prog} in
+	ld)	prog=ld.lld
+	;;
+	as)	prog="llvm-mc --arch=amdgcn"
+	;;
+	*)	prog="llvm-${gcc_prog}"
+	;;
+esac
+
+exec ${prog} "${@}"

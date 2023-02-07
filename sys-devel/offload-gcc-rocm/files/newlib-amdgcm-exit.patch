@@ -1,0 +1,134 @@
+diff -urN newlib.orig/libc/machine/amdgcn/_exit.c newlib/libc/machine/amdgcn/_exit.c
+--- ./newlib.orig/libc/machine/amdgcn/_exit.c	1970-01-01 01:00:00.000000000 +0100
++++ ./newlib/libc/machine/amdgcn/_exit.c	2023-02-07 11:44:22.610122131 +0000
+@@ -0,0 +1,23 @@
++/*
++ * Support file for amdgcn in newlib.
++ * Copyright (c) 2014-2017 Mentor Graphics.
++ *
++ * The authors hereby grant permission to use, copy, modify, distribute,
++ * and license this software and its documentation for any purpose, provided
++ * that existing copyright notices are retained in all copies and that this
++ * notice is included verbatim in any distributions. No written agreement,
++ * license, or royalty fee is required for any of the authorized uses.
++ * Modifications to this software may be copyrighted by their authors
++ * and need not follow the licensing terms described here, provided that
++ * the new terms are clearly indicated on the first page of each file where
++ * they apply.
++ */
++
++#include <stdlib.h>
++#include "exit-value.h"
++
++void __attribute__((noreturn))
++_exit (int val)
++{
++  exit_with_status_and_signal (val, 0);
++}
+diff -urN newlib.orig/libc/machine/amdgcn/exit.c newlib/libc/machine/amdgcn/exit.c
+--- ./newlib.orig/libc/machine/amdgcn/exit.c	2023-01-20 21:01:54.000000000 +0000
++++ ./newlib/libc/machine/amdgcn/exit.c	1970-01-01 01:00:00.000000000 +0100
+@@ -1,23 +0,0 @@
+-/*
+- * Support file for amdgcn in newlib.
+- * Copyright (c) 2014-2017 Mentor Graphics.
+- *
+- * The authors hereby grant permission to use, copy, modify, distribute,
+- * and license this software and its documentation for any purpose, provided
+- * that existing copyright notices are retained in all copies and that this
+- * notice is included verbatim in any distributions. No written agreement,
+- * license, or royalty fee is required for any of the authorized uses.
+- * Modifications to this software may be copyrighted by their authors
+- * and need not follow the licensing terms described here, provided that
+- * the new terms are clearly indicated on the first page of each file where
+- * they apply.
+- */
+-
+-#include <stdlib.h>
+-#include "exit-value.h"
+-
+-void __attribute__((noreturn))
+-exit (int val)
+-{
+-  exit_with_status_and_signal (val, 0);
+-}
+diff -urN newlib.orig/libc/machine/amdgcn/Makefile.inc newlib/libc/machine/amdgcn/Makefile.inc
+--- ./newlib.orig/libc/machine/amdgcn/Makefile.inc	2023-01-20 21:01:54.000000000 +0000
++++ ./newlib/libc/machine/amdgcn/Makefile.inc	2023-02-07 10:28:11.331146656 +0000
+@@ -1,6 +1,6 @@
+ libc_a_SOURCES += \
+ 	%D%/abort.c \
+-	%D%/exit.c \
++	%D%/_exit.c \
+ 	%D%/atexit.c \
+ 	%D%/mlock.c \
+ 	%D%/getreent.c \
+diff -urN newlib.orig/Makefile.in newlib/Makefile.in
+--- ./newlib.orig/Makefile.in	2023-01-20 21:01:54.000000000 +0000
++++ ./newlib/Makefile.in	2023-02-07 10:27:13.706592209 +0000
+@@ -620,7 +620,7 @@
+ 
+ @HAVE_LIBC_MACHINE_AMDGCN_TRUE@am__append_66 = \
+ @HAVE_LIBC_MACHINE_AMDGCN_TRUE@	libc/machine/amdgcn/abort.c \
+-@HAVE_LIBC_MACHINE_AMDGCN_TRUE@	libc/machine/amdgcn/exit.c \
++@HAVE_LIBC_MACHINE_AMDGCN_TRUE@	libc/machine/amdgcn/_exit.c \
+ @HAVE_LIBC_MACHINE_AMDGCN_TRUE@	libc/machine/amdgcn/atexit.c \
+ @HAVE_LIBC_MACHINE_AMDGCN_TRUE@	libc/machine/amdgcn/mlock.c \
+ @HAVE_LIBC_MACHINE_AMDGCN_TRUE@	libc/machine/amdgcn/getreent.c \
+@@ -1843,7 +1843,7 @@
+ @HAVE_LIBC_MACHINE_AARCH64_TRUE@	libc/machine/aarch64/libc_a-strrchr-stub.$(OBJEXT) \
+ @HAVE_LIBC_MACHINE_AARCH64_TRUE@	libc/machine/aarch64/libc_a-strrchr.$(OBJEXT)
+ @HAVE_LIBC_MACHINE_AMDGCN_TRUE@am__objects_77 = libc/machine/amdgcn/libc_a-abort.$(OBJEXT) \
+-@HAVE_LIBC_MACHINE_AMDGCN_TRUE@	libc/machine/amdgcn/libc_a-exit.$(OBJEXT) \
++@HAVE_LIBC_MACHINE_AMDGCN_TRUE@	libc/machine/amdgcn/libc_a-_exit.$(OBJEXT) \
+ @HAVE_LIBC_MACHINE_AMDGCN_TRUE@	libc/machine/amdgcn/libc_a-atexit.$(OBJEXT) \
+ @HAVE_LIBC_MACHINE_AMDGCN_TRUE@	libc/machine/amdgcn/libc_a-mlock.$(OBJEXT) \
+ @HAVE_LIBC_MACHINE_AMDGCN_TRUE@	libc/machine/amdgcn/libc_a-getreent.$(OBJEXT) \
+@@ -7859,7 +7859,7 @@
+ libc/machine/amdgcn/libc_a-abort.$(OBJEXT):  \
+ 	libc/machine/amdgcn/$(am__dirstamp) \
+ 	libc/machine/amdgcn/$(DEPDIR)/$(am__dirstamp)
+-libc/machine/amdgcn/libc_a-exit.$(OBJEXT):  \
++libc/machine/amdgcn/libc_a-_exit.$(OBJEXT):  \
+ 	libc/machine/amdgcn/$(am__dirstamp) \
+ 	libc/machine/amdgcn/$(DEPDIR)/$(am__dirstamp)
+ libc/machine/amdgcn/libc_a-atexit.$(OBJEXT):  \
+@@ -12289,7 +12289,7 @@
+ @AMDEP_TRUE@@am__include@ @am__quote@libc/machine/aarch64/$(DEPDIR)/libc_a-strrchr.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@libc/machine/amdgcn/$(DEPDIR)/libc_a-abort.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@libc/machine/amdgcn/$(DEPDIR)/libc_a-atexit.Po@am__quote@
+-@AMDEP_TRUE@@am__include@ @am__quote@libc/machine/amdgcn/$(DEPDIR)/libc_a-exit.Po@am__quote@
++@AMDEP_TRUE@@am__include@ @am__quote@libc/machine/amdgcn/$(DEPDIR)/libc_a-_exit.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@libc/machine/amdgcn/$(DEPDIR)/libc_a-getreent.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@libc/machine/amdgcn/$(DEPDIR)/libc_a-mlock.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@libc/machine/amdgcn/$(DEPDIR)/libc_a-signal.Po@am__quote@
+@@ -32440,19 +32440,19 @@
+ @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+ @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libc_a_CPPFLAGS) $(CPPFLAGS) $(libc_a_CFLAGS) $(CFLAGS) -c -o libc/machine/amdgcn/libc_a-abort.obj `if test -f 'libc/machine/amdgcn/abort.c'; then $(CYGPATH_W) 'libc/machine/amdgcn/abort.c'; else $(CYGPATH_W) '$(srcdir)/libc/machine/amdgcn/abort.c'; fi`
+ 
+-libc/machine/amdgcn/libc_a-exit.o: libc/machine/amdgcn/exit.c
+-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libc_a_CPPFLAGS) $(CPPFLAGS) $(libc_a_CFLAGS) $(CFLAGS) -MT libc/machine/amdgcn/libc_a-exit.o -MD -MP -MF libc/machine/amdgcn/$(DEPDIR)/libc_a-exit.Tpo -c -o libc/machine/amdgcn/libc_a-exit.o `test -f 'libc/machine/amdgcn/exit.c' || echo '$(srcdir)/'`libc/machine/amdgcn/exit.c
+-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) libc/machine/amdgcn/$(DEPDIR)/libc_a-exit.Tpo libc/machine/amdgcn/$(DEPDIR)/libc_a-exit.Po
+-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='libc/machine/amdgcn/exit.c' object='libc/machine/amdgcn/libc_a-exit.o' libtool=no @AMDEPBACKSLASH@
++libc/machine/amdgcn/libc_a-_exit.o: libc/machine/amdgcn/_exit.c
++@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libc_a_CPPFLAGS) $(CPPFLAGS) $(libc_a_CFLAGS) $(CFLAGS) -MT libc/machine/amdgcn/libc_a-_exit.o -MD -MP -MF libc/machine/amdgcn/$(DEPDIR)/libc_a-_exit.Tpo -c -o libc/machine/amdgcn/libc_a-_exit.o `test -f 'libc/machine/amdgcn/_exit.c' || echo '$(srcdir)/'`libc/machine/amdgcn/_exit.c
++@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) libc/machine/amdgcn/$(DEPDIR)/libc_a-_exit.Tpo libc/machine/amdgcn/$(DEPDIR)/libc_a-_exit.Po
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='libc/machine/amdgcn/_exit.c' object='libc/machine/amdgcn/libc_a-_exit.o' libtool=no @AMDEPBACKSLASH@
+ @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libc_a_CPPFLAGS) $(CPPFLAGS) $(libc_a_CFLAGS) $(CFLAGS) -c -o libc/machine/amdgcn/libc_a-exit.o `test -f 'libc/machine/amdgcn/exit.c' || echo '$(srcdir)/'`libc/machine/amdgcn/exit.c
++@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libc_a_CPPFLAGS) $(CPPFLAGS) $(libc_a_CFLAGS) $(CFLAGS) -c -o libc/machine/amdgcn/libc_a-_exit.o `test -f 'libc/machine/amdgcn/_exit.c' || echo '$(srcdir)/'`libc/machine/amdgcn/_exit.c
+ 
+-libc/machine/amdgcn/libc_a-exit.obj: libc/machine/amdgcn/exit.c
+-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libc_a_CPPFLAGS) $(CPPFLAGS) $(libc_a_CFLAGS) $(CFLAGS) -MT libc/machine/amdgcn/libc_a-exit.obj -MD -MP -MF libc/machine/amdgcn/$(DEPDIR)/libc_a-exit.Tpo -c -o libc/machine/amdgcn/libc_a-exit.obj `if test -f 'libc/machine/amdgcn/exit.c'; then $(CYGPATH_W) 'libc/machine/amdgcn/exit.c'; else $(CYGPATH_W) '$(srcdir)/libc/machine/amdgcn/exit.c'; fi`
+-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) libc/machine/amdgcn/$(DEPDIR)/libc_a-exit.Tpo libc/machine/amdgcn/$(DEPDIR)/libc_a-exit.Po
+-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='libc/machine/amdgcn/exit.c' object='libc/machine/amdgcn/libc_a-exit.obj' libtool=no @AMDEPBACKSLASH@
++libc/machine/amdgcn/libc_a-_exit.obj: libc/machine/amdgcn/_exit.c
++@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libc_a_CPPFLAGS) $(CPPFLAGS) $(libc_a_CFLAGS) $(CFLAGS) -MT libc/machine/amdgcn/libc_a-_exit.obj -MD -MP -MF libc/machine/amdgcn/$(DEPDIR)/libc_a-_exit.Tpo -c -o libc/machine/amdgcn/libc_a-_exit.obj `if test -f 'libc/machine/amdgcn/_exit.c'; then $(CYGPATH_W) 'libc/machine/amdgcn/_exit.c'; else $(CYGPATH_W) '$(srcdir)/libc/machine/amdgcn/_exit.c'; fi`
++@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) libc/machine/amdgcn/$(DEPDIR)/libc_a-_exit.Tpo libc/machine/amdgcn/$(DEPDIR)/libc_a-_exit.Po
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='libc/machine/amdgcn/_exit.c' object='libc/machine/amdgcn/libc_a-_exit.obj' libtool=no @AMDEPBACKSLASH@
+ @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libc_a_CPPFLAGS) $(CPPFLAGS) $(libc_a_CFLAGS) $(CFLAGS) -c -o libc/machine/amdgcn/libc_a-exit.obj `if test -f 'libc/machine/amdgcn/exit.c'; then $(CYGPATH_W) 'libc/machine/amdgcn/exit.c'; else $(CYGPATH_W) '$(srcdir)/libc/machine/amdgcn/exit.c'; fi`
++@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libc_a_CPPFLAGS) $(CPPFLAGS) $(libc_a_CFLAGS) $(CFLAGS) -c -o libc/machine/amdgcn/libc_a-_exit.obj `if test -f 'libc/machine/amdgcn/_exit.c'; then $(CYGPATH_W) 'libc/machine/amdgcn/_exit.c'; else $(CYGPATH_W) '$(srcdir)/libc/machine/amdgcn/_exit.c'; fi`
+ 
+ libc/machine/amdgcn/libc_a-atexit.o: libc/machine/amdgcn/atexit.c
+ @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libc_a_CPPFLAGS) $(CPPFLAGS) $(libc_a_CFLAGS) $(CFLAGS) -MT libc/machine/amdgcn/libc_a-atexit.o -MD -MP -MF libc/machine/amdgcn/$(DEPDIR)/libc_a-atexit.Tpo -c -o libc/machine/amdgcn/libc_a-atexit.o `test -f 'libc/machine/amdgcn/atexit.c' || echo '$(srcdir)/'`libc/machine/amdgcn/atexit.c
