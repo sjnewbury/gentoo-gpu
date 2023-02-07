@@ -1,20 +1,14 @@
 gentoo-gpu
 =============
 
-This repository contains mostly live ebuilds for
-bleeding-edge support of GPU APIs: OpenCL, GLVND,
-Vulkan.
+This repository contains mostly live or current ebuilds
+for bleeding-edge support of GPU APIs: OpenCL, GPU
+offloading, Vulkan, video acceleration etc.
 
-It also contains additional associated software,
-including nvidia-drivers with support for system-
-wide GLNVD.
+For up-to-date ROCm support use in conjunction with
+my rocm-bleeding-edge repository.
 
-The media-libs/mesa ebuild incorporates Beignet for
-Intel HD Graphics OpenCL support, along with optional
-builds for the OpenGL Vendor Neutral Dispatch library
-(GLVND) and Vulkan for Intel HD Graphics!
-
-GCC Offload Acceleration support integrated with
-live GCC7 ebuilds.  (Currently only NVPTX.  MIC
-support will follow, but I'm unable to test it.)
-
+NEWS
+GCC Offload Accelerators are now working, at least
+I've tested it with AMD ROCm with gfx900 (Vega64) and
+GCC-12.2.1 + ROCm-5.4.2.
