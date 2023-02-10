@@ -733,15 +733,16 @@ toolchain_src_prepare() {
 	fi
 
 	# various bits don't get installed into LIBPATH for some reason...
-	tc_is_offload && \
+	if tc_is_offload ; then
 		find ${S}/{libgomp,libgfortran,libcc1} -name Makefile.in \
 			-exec sed -i \
-		-e "/cafexeclibdir = /s:\(.* = \).*:\1${LIBPATH}/\$(MULTISUBDIR):" \
-		-e "/fincludedir = /s:\(.* = \).*:\1${LIBPATH}/\$(MULTISUBDIR):" \
-		-e "/plugindir = /s:\(.* = \).*:\1${LIBPATH}/plugin:" \
-		-e "/libsubincludedir = /s:\(.* = \).*:\1${LIBPATH}/include:" \
-		-e "/gfor_cdir = /s:\(.* = \).*:\1${LIBPATH}/include:" \
+			-e "/cafexeclibdir = /s:\(.* = \).*:\1${LIBPATH}/\$(MULTISUBDIR):" \
+			-e "/fincludedir = /s:\(.* = \).*:\1${LIBPATH}/\$(MULTISUBDIR):" \
+			-e "/plugindir = /s:\(.* = \).*:\1${LIBPATH}/plugin:" \
+			-e "/libsubincludedir = /s:\(.* = \).*:\1${LIBPATH}/include:" \
+			-e "/gfor_cdir = /s:\(.* = \).*:\1${LIBPATH}/include:" \
 			{} + || die
+	fi
 
 	# >= gcc-4.3 doesn't bundle ecj.jar, so copy it
 	if tc_version_is_at_least 4.3 && _tc_use_if_iuse gcj ; then
