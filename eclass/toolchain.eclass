@@ -1,4 +1,4 @@
-# Copyright 1999-2022 Gentoo Authors
+# Copyright 1999-2023 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 # @ECLASS: toolchain.eclass
@@ -12,17 +12,17 @@
 # instead.
 
 case ${EAPI} in
-	7) inherit eutils ;;
-	8) ;;
+	7|8) ;;
 	*) die "${ECLASS}: EAPI ${EAPI:-0} not supported" ;;
 esac
 
-if [[ ! ${_TOOLCHAIN_ECLASS} ]]; then
+if [[ -z ${_TOOLCHAIN_ECLASS} ]]; then
 _TOOLCHAIN_ECLASS=1
 
 DESCRIPTION="The GNU Compiler Collection"
 HOMEPAGE="https://gcc.gnu.org/"
 
+[[ ${EAPI} == 7 ]] && inherit eutils
 inherit edo flag-o-matic gnuconfig libtool multilib pax-utils toolchain-funcs prefix
 
 tc_is_live() {
@@ -57,9 +57,9 @@ if [[ ${CTARGET} = ${CHOST} ]] ; then
 		export CTARGET=${CATEGORY#cross-}
 	fi
 fi
-: ${TARGET_ABI:=${ABI}}
-: ${TARGET_MULTILIB_ABIS:=${MULTILIB_ABIS}}
-: ${TARGET_DEFAULT_ABI:=${DEFAULT_ABI}}
+: "${TARGET_ABI:=${ABI}}"
+: "${TARGET_MULTILIB_ABIS:=${MULTILIB_ABIS}}"
+: "${TARGET_DEFAULT_ABI:=${DEFAULT_ABI}}"
 
 is_crosscompile() {
 	[[ ${CHOST} != ${CTARGET} ]]
@@ -272,7 +272,8 @@ if [[ ${PN} != kgcc64 && ${PN} != gcc-* ]] ; then
 		tc_version_is_at_least 5.0 && IUSE+=" jit"
 		tc_version_is_between 5.0 9 && IUSE+=" mpx"
 		tc_version_is_at_least 6.0 && IUSE+=" +pie +ssp +pch"
-		tc_version_is_at_least 7.0 && IUSE+=" offload-nvptx offload-mic posix-threads"
+		tc_version_is_at_least 7.0 && IUSE+=" offload-nvptx offload-mic"
+		[[ ${CATEGORY} == *mingw* ]] && tc_version_is_at_least 7.0 && IUSE+=" posix-threads"
 
 		# systemtap is a gentoo-specific switch: bug #654748
 		tc_version_is_at_least 8.0 &&
@@ -443,17 +444,17 @@ PDEPEND=">=sys-devel/gcc-config-2.3"
 # Used to override compression used for for patchsets.
 # Default is xz for EAPI 8+ and bz2 for older EAPIs.
 if [[ ${EAPI} == 8 ]] ; then
-	: ${TOOLCHAIN_PATCH_SUFFIX:=xz}
+	: "${TOOLCHAIN_PATCH_SUFFIX:=xz}"
 else
 	# Older EAPIs
-	: ${TOOLCHAIN_PATCH_SUFFIX:=bz2}
+	: "${TOOLCHAIN_PATCH_SUFFIX:=bz2}"
 fi
 
 # @ECLASS_VARIABLE: TOOLCHAIN_SET_S
 # @DESCRIPTION:
 # Used to override value of S for snapshots and such. Mainly useful
 # if needing to set GCC_TARBALL_SRC_URI.
-: ${TOOLCHAIN_SET_S:=yes}
+: "${TOOLCHAIN_SET_S:=yes}"
 
 # Set the source directory depending on whether we're using
 # a live git tree, snapshot, or release tarball.
@@ -580,12 +581,18 @@ get_gcc_src_uri() {
 		# Pull gcc tarball from another location. Frequently used by gnat-gpl.
 		GCC_SRC_URI="${GCC_TARBALL_SRC_URI}"
 	elif [[ -n ${SNAPSHOT} ]] ; then
-		GCC_SRC_URI="https://gcc.gnu.org/pub/gcc/snapshots/${SNAPSHOT}/gcc-${SNAPSHOT}.tar.xz"
+		GCC_SRC_URI="mirror://gcc/snapshots/${SNAPSHOT}/gcc-${SNAPSHOT}.tar.xz"
 	else
 		if tc_version_is_between 5.5 6 || tc_version_is_between 6.4 7 || tc_version_is_at_least 7.2 ; then
-			GCC_SRC_URI="mirror://gnu/gcc/gcc-${GCC_PV}/gcc-${GCC_RELEASE_VER}.tar.xz"
+			GCC_SRC_URI="
+				mirror://gcc/gcc-${GCC_PV}/gcc-${GCC_RELEASE_VER}.tar.xz
+				mirror://gnu/gcc/gcc-${GCC_PV}/gcc-${GCC_RELEASE_VER}.tar.xz
+			"
 		else
-			GCC_SRC_URI="mirror://gnu/gcc/gcc-${GCC_PV}/gcc-${GCC_RELEASE_VER}.tar.bz2"
+			GCC_SRC_URI="
+				mirror://gcc/gcc-${GCC_PV}/gcc-${GCC_RELEASE_VER}.tar.bz2
+				mirror://gnu/gcc/gcc-${GCC_PV}/gcc-${GCC_RELEASE_VER}.tar.bz2
+			"
 		fi
 	fi
 
@@ -1157,6 +1164,14 @@ toolchain_src_configure() {
 		confgcc+=( --enable-libstdcxx-time )
 	fi
 
+	# This only controls whether the compiler *supports* LTO, not whether
+	# it's *built using* LTO. Hence we do it without a USE flag.
+	if tc_version_is_at_least 4.6 && [[ ${CTARGET} != nvptx-none ]] ; then
+		confgcc+=( --enable-lto )
+	elif tc_version_is_at_least 4.5 ; then
+		confgcc+=( --disable-lto )
+	fi
+
 	# Build compiler itself using LTO
 	if tc_version_is_at_least 9.1 && _tc_use_if_iuse lto ; then
 		build_config_targets+=( bootstrap-lto )
@@ -1258,6 +1273,10 @@ toolchain_src_configure() {
 				;;
 			avr)
 				confgcc+=( --enable-shared --disable-threads )
+				;;
+			nvptx*)
+				# "LTO is not supported for this target"
+				confgcc+=( --disable-lto )
 				;;
 		esac
 
@@ -1451,7 +1470,7 @@ toolchain_src_configure() {
 			[[ ${arm_arch} == armv7? ]] && arm_arch=${arm_arch/7/7-}
 			# See if this is a valid --with-arch flag
 			if (srcdir=${S}/gcc target=${CTARGET} with_arch=${arm_arch};
-			    . "${srcdir}"/config.gcc) &>/dev/null
+				. "${srcdir}"/config.gcc) &>/dev/null
 			then
 				confgcc+=( --with-arch=${arm_arch} )
 			fi
@@ -1492,7 +1511,7 @@ toolchain_src_configure() {
 			;;
 
 		amd64)
-			# drop the older/ABI checks once this get's merged into some
+			# drop the older/ABI checks once this gets merged into some
 			# version of gcc upstream
 			if tc_version_is_at_least 4.8 && has x32 $(get_all_abis TARGET) ; then
 				confgcc+=( --with-abi=$(gcc-abi-map ${TARGET_DEFAULT_ABI}) )
@@ -1655,14 +1674,6 @@ toolchain_src_configure() {
 
 	if in_iuse zstd ; then
 		confgcc+=( $(use_with zstd) )
-	fi
-
-	# This only controls whether the compiler *supports* LTO, not whether
-	# it's *built using* LTO. Hence we do it without a USE flag.
-	if tc_version_is_at_least 4.6 && [[ ${CTARGET} != nvptx-none ]] ; then
-		confgcc+=( --enable-lto )
-	elif tc_version_is_at_least 4.5 ; then
-		confgcc+=( --disable-lto )
 	fi
 
 	# graphite was added in 4.4 but we only support it in 6.5+ due to external
@@ -2132,7 +2143,7 @@ gcc_do_make() {
 			LIBPATH="${LIBPATH}" \
 			BOOT_CFLAGS="${BOOT_CFLAGS}"
 		popd > /dev/null || die
-        fi
+	fi
 
 	einfo "Compiling ${PN} (${GCC_MAKE_TARGET})..."
 
@@ -2593,7 +2604,7 @@ create_gcc_env_entry() {
 	local gcc_envd_file="${ED}${gcc_envd_base}"
 	if [[ -z $1 ]] ; then
 		# I'm leaving the following commented out to remind me that it
-		# was an insanely -bad- idea. Stuff broke. GCC_SPECS isnt unset
+		# was an insanely -bad- idea. Stuff broke. GCC_SPECS isn't unset
 		# on chroot or in non-toolchain.eclass gcc ebuilds!
 		#gcc_specs_file="${LIBPATH}/specs"
 		gcc_specs_file=""
@@ -2772,14 +2783,14 @@ do_gcc_config() {
 			ewarn "The currently selected specs-specific gcc config,"
 			ewarn "${current_specs}, doesn't exist anymore. This is usually"
 			ewarn "due to enabling/disabling hardened or switching to a version"
-			ewarn "of gcc that doesnt create multiple specs files. The default"
+			ewarn "of gcc that doesn't create multiple specs files. The default"
 			ewarn "config will be used, and the previous preference forgotten."
 			use_specs=""
 		fi
 
 		target="${CTARGET}-${GCC_CONFIG_VER}${use_specs}"
 	else
-		# The curent target is invalid.  Attempt to switch to a valid one.
+		# The current target is invalid.  Attempt to switch to a valid one.
 		# Blindly pick the latest version. bug #529608
 		# TODO: Should update gcc-config to accept `-l ${CTARGET}` rather than
 		# doing a partial grep like this.
@@ -2832,7 +2843,7 @@ should_we_gcc_config() {
 #---->> support and misc functions <<----
 
 # This is to make sure we don't accidentally try to enable support for a
-# language that doesnt exist. GCC 3.4 supports f77, while 4.0 supports f95, etc.
+# language that doesn't exist. GCC 3.4 supports f77, while 4.0 supports f95, etc.
 #
 # Also add a hook so special ebuilds (kgcc64) can control which languages
 # exactly get enabled
@@ -3017,9 +3028,6 @@ toolchain_death_notice() {
 
 fi
 
-EXPORT_FUNCTIONS pkg_pretend pkg_setup src_unpack src_prepare src_configure \
-	src_compile src_test src_install pkg_postinst pkg_postrm
-
 # Note [implicitly enabled flags]
 # -------------------------------
 # Usually configure-based packages handle explicit feature requests
@@ -3037,3 +3045,5 @@ EXPORT_FUNCTIONS pkg_pretend pkg_setup src_unpack src_prepare src_configure \
 # Thus safer way to enable/disable the feature is to rely on implicit
 # enabled-by-default state:
 #    econf $(usex foo '' --disable-foo)
+
+EXPORT_FUNCTIONS pkg_pretend pkg_setup src_unpack src_prepare src_configure src_compile src_test src_install pkg_postinst pkg_postrm

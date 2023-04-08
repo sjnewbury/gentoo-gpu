@@ -355,16 +355,16 @@ tc-export_build_env() {
 		# Some build envs will initialize vars like:
 		# : ${BUILD_LDFLAGS:-${LDFLAGS}}
 		# So make sure all variables are non-empty. #526734
-		: ${BUILD_CFLAGS:=-O1 -pipe}
-		: ${BUILD_CXXFLAGS:=-O1 -pipe}
-		: ${BUILD_CPPFLAGS:= }
-		: ${BUILD_LDFLAGS:= }
+		: "${BUILD_CFLAGS:=-O1 -pipe}"
+		: "${BUILD_CXXFLAGS:=-O1 -pipe}"
+		: "${BUILD_CPPFLAGS:= }"
+		: "${BUILD_LDFLAGS:= }"
 	else
 		# https://bugs.gentoo.org/654424
-		: ${BUILD_CFLAGS:=${CFLAGS}}
-		: ${BUILD_CXXFLAGS:=${CXXFLAGS}}
-		: ${BUILD_CPPFLAGS:=${CPPFLAGS}}
-		: ${BUILD_LDFLAGS:=${LDFLAGS}}
+		: "${BUILD_CFLAGS:=${CFLAGS}}"
+		: "${BUILD_CXXFLAGS:=${CXXFLAGS}}"
+		: "${BUILD_CPPFLAGS:=${CPPFLAGS}}"
+		: "${BUILD_LDFLAGS:=${LDFLAGS}}"
 	fi
 	export BUILD_{C,CXX,CPP,LD}FLAGS
 
@@ -599,16 +599,6 @@ _tc-has-openmp() {
 	return ${ret}
 }
 
-# @FUNCTION: tc-has-openmp
-# @USAGE: [toolchain prefix]
-# @DEPRECATED: tc-check-openmp
-# @DESCRIPTION:
-# See if the toolchain supports OpenMP.  This function is deprecated and will be
-# removed on 2023-01-01.
-tc-has-openmp() {
-	_tc-has-openmp "$@"
-}
-
 # @FUNCTION: tc-check-openmp
 # @DESCRIPTION:
 # Test for OpenMP support with the current compiler and error out with
@@ -664,7 +654,7 @@ tc-has-tls() {
 		-l) ;;
 		-*) die "Usage: tc-has-tls [-c|-l] [toolchain prefix]";;
 	esac
-	: ${flags:=-fPIC -shared -Wl,-z,defs}
+	: "${flags:=-fPIC -shared -Wl,-z,defs}"
 	[[ $1 == -* ]] && shift
 	$(tc-getCC "$@") ${flags} "${base}.c" -o "${base}" >&/dev/null
 	local ret=$?
@@ -767,6 +757,13 @@ tc-arch() {
 	tc-ninja_magic_to_arch portage "$@"
 }
 
+# @FUNCTION: tc-endian
+# @USAGE: [toolchain prefix]
+# @RETURN: 'big' or 'little' corresponding to the passed (or host) endianness
+# @DESCRIPTION:
+# Accepts 'host' as an argument which defaults to CTARGET and falls back to CHOST
+# if unspecified.  Returns 'big' or 'little' depending on whether 'host' is
+# big or little endian.
 tc-endian() {
 	local host=$1
 	[[ -z ${host} ]] && host=${CTARGET:-${CHOST}}
