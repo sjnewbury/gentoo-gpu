@@ -1,0 +1,166 @@
+--- ./gcc/config/gcn/gcn-hsa.h~	2023-10-14 23:32:08.000000000 +0100
++++ ./gcc/config/gcn/gcn-hsa.h	2023-12-04 17:30:40.740309564 +0000
+@@ -76,7 +76,7 @@
+ #define GOMP_SELF_SPECS ""
+ 
+ #define NO_XNACK "!march=*:;march=fiji:;"
+-#define NO_SRAM_ECC "!march=*:;march=fiji:;march=gfx900:;march=gfx906:;"
++#define NO_SRAM_ECC "!march=*:;march=fiji:;march=gfx900:;march=gfx902:;march=gfx906:;"
+ 
+ /* In HSACOv4 no attribute setting means the binary supports "any" hardware
+    configuration.  The name of the attribute also changed.  */
+--- ./gcc/config/gcn/gcn-opts.h~	2023-10-14 23:32:08.000000000 +0100
++++ ./gcc/config/gcn/gcn-opts.h	2023-12-04 17:36:25.060118018 +0000
+@@ -22,6 +22,7 @@
+ {
+   PROCESSOR_FIJI,    // gfx803
+   PROCESSOR_VEGA10,  // gfx900
++  PROCESSOR_RAVEN,   // gfx902
+   PROCESSOR_VEGA20,  // gfx906
+   PROCESSOR_GFX908,
+   PROCESSOR_GFX90a
+@@ -29,6 +30,7 @@
+ 
+ #define TARGET_FIJI (gcn_arch == PROCESSOR_FIJI)
+ #define TARGET_VEGA10 (gcn_arch == PROCESSOR_VEGA10)
++#define TARGET_RAVEN (gcn_arch == PROCESSOR_RAVEN)
+ #define TARGET_VEGA20 (gcn_arch == PROCESSOR_VEGA20)
+ #define TARGET_GFX908 (gcn_arch == PROCESSOR_GFX908)
+ #define TARGET_GFX90a (gcn_arch == PROCESSOR_GFX90a)
+--- ./gcc/config/gcn/gcn.cc~	2023-10-14 23:32:08.000000000 +0100
++++ ./gcc/config/gcn/gcn.cc	2023-12-04 17:38:01.076930305 +0000
+@@ -3009,6 +3009,8 @@
+ 	return gcn_arch == PROCESSOR_FIJI;
+       if (strcmp (name, "gfx900") == 0)
+ 	return gcn_arch == PROCESSOR_VEGA10;
++      if (strcmp (name, "gfx902") == 0)
++	return gcn_arch == PROCESSOR_RAVEN;
+       if (strcmp (name, "gfx906") == 0)
+ 	return gcn_arch == PROCESSOR_VEGA20;
+       if (strcmp (name, "gfx908") == 0)
+@@ -6183,6 +6185,10 @@
+       cpu = "gfx900";
+       sram_ecc = "";
+       break;
++    case PROCESSOR_RAVEN:
++      cpu = "gfx902";
++      sram_ecc = "";
++      break;
+     case PROCESSOR_VEGA20:
+       cpu = "gfx906";
+       sram_ecc = "";
+--- ./gcc/config/gcn/gcn.h~	2023-10-14 23:32:08.000000000 +0100
++++ ./gcc/config/gcn/gcn.h	2023-12-04 17:38:56.690376275 +0000
+@@ -35,6 +35,8 @@
+ 	}                                                                      \
+       else if (TARGET_VEGA10)                                                  \
+ 	builtin_define ("__gfx900__");                                         \
++      else if (TARGET_RAVEN)                                                  \
++	builtin_define ("__gfx902__");                                         \
+       else if (TARGET_VEGA20)                                                  \
+ 	builtin_define ("__gfx906__");                                         \
+       else if (TARGET_GFX908)                                                  \
+--- ./gcc/config/gcn/gcn.opt~	2023-10-14 23:32:08.000000000 +0100
++++ ./gcc/config/gcn/gcn.opt	2023-12-04 17:40:02.997200745 +0000
+@@ -32,6 +32,9 @@
+ Enum(gpu_type) String(gfx900) Value(PROCESSOR_VEGA10)
+ 
+ EnumValue
++Enum(gpu_type) String(gfx902) Value(PROCESSOR_RAVEN)
++
++EnumValue
+ Enum(gpu_type) String(gfx906) Value(PROCESSOR_VEGA20)
+ 
+ EnumValue
+--- ./gcc/config/gcn/mkoffload.cc~	2023-10-14 23:32:08.000000000 +0100
++++ ./gcc/config/gcn/mkoffload.cc	2023-12-04 17:43:18.057786137 +0000
+@@ -928,6 +928,8 @@
+ 	elf_arch = EF_AMDGPU_MACH_AMDGCN_GFX803;
+       else if (strcmp (argv[i], "-march=gfx900") == 0)
+ 	elf_arch = EF_AMDGPU_MACH_AMDGCN_GFX900;
++      else if (strcmp (argv[i], "-march=gfx902") == 0)
++	elf_arch = EF_AMDGPU_MACH_AMDGCN_GFX902;
+       else if (strcmp (argv[i], "-march=gfx906") == 0)
+ 	elf_arch = EF_AMDGPU_MACH_AMDGCN_GFX906;
+       else if (strcmp (argv[i], "-march=gfx908") == 0)
+--- ./libgomp/plugin/plugin-gcn.c~	2023-10-14 23:33:10.000000000 +0100
++++ ./libgomp/plugin/plugin-gcn.c	2023-12-04 17:45:36.192973981 +0000
+@@ -1630,6 +1630,7 @@
+ 
+ const static char *gcn_gfx803_s = "gfx803";
+ const static char *gcn_gfx900_s = "gfx900";
++const static char *gcn_gfx902_s = "gfx902";
+ const static char *gcn_gfx906_s = "gfx906";
+ const static char *gcn_gfx908_s = "gfx908";
+ const static char *gcn_gfx90a_s = "gfx90a";
+@@ -1646,6 +1647,8 @@
+       return gcn_gfx803_s;
+     case EF_AMDGPU_MACH_AMDGCN_GFX900:
+       return gcn_gfx900_s;
++    case EF_AMDGPU_MACH_AMDGCN_GFX902:
++      return gcn_gfx902_s;
+     case EF_AMDGPU_MACH_AMDGCN_GFX906:
+       return gcn_gfx906_s;
+     case EF_AMDGPU_MACH_AMDGCN_GFX908:
+@@ -1682,6 +1685,9 @@
+   if (!strncmp (isa, gcn_gfx900_s, gcn_isa_name_len))
+     return EF_AMDGPU_MACH_AMDGCN_GFX900;
+ 
++  if (!strncmp (isa, gcn_gfx902_s, gcn_isa_name_len))
++    return EF_AMDGPU_MACH_AMDGCN_GFX902;
++
+   if (!strncmp (isa, gcn_gfx906_s, gcn_isa_name_len))
+     return EF_AMDGPU_MACH_AMDGCN_GFX906;
+ 
+--- /dev/null	2023-12-01 23:39:11.046288985 +0000
++++ ./libgomp/testsuite/libgomp.c/declare-variant-4-gfx902.c	2023-12-04 17:47:27.935677884 +0000
+@@ -0,0 +1,7 @@
++/* { dg-do run { target { offload_target_amdgcn } } } */
++/* { dg-skip-if "gfx902 only" { ! amdgcn-*-* } { "*" } { "-foffload=-march=gfx902" } } */
++/* { dg-additional-options "-foffload=-fdump-tree-optimized" } */
++
++#include "declare-variant-4.h"
++
++/* { dg-final { scan-offload-tree-dump "= gfx902 \\(\\);" "optimized" } } */
+--- ./gcc/config/gcn/t-gcn-hsa~	2023-10-14 23:32:08.000000000 +0100
++++ ./gcc/config/gcn/t-gcn-hsa	2023-12-04 18:10:29.582508993 +0000
+@@ -42,8 +42,8 @@
+ gcn-run$(exeext): gcn-run.o
+ 	+$(LINKER) $(ALL_LINKERFLAGS) $(LDFLAGS) -o $@ $< -ldl
+ 
+-MULTILIB_OPTIONS = march=gfx900/march=gfx906/march=gfx908/march=gfx90a
+-MULTILIB_DIRNAMES = gfx900 gfx906 gfx908 gfx90a
++MULTILIB_OPTIONS = march=gfx900/march=gfx902/march=gfx906/march=gfx908/march=gfx90a
++MULTILIB_DIRNAMES = gfx900 gfx902 gfx906 gfx908 gfx90a
+ 
+ gcn-tree.o: $(srcdir)/config/gcn/gcn-tree.cc
+ 	$(COMPILE) $<
+--- ./gcc/config/gcn/t-omp-device~	2023-10-14 23:32:08.000000000 +0100
++++ ./gcc/config/gcn/t-omp-device	2023-12-04 18:10:31.175872871 +0000
+@@ -1,4 +1,4 @@
+ omp-device-properties-gcn: $(srcdir)/config/gcn/gcn.cc
+ 	echo kind: gpu > $@
+ 	echo arch: amdgcn gcn >> $@
+-	echo isa: fiji gfx803 gfx900 gfx906 gfx908 gfx90a >> $@
++	echo isa: fiji gfx803 gfx900 gfx902 gfx906 gfx908 gfx90a >> $@
+--- ./gcc/config/gcn/mkoffload.cc~	2023-12-04 18:13:24.000000000 +0000
++++ ./gcc/config/gcn/mkoffload.cc	2023-12-04 18:46:55.001561194 +0000
+@@ -51,6 +51,8 @@
+ #define EF_AMDGPU_MACH_AMDGCN_GFX803 0x2a
+ #undef  EF_AMDGPU_MACH_AMDGCN_GFX900
+ #define EF_AMDGPU_MACH_AMDGCN_GFX900 0x2c
++#undef  EF_AMDGPU_MACH_AMDGCN_GFX902
++#define EF_AMDGPU_MACH_AMDGCN_GFX902 0x2d
+ #undef  EF_AMDGPU_MACH_AMDGCN_GFX906
+ #define EF_AMDGPU_MACH_AMDGCN_GFX906 0x2f
+ #undef  EF_AMDGPU_MACH_AMDGCN_GFX908
+--- ./gcc/config/gcn/gcn.cc~	2023-12-04 18:56:28.000000000 +0000
++++ ./gcc/config/gcn/gcn.cc	2023-12-04 19:02:50.911940020 +0000
+@@ -133,6 +133,7 @@
+ 
+   gcn_isa = (gcn_arch == PROCESSOR_FIJI ? ISA_GCN3
+       : gcn_arch == PROCESSOR_VEGA10 ? ISA_GCN5
++      : gcn_arch == PROCESSOR_RAVEN ? ISA_GCN5
+       : gcn_arch == PROCESSOR_VEGA20 ? ISA_GCN5
+       : gcn_arch == PROCESSOR_GFX908 ? ISA_CDNA1
+       : gcn_arch == PROCESSOR_GFX90a ? ISA_CDNA2

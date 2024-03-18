@@ -8,7 +8,7 @@ EAPI=7
 
 CMAKE_ECLASS=cmake
 
-inherit flag-o-matic toolchain-funcs eutils cmake-multilib
+inherit flag-o-matic toolchain-funcs cmake-multilib
 
 MY_P=SDL2-${PV}
 DESCRIPTION="Simple Direct Media Layer"

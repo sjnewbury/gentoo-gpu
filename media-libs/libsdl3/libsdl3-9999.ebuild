@@ -8,7 +8,7 @@ EAPI=7
 
 CMAKE_ECLASS=cmake
 
-inherit flag-o-matic toolchain-funcs eutils cmake-multilib
+inherit flag-o-matic toolchain-funcs cmake-multilib
 
 MY_P=SDL3-${PV}
 DESCRIPTION="Simple Direct Media Layer"
@@ -176,5 +176,5 @@ multilib_src_install() {
 	cmake_src_install
 
 	multilib_is_native_abi && \
-		dodoc "${S}"/{BUGS,CREDITS,README-SDL,TODO,WhatsNew}.txt "${S}"/docs/README*.md
+		dodoc "${S}"/{BUGS,README-SDL,WhatsNew}.txt "${S}"/docs/README*.md
 }
